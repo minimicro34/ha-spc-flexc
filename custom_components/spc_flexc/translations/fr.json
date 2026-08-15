@@ -1,0 +1,15 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SPC FlexC",
+        "description": "Configurer le récepteur FlexC local.",
+        "data": {
+          "host": "Adresse SPC",
+          "port": "Port FlexC",
+          "encryption_key": "Clé AES-256"
+        }
+      }
+    }
+  }
+}
