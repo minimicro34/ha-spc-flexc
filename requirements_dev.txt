@@ -1,0 +1,6 @@
+ruff
+pytest
+pytest-homeassistant-custom-component
+pytest<9
+mypy
+types-python-dateutil

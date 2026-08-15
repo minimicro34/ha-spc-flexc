@@ -1,4 +1,8 @@
-from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 PANEL = (
@@ -14,18 +18,26 @@ FAULTS = (
     BinarySensorEntityDescription(key="xbus_battery_fault", name="X-BUS battery fault"),
 )
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
     c = entry.runtime_data
-    async_add_entities([SpcBinary(c, d, "panel") for d in PANEL] +
-                       [SpcBinary(c, d, "faults") for d in FAULTS])
+    async_add_entities(
+        [SpcBinary(c, d, "panel") for d in PANEL]
+        + [SpcBinary(c, d, "faults") for d in FAULTS]
+    )
+
 
 class SpcBinary(CoordinatorEntity, BinarySensorEntity):
-    _attr_entity_category = "diagnostic"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
     def __init__(self, coordinator, description, section):
         super().__init__(coordinator)
         self.entity_description = description
         self.section = section
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
+
     @property
     def is_on(self):
-        return getattr(getattr(self.coordinator.data, self.section), self.entity_description.key)
+        return getattr(
+            getattr(self.coordinator.data, self.section), self.entity_description.key
+        )

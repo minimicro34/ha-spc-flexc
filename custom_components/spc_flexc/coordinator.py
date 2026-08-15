@@ -1,14 +1,19 @@
 from datetime import timedelta
+
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from .const import DOMAIN, DEFAULT_PANEL_INTERVAL
-from .models import SpcState
+
+from .const import DEFAULT_PANEL_INTERVAL, DOMAIN
 from .flexc.connection import FlexCClient
+from .models import SpcState
+
 
 class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     def __init__(self, hass, entry):
         super().__init__(
-            hass, logger=__import__("logging").getLogger(__name__),
-            name=DOMAIN, update_interval=timedelta(seconds=DEFAULT_PANEL_INTERVAL)
+            hass,
+            logger=__import__("logging").getLogger(__name__),
+            name=DOMAIN,
+            update_interval=timedelta(seconds=DEFAULT_PANEL_INTERVAL),
         )
         self.entry = entry
         self.state = SpcState()

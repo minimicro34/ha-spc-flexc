@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+
 @dataclass
 class PanelState:
     battery_voltage: float | None = None
@@ -16,6 +17,7 @@ class PanelState:
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
 
+
 @dataclass
 class FaultState:
     modem_1_fault: bool | None = None
@@ -26,6 +28,7 @@ class FaultState:
     xbus_mains_fault: bool | None = None
     xbus_battery_fault: bool | None = None
     last_event: dict[str, Any] | None = None
+
 
 @dataclass
 class SpcState:
