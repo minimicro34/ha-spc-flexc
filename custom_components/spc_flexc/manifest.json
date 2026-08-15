@@ -1,7 +1,7 @@
 {
   "domain": "spc_flexc",
   "name": "SPC FlexC",
-  "codeowners": [],
+  "codeowners": ["@minimicro34"],
   "config_flow": true,
   "documentation": "https://github.com/minimicro34/ha-spc-flexc",
   "iot_class": "local_polling",
