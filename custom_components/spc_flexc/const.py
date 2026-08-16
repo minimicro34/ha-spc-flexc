@@ -13,3 +13,5 @@ CONF_PORT = "port"
 CONF_KEY = "encryption_key"
 CONF_COMMAND_USERNAME = "command_username"
 CONF_COMMAND_PASSWORD = "command_password"
+
+ATS_IDS = range(1, 5)

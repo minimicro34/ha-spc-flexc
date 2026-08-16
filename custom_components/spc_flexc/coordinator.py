@@ -8,8 +8,9 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import DEFAULT_PANEL_INTERVAL, DOMAIN
+from .const import ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN
 from .flexc.connection import FlexCClient, FlexCError
+from .flexc.flexml import FlexMLError
 from .models import AtpState, AtsState, PanelState, SpcState
 
 _LOGGER = logging.getLogger(__name__)
@@ -175,22 +176,38 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             if summary:
                 self.state.panel = _panel_state_from_summary(summary)
 
-            ats_status = await self.client.async_get_flexc_ats_status(1)
+            timezone = ZoneInfo(self.hass.config.time_zone)
 
-            if ats_status:
+            for ats_id in ATS_IDS:
+                try:
+                    ats_status = await self.client.async_get_flexc_ats_status(ats_id)
+                except FlexMLError as err:
+                    # Empty, unavailable or invalid ATS IDs are normal
+                    # during ATS discovery.
+                    #
+                    # Keep any last known state already stored for this ATS.
+                    _LOGGER.debug(
+                        "Ignoring unavailable FlexC ATS %d: %s",
+                        ats_id,
+                        err,
+                    )
+                    continue
+
+                if not ats_status:
+                    continue
+
                 ats = _ats_state_from_status(
                     ats_status,
-                    ZoneInfo(self.hass.config.time_zone),
+                    timezone,
                 )
+
                 self.state.ats[ats.ats_id] = ats
 
             return self.state
 
         except FlexCError as err:
-            # IMPORTANT:
-            # Do not clear self.state.ats here.
-            #
-            # It intentionally remains the last known ATS/ATP state.
+            # Preserve the last known PANEL / ATS / ATP state when the
+            # FlexC connection itself is lost.
             raise UpdateFailed(f"FlexC update failed: {err}") from err
 
     async def async_shutdown(self) -> None:
