@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN
 from .flexc.connection import FlexCClient, FlexCError
+from .flexc.events import apply_event
 from .flexc.flexml import FlexMLError
 from .models import AtpState, AtsState, PanelState, SpcState
 
@@ -167,6 +168,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self.entry = entry
         self.state = SpcState()
         self.client = FlexCClient(entry.data)
+        self.client.set_event_callback(self._handle_flexc_event)
 
         # ATS IDs successfully discovered during this coordinator lifetime.
         self._detected_ats_ids: set[int] = set()
@@ -195,6 +197,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                 if summary:
                     self.state.panel = _panel_state_from_summary(summary)
+
+                # Read ALERT_STATUS for initial/current alert state.
+                # Its detailed mapping will be added once a real active alert
+                # response has been captured and validated.
+                await self.client.async_get_alert_status()
 
                 # ATS discovery is not performed during the first
                 # config-entry refresh.
@@ -343,3 +350,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 await task
 
         await self.client.async_close()
+
+    def _handle_flexc_event(
+        self,
+        event: dict[str, str],
+    ) -> None:
+        """Apply one unsolicited FlexC EVENT 0x60."""
+        changed = apply_event(
+            self.state.faults,
+            event,
+        )
+
+        if changed:
+            self.async_set_updated_data(self.state)

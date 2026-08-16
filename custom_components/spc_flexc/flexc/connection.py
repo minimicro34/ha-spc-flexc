@@ -7,7 +7,7 @@ import hashlib
 import logging
 import os
 import zlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from Crypto.Cipher import AES
@@ -20,9 +20,12 @@ from ..const import (
     CONF_PORT,
     DEFAULT_PORT,
 )
+from .events import parse_event_payload
 from .flexml import (
+    build_alert_status_command,
     build_flexc_ats_status_command,
     build_panel_summary_command,
+    parse_alert_status,
     parse_flexc_ats_status,
     parse_panel_summary,
 )
@@ -138,6 +141,8 @@ class FlexCClient:
         self._poll_waiter: asyncio.Future[dict[str, Any]] | None = None
         self._response_buffer = bytearray()
         self._response_length: int | None = None
+
+        self._event_callback: Callable[[dict[str, str]], None] | None = None
 
     async def async_ensure_connected(self) -> None:
         """Ensure that the SPC has established a FlexC session."""
@@ -568,9 +573,14 @@ class FlexCClient:
                 )
             )
 
-            # Event decoding/state propagation will be connected to
-            # events.py later. The transport must always ACK it.
-            _LOGGER.debug("FlexC EVENT 0x60 received and acknowledged")
+            event = parse_event_payload(bytes(message["app_data"]))
+
+            if event is not None:
+                callback = self._event_callback
+
+                if callback is not None:
+                    callback(event)
+
             return
 
         if message_id == MSG_DATA_ACK:
@@ -784,6 +794,26 @@ class FlexCClient:
         response = await self.async_send_flexml(command)
 
         return parse_panel_summary(response)
+
+    def set_event_callback(
+        self,
+        callback: Callable[[dict[str, str]], None] | None,
+    ) -> None:
+        """Set the callback invoked for validated EVENT 0x60 messages."""
+        self._event_callback = callback
+
+    async def async_get_alert_status(
+        self,
+    ) -> list[dict[str, str]]:
+        """Read current panel alerts."""
+        command = build_alert_status_command(
+            self.command_username,
+            self.command_password,
+        )
+
+        response = await self.async_send_flexml(command)
+
+        return parse_alert_status(response)
 
     async def async_close(self) -> None:
         """Close the FlexC receiver and current SPC connection."""

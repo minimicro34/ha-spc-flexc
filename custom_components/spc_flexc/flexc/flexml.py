@@ -103,6 +103,18 @@ def build_area_status_batch(
     )
 
 
+def build_alert_status_command(
+    username: str,
+    password: str,
+) -> str:
+    """Build CMD_GET_ALERT_STATUS."""
+    return _build_command_envelope(
+        "<CMD_GET_ALERT_STATUS />",
+        username,
+        password,
+    )
+
+
 def _parse_reply_root(response: str) -> ET.Element:
     """Parse and validate a FLEXML_REPLY root element."""
     try:
@@ -252,3 +264,21 @@ def parse_flexc_ats_status(
         result["atps"].append(dict(atp.attrib))
 
     return result
+
+
+def parse_alert_status(
+    response: str,
+) -> list[dict[str, str]]:
+    """Parse current SPC alert objects."""
+    root = _parse_reply_root(response)
+
+    reply = root.find("REPLY_GET_ALERT_STATUS")
+    if reply is None:
+        raise FlexMLError("REPLY_GET_ALERT_STATUS not found")
+
+    _validate_reply(
+        reply,
+        "REPLY_GET_ALERT_STATUS",
+    )
+
+    return [dict(element.attrib) for element in reply if element.attrib]
