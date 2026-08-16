@@ -53,31 +53,32 @@ class SpcPanelSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the sensor value."""
-        return self.coordinator.data.panel.get(self.entity_description.key)
+        return getattr(
+            self.coordinator.data.panel,
+            self.entity_description.key,
+        )
 
 
 def build_device_info(coordinator) -> DeviceInfo:
     """Return the SPC panel device information."""
     panel = coordinator.data.panel
 
-    serial = (
-        panel.get("serial_number")
-        or panel.get("SPC_SERIAL_NO")
-        or coordinator.entry.entry_id
-    )
+    serial = panel.serial_number or coordinator.entry.entry_id
+    name = panel.installation_name or "SPC"
 
-    name = panel.get("installation_name") or panel.get("INSTALLATION_NAME") or "SPC"
-
-    model = panel.get("spc_type") or panel.get("SPC_TYPE") or "SPC"
+    if panel.spc_variant:
+        model = f"SPC{panel.spc_variant}"
+    else:
+        model = panel.spc_type or "SPC"
 
     return DeviceInfo(
         identifiers={(DOMAIN, str(serial))},
-        name=str(name),
+        name=name,
         manufacturer="Vanderbilt",
-        model=str(model),
+        model=model,
         serial_number=str(serial),
-        sw_version=panel.get("spc_fw_version") or panel.get("SPC_FW_VERSION"),
-        hw_version=panel.get("spc_hw_version") or panel.get("SPC_HW_VERSION"),
+        sw_version=panel.firmware_version,
+        hw_version=panel.hardware_version,
         configuration_url=f"http://{coordinator.entry.data[CONF_HOST]}",
     )
 

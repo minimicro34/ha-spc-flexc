@@ -58,50 +58,36 @@ class SpcBinary(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """Return the binary sensor state."""
-        value = self.coordinator.data.get(self.entity_description.key)
+        section = getattr(
+            self.coordinator.data,
+            self.section,
+        )
 
-        if value is None:
-            return None
-
-        return bool(value)
+        return getattr(
+            section,
+            self.entity_description.key,
+        )
 
 
 def build_device_info(coordinator) -> DeviceInfo:
     """Return the SPC panel device information."""
-    data = coordinator.data
+    panel = coordinator.data.panel
 
-    panel = getattr(data, "panel", None)
+    serial = panel.serial_number or coordinator.entry.entry_id
+    name = panel.installation_name or "SPC"
 
-    if isinstance(panel, dict):
-        device_data = panel
-    elif isinstance(data, dict):
-        device_data = data
+    if panel.spc_variant:
+        model = f"SPC{panel.spc_variant}"
     else:
-        device_data = {}
-
-    serial = (
-        device_data.get("serial_number")
-        or device_data.get("SPC_SERIAL_NO")
-        or coordinator.entry.entry_id
-    )
-
-    name = (
-        device_data.get("installation_name")
-        or device_data.get("INSTALLATION_NAME")
-        or "SPC"
-    )
-
-    model = device_data.get("spc_type") or device_data.get("SPC_TYPE") or "SPC"
+        model = panel.spc_type or "SPC"
 
     return DeviceInfo(
         identifiers={(DOMAIN, str(serial))},
-        name=str(name),
+        name=name,
         manufacturer="Vanderbilt",
-        model=str(model),
+        model=model,
         serial_number=str(serial),
-        sw_version=device_data.get("spc_fw_version")
-        or device_data.get("SPC_FW_VERSION"),
-        hw_version=device_data.get("spc_hw_version")
-        or device_data.get("SPC_HW_VERSION"),
+        sw_version=panel.firmware_version,
+        hw_version=panel.hardware_version,
         configuration_url=f"http://{coordinator.entry.data[CONF_HOST]}",
     )
