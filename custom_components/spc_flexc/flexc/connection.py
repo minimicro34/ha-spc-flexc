@@ -341,20 +341,20 @@ class FlexCClient:
 
         return message
 
-        async def async_get_flexc_ats_status(
-            self,
-            ats_id: int,
-        ) -> dict[str, Any]:
-            """Request and return instantaneous FlexC ATS status."""
-            command = build_flexc_ats_status_command(
-                ats_id,
-                self.command_username,
-                self.command_password,
-            )
+    async def async_get_flexc_ats_status(
+        self,
+        ats_id: int,
+    ) -> dict[str, Any]:
+        """Request and return instantaneous FlexC ATS status."""
+        command = build_flexc_ats_status_command(
+            ats_id,
+            self.command_username,
+            self.command_password,
+        )
 
-            response = await self.async_send_flexml(command)
+        response = await self.async_send_flexml(command)
 
-            return parse_flexc_ats_status(response)
+        return parse_flexc_ats_status(response)
 
     @staticmethod
     def _digest_for(
