@@ -604,13 +604,17 @@ class FlexCClient:
 
         response = self._decode_application(logical)
 
+        if response is None:
+            _LOGGER.warning("Ignoring FlexC DATA application without FLEXML_REPLY")
+            return
+
         pending = self._pending_reply
 
         if pending is not None and not pending.done():
             pending.set_result(response)
 
     @staticmethod
-    def _decode_application(application: bytes) -> str:
+    def _decode_application(application: bytes) -> str | None:
         """Extract FLEXML_REPLY from an application buffer."""
         xml_parts: list[str] = []
 
@@ -631,7 +635,12 @@ class FlexCClient:
             if xml_part.startswith("<FLEXML_REPLY"):
                 return xml_part
 
-        raise FlexCProtocolError("FlexC DATA reply contained no FLEXML_REPLY")
+        _LOGGER.warning(
+            "FlexC DATA without FLEXML_REPLY: xml_parts=%r raw=%s",
+            xml_parts,
+            application.hex(" "),
+        )
+        return None
 
     def _handle_error(
         self,
