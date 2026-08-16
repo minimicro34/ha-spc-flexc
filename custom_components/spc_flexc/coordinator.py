@@ -201,7 +201,14 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 # Read ALERT_STATUS for initial/current alert state.
                 # Its detailed mapping will be added once a real active alert
                 # response has been captured and validated.
-                await self.client.async_get_alert_status()
+                alerts = await self.client.async_get_alert_status()
+
+                if not alerts:
+                    self.state.faults.modem_1_fault = False
+                    self.state.faults.modem_1_line_fault = False
+                    self.state.faults.rf_jamming = False
+                    self.state.faults.xbus_battery_fault = False
+                    self.state.faults.xbus_mains_fault = False
 
                 # ATS discovery is not performed during the first
                 # config-entry refresh.
