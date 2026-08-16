@@ -85,6 +85,9 @@ class SpcBinary(CoordinatorEntity, BinarySensorEntity):
         self.entity_description = description
         self.section = section
 
+        if section == "faults":
+            self._attr_device_class = BinarySensorDeviceClass.PROBLEM
+
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
         self._attr_device_info = build_device_info(coordinator)
 
