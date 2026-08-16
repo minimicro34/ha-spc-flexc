@@ -323,7 +323,6 @@ class FlexCClient:
             "data_header": data_header,
             "recv_sha1": plaintext[28:48],
             "app_data": plaintext[48:],
-            "application_offset": _be32(data_header[0:4]),
             "application_length": _be32(data_header[0:4]),
             "new_application_message": data_header[4] == 1,
         }
@@ -577,35 +576,37 @@ class FlexCClient:
             _LOGGER.debug("Received unsolicited DATA 0x80 with no pending request")
             return
 
-        offset = int(message["application_offset"])
-
         if message["new_application_message"]:
             self._response_buffer = bytearray()
             self._response_length = int(message["application_length"])
 
+        if self._response_length is None:
+            _LOGGER.warning("Received FlexC DATA without application length")
+            return
+
         app_data = bytes(message["app_data"])
 
-        required_length = offset + len(app_data)
-
-        if len(self._response_buffer) < required_length:
-            self._response_buffer.extend(
-                b"\x00" * (required_length - len(self._response_buffer))
-            )
-
-        self._response_buffer[offset : offset + len(app_data)] = app_data
-
-        if self._response_length is None:
-            return
+        self._response_buffer.extend(app_data)
 
         if len(self._response_buffer) < self._response_length:
             return
 
         logical = bytes(self._response_buffer[: self._response_length])
 
-        response = self._decode_application(logical)
+        _LOGGER.debug(
+            "FlexC DATA reply: logical_length=%d received=%d",
+            self._response_length,
+            len(self._response_buffer),
+        )
 
-        if response is None:
-            _LOGGER.warning("Ignoring FlexC DATA application without FLEXML_REPLY")
+        try:
+            response = self._decode_application(logical)
+        except FlexCProtocolError as err:
+            pending = self._pending_reply
+
+            if pending is not None and not pending.done():
+                pending.set_exception(err)
+
             return
 
         pending = self._pending_reply
@@ -614,7 +615,7 @@ class FlexCClient:
             pending.set_result(response)
 
     @staticmethod
-    def _decode_application(application: bytes) -> str | None:
+    def _decode_application(application: bytes) -> str:
         """Extract FLEXML_REPLY from an application buffer."""
         xml_parts: list[str] = []
 
@@ -640,7 +641,8 @@ class FlexCClient:
             xml_parts,
             application.hex(" "),
         )
-        return None
+
+        raise FlexCProtocolError("FlexC DATA reply contained no FLEXML_REPLY")
 
     def _handle_error(
         self,
