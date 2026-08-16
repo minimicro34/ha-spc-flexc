@@ -7,7 +7,9 @@
         "data": {
           "host": "Adresse SPC",
           "port": "Port FlexC",
-          "encryption_key": "Clé AES-256"
+          "encryption_key": "Clé de chiffrement AES-256",
+          "command_username": "Nom d’utilisateur pour commandes",
+          "command_password": "Mot de passe de commande"
         }
       }
     }
