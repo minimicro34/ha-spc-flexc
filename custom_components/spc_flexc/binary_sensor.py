@@ -1,4 +1,5 @@
 from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
@@ -7,6 +8,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import SpcFlexCCoordinator
 
 PANEL = (
     BinarySensorEntityDescription(key="internal_bells", name="Internal bells"),
@@ -35,10 +37,13 @@ FAULTS = (
 async def async_setup_entry(hass, entry, async_add_entities):
     c = entry.runtime_data
 
-    async_add_entities(
+    entities = (
         [SpcBinary(c, d, "panel") for d in PANEL]
         + [SpcBinary(c, d, "faults") for d in FAULTS]
+        + [SpcFlexCConnectionSensor(c)]
     )
+
+    async_add_entities(entities)
 
 
 class SpcBinary(CoordinatorEntity, BinarySensorEntity):
@@ -91,3 +96,28 @@ def build_device_info(coordinator) -> DeviceInfo:
         hw_version=panel.hardware_version,
         configuration_url=f"http://{coordinator.entry.data[CONF_HOST]}",
     )
+
+
+class SpcFlexCConnectionSensor(
+    CoordinatorEntity[SpcFlexCCoordinator],
+    BinarySensorEntity,
+):
+    """FlexC connection availability."""
+
+    _attr_name = "FlexC connection"
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SpcFlexCCoordinator) -> None:
+        super().__init__(coordinator)
+
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_flexc_connection"
+        self._attr_device_info = build_device_info(coordinator)
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the SPC FlexC connection is healthy."""
+        return bool(
+            self.coordinator.last_update_success and self.coordinator.client.connected
+        )

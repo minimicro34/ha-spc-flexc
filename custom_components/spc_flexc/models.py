@@ -4,6 +4,67 @@ from typing import Any
 
 
 @dataclass
+class AtpState:
+    """Last known FlexC ATP state."""
+
+    atp_id: int
+    name: str | None = None
+    uid: int | None = None
+
+    status: int | None = None
+    state: int | None = None
+    connect_state: int | None = None
+
+    last_tx_ok_timestamp: datetime | None = None
+
+    @property
+    def fault(self) -> bool | None:
+        """Return the validated ATP fault state."""
+        if self.status is None:
+            return None
+
+        if self.status == 1:
+            return False
+
+        if self.status == 2:
+            return True
+
+        return None
+
+    @property
+    def active(self) -> bool | None:
+        """Return whether this ATP is the active/connected path."""
+        if self.connect_state is None:
+            return None
+
+        if self.connect_state == 15:
+            return True
+
+        if self.connect_state == 0:
+            return False
+
+        return None
+
+
+@dataclass
+class AtsState:
+    """Last known FlexC ATS state."""
+
+    ats_id: int
+    name: str | None = None
+
+    status: int | None = None
+    state: int | None = None
+
+    registration_id: str | None = None
+    event_log_count: int | None = None
+
+    atps: dict[int, AtpState] = field(default_factory=dict)
+
+    updated_at: datetime | None = None
+
+
+@dataclass
 class PanelState:
     """Current SPC panel state."""
 
@@ -56,3 +117,4 @@ class SpcState:
 
     areas: dict[int, dict[str, Any]] = field(default_factory=dict)
     zones: dict[int, dict[str, Any]] = field(default_factory=dict)
+    ats: dict[int, AtsState] = field(default_factory=dict)

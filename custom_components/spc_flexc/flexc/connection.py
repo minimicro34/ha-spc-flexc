@@ -20,7 +20,12 @@ from ..const import (
     CONF_PORT,
     DEFAULT_PORT,
 )
-from .flexml import build_panel_summary_command, parse_panel_summary
+from .flexml import (
+    build_flexc_ats_status_command,
+    build_panel_summary_command,
+    parse_flexc_ats_status,
+    parse_panel_summary,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,6 +135,7 @@ class FlexCClient:
         self._rct_sequence = INITIAL_RCT_SEQUENCE
 
         self._pending_reply: asyncio.Future[str] | None = None
+        self._poll_waiter: asyncio.Future[dict[str, Any]] | None = None
         self._response_buffer = bytearray()
         self._response_length: int | None = None
 
@@ -335,6 +341,21 @@ class FlexCClient:
 
         return message
 
+        async def async_get_flexc_ats_status(
+            self,
+            ats_id: int,
+        ) -> dict[str, Any]:
+            """Request and return instantaneous FlexC ATS status."""
+            command = build_flexc_ats_status_command(
+                ats_id,
+                self.command_username,
+                self.command_password,
+            )
+
+            response = await self.async_send_flexml(command)
+
+            return parse_flexc_ats_status(response)
+
     @staticmethod
     def _digest_for(
         clear: bytes,
@@ -524,10 +545,14 @@ class FlexCClient:
                 )
             )
 
-            # A valid POLL also proves that the established session
-            # is alive.
             self.connected = True
             self._connected_event.set()
+
+            poll_waiter = self._poll_waiter
+
+            if poll_waiter is not None and not poll_waiter.done():
+                poll_waiter.set_result(dict(message))
+
             return
 
         if message_id == MSG_EVENT:
@@ -673,12 +698,25 @@ class FlexCClient:
         await self.async_ensure_connected()
 
         async with self._command_lock:
-            if self._last_message is None:
-                raise FlexCConnectionError(
-                    "FlexC session has no validated incoming message yet"
-                )
-
             loop = asyncio.get_running_loop()
+
+            # Wait for a fresh SPC POLL 0x20 before emitting DATA 0x80.
+            # This matches the sequence validated by the working prototypes.
+            poll_waiter: asyncio.Future[dict[str, Any]] = loop.create_future()
+            self._poll_waiter = poll_waiter
+
+            try:
+                async with asyncio.timeout(COMMAND_TIMEOUT):
+                    poll_message = await poll_waiter
+
+            except TimeoutError as err:
+                raise FlexCConnectionError(
+                    "Timeout waiting for FlexC POLL 0x20"
+                ) from err
+
+            finally:
+                if self._poll_waiter is poll_waiter:
+                    self._poll_waiter = None
 
             pending: asyncio.Future[str] = loop.create_future()
 
@@ -688,14 +726,10 @@ class FlexCClient:
 
             application = self._build_application_buffer(command)
 
-            # The successful prototypes incremented the current
-            # panel-visible rctSequence for each outbound command.
-            self._rct_sequence = (
-                int(self._last_message["rct_sequence"]) + 1
-            ) & 0xFFFFFFFF
+            self._rct_sequence = (int(poll_message["rct_sequence"]) + 1) & 0xFFFFFFFF
 
             wire = self._build_outbound_data(
-                self._last_message,
+                poll_message,
                 self._rct_sequence,
                 application,
             )
@@ -707,6 +741,21 @@ class FlexCClient:
                     return await pending
 
             except TimeoutError as err:
+                self.connected = False
+                self._connected_event.clear()
+
+                writer = self._writer
+                self._writer = None
+                self._reader = None
+
+                if writer is not None:
+                    writer.close()
+
+                    try:
+                        await writer.wait_closed()
+                    except (ConnectionError, OSError):
+                        pass
+
                 raise FlexCCommandError(
                     "Timeout waiting for FlexC FLEXML reply"
                 ) from err

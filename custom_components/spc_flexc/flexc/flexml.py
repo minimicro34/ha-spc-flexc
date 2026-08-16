@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
+from typing import Any
 from xml.sax.saxutils import quoteattr
 
 
@@ -181,21 +182,73 @@ def parse_zone_status(
 def parse_area_status(
     response: str,
 ) -> list[dict[str, str]]:
-    """Parse one or more REPLY_GET_AREA_STATUS elements."""
+    """Parse valid REPLY_GET_AREA_STATUS elements."""
     root = _parse_reply_root(response)
 
     areas: list[dict[str, str]] = []
 
     for reply in root.findall("REPLY_GET_AREA_STATUS"):
+        result = reply.get("RESULT")
+
+        # RESULT=102 can mark the end of the configured area range.
+        # Keep any valid areas already returned in the same batch.
+        if result == "102":
+            continue
+
         _validate_reply(
             reply,
             "REPLY_GET_AREA_STATUS",
         )
 
         status = reply.find("AREA_STATUS")
+
+        # Valid but unconfigured/non-existing area.
         if status is None:
             continue
 
         areas.append(dict(status.attrib))
 
     return areas
+
+
+def build_flexc_ats_status_command(
+    ats_id: int,
+    username: str,
+    password: str,
+) -> str:
+    """Build CMD_GET_FLEXC_ATS_STATUS."""
+    return _build_command_envelope(
+        f'<CMD_GET_FLEXC_ATS_STATUS ATS_ID="{ats_id}" />',
+        username,
+        password,
+    )
+
+
+def parse_flexc_ats_status(
+    response: str,
+) -> dict[str, Any]:
+    """Parse REPLY_GET_FLEXC_ATS_STATUS."""
+    root = _parse_reply_root(response)
+
+    reply = root.find("REPLY_GET_FLEXC_ATS_STATUS")
+    if reply is None:
+        raise FlexMLError("REPLY_GET_FLEXC_ATS_STATUS not found")
+
+    _validate_reply(
+        reply,
+        "REPLY_GET_FLEXC_ATS_STATUS",
+    )
+
+    status = reply.find("FLEXC_ATS_STATUS")
+    if status is None:
+        raise FlexMLError("FLEXC_ATS_STATUS not found")
+
+    result: dict[str, Any] = {
+        "ats": dict(status.attrib),
+        "atps": [],
+    }
+
+    for atp in status.findall("FLEXC_ATP_STATUS"):
+        result["atps"].append(dict(atp.attrib))
+
+    return result
