@@ -33,11 +33,11 @@ class AtpState:
 
     @property
     def active(self) -> bool | None:
-        """Return whether this ATP is the active/connected path."""
+        """Return whether this ATP is an active/connected path."""
         if self.connect_state is None:
             return None
 
-        if self.connect_state == 15:
+        if self.connect_state in (15, 16):
             return True
 
         if self.connect_state == 0:

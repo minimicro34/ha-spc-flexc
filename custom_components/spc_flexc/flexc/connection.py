@@ -228,11 +228,16 @@ class FlexCClient:
 
                 await self._handle_message(message)
 
-        except (
-            asyncio.IncompleteReadError,
-            ConnectionError,
-            OSError,
-        ) as err:
+        except asyncio.IncompleteReadError as err:
+            if err.partial:
+                _LOGGER.warning(
+                    "FlexC connection lost with partial frame: %s",
+                    err,
+                )
+            else:
+                _LOGGER.debug("FlexC connection closed by peer")
+
+        except (ConnectionError, OSError) as err:
             _LOGGER.warning("FlexC connection lost: %s", err)
 
         except asyncio.CancelledError:

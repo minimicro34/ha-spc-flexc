@@ -153,7 +153,8 @@ class SpcAtsActivePathSensor(
 
         self.ats_id = ats_id
 
-        self._attr_name = "Active path"
+        ats = coordinator.data.ats[ats_id]
+        self._attr_name = f"{ats.name or f'ATS {ats_id}'} active path"
         self._attr_unique_id = f"{coordinator.entry.entry_id}_ats_{ats_id}_active_path"
         self._attr_device_info = build_device_info(coordinator)
 
