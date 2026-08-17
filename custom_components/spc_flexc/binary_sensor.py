@@ -188,6 +188,73 @@ class SpcFlexCConnectionSensor(
         )
 
 
+SPC_ZONE_TYPE_NAMES: dict[int, str] = {
+    0: "Alarme",
+    1: "Entrée / Sortie",
+    2: "Fin tempo de sortie",
+    3: "Feu",
+    4: "Issue de secours",
+    5: "Ligne",
+    6: "Panique",
+    7: "Agression",
+    8: "Autosurv",
+    9: "Technique",
+    10: "Médicale",
+    11: "Armement par clé",
+    13: "Shunt",
+    14: "X-Shunt",
+    15: "Défaut Détecteur",
+    16: "Supervision de Verrouillage",
+    18: "Tout Va Bien",
+    19: "Défaut Agression",
+    20: "Défaut Avertissement",
+    21: "Autorisation avant MES/MHS",
+    22: "Élément de verrouillage",
+    23: "Bris de vitre",
+    24: "Eau",
+    25: "Chaleur",
+    26: "Frigo/congél.",
+    27: "Gaz",
+    28: "Sprinkler",
+    29: "CO2",
+    30: "Entrée / Sortie 2",
+}
+
+
+def zone_device_class(
+    zone_type: int | None,
+) -> BinarySensorDeviceClass | None:
+    """Return the Home Assistant device class for an SPC zone type."""
+    if zone_type in (0, 1, 2, 30):
+        return BinarySensorDeviceClass.MOTION
+
+    if zone_type == 3:
+        return BinarySensorDeviceClass.SMOKE
+
+    if zone_type == 4:
+        return BinarySensorDeviceClass.DOOR
+
+    if zone_type == 8:
+        return BinarySensorDeviceClass.TAMPER
+
+    if zone_type in (15, 19, 20):
+        return BinarySensorDeviceClass.PROBLEM
+
+    if zone_type == 23:
+        return BinarySensorDeviceClass.VIBRATION
+
+    if zone_type == 24:
+        return BinarySensorDeviceClass.MOISTURE
+
+    if zone_type == 25:
+        return BinarySensorDeviceClass.HEAT
+
+    if zone_type in (27, 29):
+        return BinarySensorDeviceClass.GAS
+
+    return None
+
+
 class SpcZoneBinarySensor(
     CoordinatorEntity[SpcFlexCCoordinator],
     BinarySensorEntity,
@@ -195,7 +262,6 @@ class SpcZoneBinarySensor(
     """Represent the live state of an SPC zone."""
 
     _attr_has_entity_name = True
-    _attr_device_class = BinarySensorDeviceClass.MOTION
 
     def __init__(
         self,
@@ -208,6 +274,7 @@ class SpcZoneBinarySensor(
 
         zone = coordinator.data.zones[zone_id]
 
+        self._attr_device_class = zone_device_class(zone.zone_type)
         self._attr_name = zone.name or f"Zone {zone_id}"
         self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_motion"
         self._attr_device_info = build_device_info(coordinator)
@@ -239,6 +306,11 @@ class SpcZoneBinarySensor(
             "zone_id": zone.zone_id,
             "area_id": zone.area_id,
             "zone_type": zone.zone_type,
+            "spc_zone_type_name": (
+                SPC_ZONE_TYPE_NAMES.get(zone.zone_type)
+                if zone.zone_type is not None
+                else None
+            ),
             "logic_input": zone.logic_input,
             "status": zone.status,
             "proc_state": zone.proc_state,
