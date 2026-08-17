@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .coordinator import SpcFlexCCoordinator
-from .device import build_area_device_info
+from .flexc.device import build_area_device_info
 
 MODE_LABELS: dict[int, str] = {
     0: "Unset",
