@@ -4,6 +4,34 @@ from typing import Any
 
 
 @dataclass
+class AreaState:
+    """Last known SPC area state."""
+
+    area_id: int
+    name: str | None = None
+
+    mode: int | None = None
+    partset_a_enabled: bool | None = None
+    partset_b_enabled: bool | None = None
+
+    last_set_time: datetime | None = None
+    last_set_user_id: int | None = None
+    last_set_user_name: str | None = None
+
+    last_unset_time: datetime | None = None
+    last_unset_user_id: int | None = None
+    last_unset_user_name: str | None = None
+
+    last_alarm: datetime | None = None
+
+    internal_bells: bool | None = None
+    external_bells: bool | None = None
+
+    raw: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime | None = None
+
+
+@dataclass
 class AtpState:
     """Last known FlexC ATP state."""
 
@@ -115,6 +143,6 @@ class SpcState:
     panel: PanelState = field(default_factory=PanelState)
     faults: FaultState = field(default_factory=FaultState)
 
-    areas: dict[int, dict[str, Any]] = field(default_factory=dict)
+    areas: dict[int, AreaState] = field(default_factory=dict)
     zones: dict[int, dict[str, Any]] = field(default_factory=dict)
     ats: dict[int, AtsState] = field(default_factory=dict)

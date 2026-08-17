@@ -7,7 +7,7 @@ import hashlib
 import logging
 import os
 import zlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 from Crypto.Cipher import AES
@@ -23,9 +23,11 @@ from ..const import (
 from .events import parse_event_payload
 from .flexml import (
     build_alert_status_command,
+    build_area_status_batch,
     build_flexc_ats_status_command,
     build_panel_summary_command,
     parse_alert_status,
+    parse_area_status,
     parse_flexc_ats_status,
     parse_panel_summary,
 )
@@ -814,6 +816,21 @@ class FlexCClient:
         response = await self.async_send_flexml(command)
 
         return parse_alert_status(response)
+
+    async def async_get_area_status(
+        self,
+        area_ids: Iterable[int],
+    ) -> list[dict[str, str]]:
+        """Request statuses for a collection of SPC areas."""
+        command = build_area_status_batch(
+            area_ids,
+            self.command_username,
+            self.command_password,
+        )
+
+        response = await self.async_send_flexml(command)
+
+        return parse_area_status(response)
 
     async def async_close(self) -> None:
         """Close the FlexC receiver and current SPC connection."""

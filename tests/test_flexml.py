@@ -1,10 +1,14 @@
 """Tests for FLEXML command generation."""
 
+import pytest
+
 from custom_components.spc_flexc.flexc.flexml import (
+    FlexMLReplyError,
     build_area_status_batch,
     build_panel_summary_command,
     build_zone_status_batch,
     parse_alert_status,
+    parse_area_status,
 )
 
 
@@ -99,3 +103,72 @@ def test_parse_alert_status_objects() -> None:
             "STATE": "1",
         },
     ]
+
+
+def test_parse_area_status_valid_and_empty_replies() -> None:
+    """Keep valid areas and ignore successful empty replies."""
+    response = (
+        '<FLEXML_REPLY VER="1.0">'
+        '<REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<AREA_STATUS AREA_ID="1" AREA_NAME="Logis" MODE="0" />'
+        "</REPLY_GET_AREA_STATUS>"
+        '<REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<AREA_STATUS AREA_ID="2" AREA_NAME="Garage" MODE="0" />'
+        "</REPLY_GET_AREA_STATUS>"
+        '<REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK">'
+        "</REPLY_GET_AREA_STATUS>"
+        "</FLEXML_REPLY>"
+    )
+
+    assert parse_area_status(response) == [
+        {
+            "AREA_ID": "1",
+            "AREA_NAME": "Logis",
+            "MODE": "0",
+        },
+        {
+            "AREA_ID": "2",
+            "AREA_NAME": "Garage",
+            "MODE": "0",
+        },
+    ]
+
+
+def test_parse_area_status_ignores_result_102() -> None:
+    """Keep valid areas when a later reply returns RESULT=102."""
+    response = (
+        '<FLEXML_REPLY VER="1.0">'
+        '<REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<AREA_STATUS AREA_ID="1" AREA_NAME="Logis" MODE="0" />'
+        "</REPLY_GET_AREA_STATUS>"
+        '<REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<AREA_STATUS AREA_ID="2" AREA_NAME="Garage" MODE="0" />'
+        "</REPLY_GET_AREA_STATUS>"
+        '<REPLY_GET_AREA_STATUS RESULT="102" CMD_RESULT="ERROR" />'
+        "</FLEXML_REPLY>"
+    )
+
+    assert parse_area_status(response) == [
+        {
+            "AREA_ID": "1",
+            "AREA_NAME": "Logis",
+            "MODE": "0",
+        },
+        {
+            "AREA_ID": "2",
+            "AREA_NAME": "Garage",
+            "MODE": "0",
+        },
+    ]
+
+
+def test_parse_area_status_raises_on_real_error() -> None:
+    """Do not hide real AREA_STATUS command errors."""
+    response = (
+        '<FLEXML_REPLY VER="1.0">'
+        '<REPLY_GET_AREA_STATUS RESULT="54" CMD_RESULT="ERROR" />'
+        "</FLEXML_REPLY>"
+    )
+
+    with pytest.raises(FlexMLReplyError):
+        parse_area_status(response)
