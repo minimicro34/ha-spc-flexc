@@ -64,5 +64,5 @@ def build_area_device_info(
 
     if panel_device_id is not None:
         device_info["via_device_id"] = panel_device_id
-
+    
     return device_info
