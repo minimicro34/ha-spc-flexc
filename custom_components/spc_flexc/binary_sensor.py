@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SPC_ZONE_TYPES
 from .coordinator import SpcFlexCCoordinator
-from .device import (
+from .flexc.device import (
     build_area_device_info,
     build_panel_device_info,
 )
