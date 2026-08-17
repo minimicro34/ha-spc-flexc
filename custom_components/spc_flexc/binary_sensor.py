@@ -157,7 +157,7 @@ class SpcFlexCConnectionSensor(
         super().__init__(coordinator)
 
         self._attr_unique_id = f"{coordinator.entry.entry_id}_flexc_connection"
-        self._attr_device_info = build_device_info(coordinator)
+        self._attr_device_info = build_panel_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
