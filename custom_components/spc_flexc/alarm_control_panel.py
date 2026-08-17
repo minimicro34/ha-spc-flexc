@@ -6,9 +6,7 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelState,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import (
     AddConfigEntryEntitiesCallback,
 )
@@ -16,8 +14,8 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from .const import DOMAIN
 from .coordinator import SpcFlexCCoordinator
+from .device import build_area_device_info
 
 MODE_LABELS: dict[int, str] = {
     0: "Unset",
@@ -25,32 +23,6 @@ MODE_LABELS: dict[int, str] = {
     2: "PartSetA",
     3: "PartSetB",
 }
-
-
-def build_device_info(
-    coordinator: SpcFlexCCoordinator,
-) -> DeviceInfo:
-    """Return the SPC panel device information."""
-    panel = coordinator.data.panel
-
-    serial = panel.serial_number or coordinator.entry.entry_id
-    name = panel.installation_name or "SPC"
-
-    if panel.spc_variant:
-        model = f"SPC{panel.spc_variant}"
-    else:
-        model = panel.spc_type or "SPC"
-
-    return DeviceInfo(
-        identifiers={(DOMAIN, str(serial))},
-        name=name,
-        manufacturer="Vanderbilt",
-        model=model,
-        serial_number=str(serial),
-        sw_version=panel.firmware_version,
-        hw_version=panel.hardware_version,
-        configuration_url=(f"http://{coordinator.entry.data[CONF_HOST]}"),
-    )
 
 
 class SpcAreaAlarmControlPanel(
@@ -76,7 +48,10 @@ class SpcAreaAlarmControlPanel(
 
         self._attr_name = area.name or f"Area {area_id}"
         self._attr_unique_id = f"{coordinator.entry.entry_id}_area_{area_id}"
-        self._attr_device_info = build_device_info(coordinator)
+        self._attr_device_info = build_area_device_info(
+            coordinator,
+            area_id,
+        )
 
     @property
     def available(self) -> bool:
