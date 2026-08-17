@@ -7,7 +7,7 @@ from homeassistant.const import CONF_HOST, EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, SPC_ZONE_TYPES
 from .coordinator import SpcFlexCCoordinator
 
 PANEL = (
@@ -187,40 +187,6 @@ class SpcFlexCConnectionSensor(
             self.coordinator.last_update_success and self.coordinator.client.connected
         )
 
-
-SPC_ZONE_TYPE_NAMES: dict[int, str] = {
-    0: "Alarme",
-    1: "Entrée / Sortie",
-    2: "Fin tempo de sortie",
-    3: "Feu",
-    4: "Issue de secours",
-    5: "Ligne",
-    6: "Panique",
-    7: "Agression",
-    8: "Autosurv",
-    9: "Technique",
-    10: "Médicale",
-    11: "Armement par clé",
-    13: "Shunt",
-    14: "X-Shunt",
-    15: "Défaut Détecteur",
-    16: "Supervision de Verrouillage",
-    18: "Tout Va Bien",
-    19: "Défaut Agression",
-    20: "Défaut Avertissement",
-    21: "Autorisation avant MES/MHS",
-    22: "Élément de verrouillage",
-    23: "Bris de vitre",
-    24: "Eau",
-    25: "Chaleur",
-    26: "Frigo/congél.",
-    27: "Gaz",
-    28: "Sprinkler",
-    29: "CO2",
-    30: "Entrée / Sortie 2",
-}
-
-
 def zone_device_class(
     zone_type: int | None,
 ) -> BinarySensorDeviceClass | None:
@@ -253,7 +219,6 @@ def zone_device_class(
         return BinarySensorDeviceClass.GAS
 
     return None
-
 
 class SpcZoneBinarySensor(
     CoordinatorEntity[SpcFlexCCoordinator],
@@ -305,12 +270,7 @@ class SpcZoneBinarySensor(
         return {
             "zone_id": zone.zone_id,
             "area_id": zone.area_id,
-            "zone_type": zone.zone_type,
-            "spc_zone_type_name": (
-                SPC_ZONE_TYPE_NAMES.get(zone.zone_type)
-                if zone.zone_type is not None
-                else None
-            ),
+            "spc_zone_type": SPC_ZONE_TYPES.get(zone.zone_type),
             "logic_input": zone.logic_input,
             "status": zone.status,
             "proc_state": zone.proc_state,
