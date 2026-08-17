@@ -187,6 +187,7 @@ class SpcFlexCConnectionSensor(
             self.coordinator.last_update_success and self.coordinator.client.connected
         )
 
+
 def zone_device_class(
     zone_type: int | None,
 ) -> BinarySensorDeviceClass | None:
@@ -219,6 +220,7 @@ def zone_device_class(
         return BinarySensorDeviceClass.GAS
 
     return None
+
 
 class SpcZoneBinarySensor(
     CoordinatorEntity[SpcFlexCCoordinator],
@@ -270,7 +272,11 @@ class SpcZoneBinarySensor(
         return {
             "zone_id": zone.zone_id,
             "area_id": zone.area_id,
-            "spc_zone_type": SPC_ZONE_TYPES.get(zone.zone_type),
+            "spc_zone_type": (
+                SPC_ZONE_TYPES.get(zone.zone_type)
+                if zone.zone_type is not None
+                else None
+            ),
             "logic_input": zone.logic_input,
             "status": zone.status,
             "proc_state": zone.proc_state,
