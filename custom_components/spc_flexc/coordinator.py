@@ -10,11 +10,11 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN
+from .const import AREA_IDS, ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN
 from .flexc.connection import FlexCClient, FlexCError
 from .flexc.events import apply_event
 from .flexc.flexml import FlexMLError
-from .models import AtpState, AtsState, PanelState, SpcState
+from .models import AreaState, AtpState, AtsState, PanelState, SpcState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -154,6 +154,40 @@ def _ats_state_from_status(
     return ats
 
 
+def _area_state_from_status(
+    raw_area: dict[str, str],
+    timezone: ZoneInfo,
+) -> AreaState:
+    """Convert raw AREA_STATUS attributes to AreaState."""
+    return AreaState(
+        area_id=int(raw_area["AREA_ID"]),
+        name=raw_area.get("AREA_NAME"),
+        mode=_int_value(raw_area.get("MODE")),
+        partset_a_enabled=_bool_value(raw_area.get("PARTSETA_ENABLE")),
+        partset_b_enabled=_bool_value(raw_area.get("PARTSETB_ENABLE")),
+        last_set_time=_spc_datetime(
+            raw_area.get("LAST_SET_TIME"),
+            timezone,
+        ),
+        last_set_user_id=_int_value(raw_area.get("LAST_SET_USER_ID")),
+        last_set_user_name=raw_area.get("LAST_SET_USER_NAME"),
+        last_unset_time=_spc_datetime(
+            raw_area.get("LAST_UNSET_TIME"),
+            timezone,
+        ),
+        last_unset_user_id=_int_value(raw_area.get("LAST_UNSET_USER_ID")),
+        last_unset_user_name=raw_area.get("LAST_UNSET_USER_NAME"),
+        last_alarm=_spc_datetime(
+            raw_area.get("LAST_ALARM"),
+            timezone,
+        ),
+        internal_bells=_bool_value(raw_area.get("INTERNAL_BELLS")),
+        external_bells=_bool_value(raw_area.get("EXTERNAL_BELLS")),
+        raw=dict(raw_area),
+        updated_at=datetime.now(UTC),
+    )
+
+
 class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     """Coordinate SPC FlexC updates."""
 
@@ -181,11 +215,14 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # Protect complete FlexC command sequences.
         #
         # FlexCClient already serializes individual FLEXML commands, but
-        # this lock prevents PANEL_SUMMARY / ATS polling / ATS discovery
-        # sequences from being interleaved with each other.
+        # this lock prevents PANEL_SUMMARY / ALERT_STATUS / ATS / area
+        # polling and background discovery sequences from being interleaved.
         self._client_operation_lock = asyncio.Lock()
 
         self._ats_discovery_task: asyncio.Task[None] | None = None
+
+        self._detected_area_ids: set[int] = set()
+        self._area_discovery_complete = False
 
     async def _async_update_data(self) -> SpcState:
         """Update SPC data."""
@@ -198,9 +235,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 if summary:
                     self.state.panel = _panel_state_from_summary(summary)
 
-                # Read ALERT_STATUS for initial/current alert state.
-                # Its detailed mapping will be added once a real active alert
-                # response has been captured and validated.
+                # Read ALERT_STATUS for current fault state.
                 alerts = await self.client.async_get_alert_status()
 
                 if not alerts:
@@ -210,14 +245,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     self.state.faults.xbus_battery_fault = False
                     self.state.faults.xbus_mains_fault = False
 
-                # ATS discovery is not performed during the first
-                # config-entry refresh.
-                #
+                timezone = ZoneInfo(self.hass.config.time_zone)
+
                 # Once discovery is complete, only ATS IDs that really
                 # exist are polled during normal coordinator updates.
                 if self._ats_discovery_complete:
-                    timezone = ZoneInfo(self.hass.config.time_zone)
-
                     for ats_id in sorted(self._detected_ats_ids):
                         try:
                             ats_status = await self.client.async_get_flexc_ats_status(
@@ -243,16 +275,33 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                         self.state.ats[ats.ats_id] = ats
 
-            # If the initial discovery previously failed because the
-            # FlexC transport was unavailable, retry it after a later
+                # Once area discovery is complete, update only the
+                # areas that were actually detected.
+                if self._area_discovery_complete and self._detected_area_ids:
+                    raw_areas = await self.client.async_get_area_status(
+                        sorted(self._detected_area_ids)
+                    )
+
+                    for raw_area in raw_areas:
+                        area = _area_state_from_status(
+                            raw_area,
+                            timezone,
+                        )
+
+                        self.state.areas[area.area_id] = area
+
+            # If the initial background discovery previously failed because
+            # the FlexC transport was unavailable, retry it after a later
             # successful normal refresh.
-            if self._ats_discovery_requested and not self._ats_discovery_complete:
+            if self._ats_discovery_requested and (
+                not self._ats_discovery_complete or not self._area_discovery_complete
+            ):
                 self._schedule_ats_discovery()
 
             return self.state
 
         except FlexCError as err:
-            # Preserve the last known PANEL / ATS / ATP state when
+            # Preserve the last known PANEL / ATS / ATP / area state when
             # the FlexC connection itself is lost.
             raise UpdateFailed(f"FlexC update failed: {err}") from err
 
@@ -279,14 +328,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         )
 
     async def _async_discover_ats(self) -> None:
-        """Discover available FlexC ATS IDs in the background."""
+        """Discover available FlexC ATS IDs and SPC areas in the background."""
         try:
             detected_ats_ids: set[int] = set()
+            detected_area_ids: set[int] = set()
             timezone = ZoneInfo(self.hass.config.time_zone)
 
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
 
+                # Discover ATS.
                 for ats_id in ATS_IDS:
                     try:
                         ats_status = await self.client.async_get_flexc_ats_status(
@@ -312,18 +363,37 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     detected_ats_ids.add(ats.ats_id)
 
                 self._detected_ats_ids.update(detected_ats_ids)
-
                 self._ats_discovery_complete = True
+
+                # Discover areas.
+                raw_areas = await self.client.async_get_area_status(AREA_IDS)
+
+                for raw_area in raw_areas:
+                    area = _area_state_from_status(
+                        raw_area,
+                        timezone,
+                    )
+
+                    self.state.areas[area.area_id] = area
+                    detected_area_ids.add(area.area_id)
+
+                self._detected_area_ids.update(detected_area_ids)
+                self._area_discovery_complete = True
 
             _LOGGER.info(
                 "FlexC ATS discovery completed: detected ATS IDs %s",
                 sorted(self._detected_ats_ids),
             )
 
+            _LOGGER.info(
+                "SPC area discovery completed: detected area IDs %s",
+                sorted(self._detected_area_ids),
+            )
+
             # Notify coordinator listeners immediately.
             #
-            # sensor.py and binary_sensor.py will then create the
-            # dynamically discovered ATS/ATP entities.
+            # Platforms can then create the dynamically discovered
+            # ATS/ATP and area entities.
             self.async_set_updated_data(self.state)
 
         except asyncio.CancelledError:
@@ -333,7 +403,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             # Keep discovery incomplete. It will be retried after a
             # later successful coordinator refresh.
             _LOGGER.debug(
-                "FlexC ATS discovery interrupted: %s",
+                "FlexC background discovery interrupted: %s",
                 err,
             )
 
