@@ -5,7 +5,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import DOMAIN
-from .coordinator import SpcFlexCCoordinator
+from ..coordinator import SpcFlexCCoordinator
 
 
 def build_panel_device_info(
