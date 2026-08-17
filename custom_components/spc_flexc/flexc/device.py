@@ -4,7 +4,7 @@ from homeassistant.const import CONF_HOST
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN
+from ..const import DOMAIN
 from .coordinator import SpcFlexCCoordinator
 
 
