@@ -188,6 +188,65 @@ class SpcFlexCConnectionSensor(
         )
 
 
+class SpcZoneBinarySensor(
+    CoordinatorEntity[SpcFlexCCoordinator],
+    BinarySensorEntity,
+):
+    """Represent the live state of an SPC zone."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.MOTION
+
+    def __init__(
+        self,
+        coordinator: SpcFlexCCoordinator,
+        zone_id: int,
+    ) -> None:
+        super().__init__(coordinator)
+
+        self.zone_id = zone_id
+
+        zone = coordinator.data.zones[zone_id]
+
+        self._attr_name = zone.name or f"Zone {zone_id}"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_motion"
+        self._attr_device_info = build_device_info(coordinator)
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return whether the zone is currently active."""
+        zone = self.coordinator.data.zones.get(self.zone_id)
+
+        if zone is None:
+            return None
+
+        return bool(zone.logic_input)
+
+    @property
+    def available(self) -> bool:
+        """Return whether the zone is known."""
+        return self.zone_id in self.coordinator.data.zones
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return diagnostic information for the zone."""
+        zone = self.coordinator.data.zones.get(self.zone_id)
+
+        if zone is None:
+            return {}
+
+        return {
+            "zone_id": zone.zone_id,
+            "area_id": zone.area_id,
+            "zone_type": zone.zone_type,
+            "logic_input": zone.logic_input,
+            "status": zone.status,
+            "proc_state": zone.proc_state,
+            "alarm_state": zone.alarm_state,
+            "actuations_since_last_read": zone.actuations_since_last_read,
+        }
+
+
 async def async_setup_entry(
     hass,
     entry,
@@ -203,6 +262,27 @@ async def async_setup_entry(
     )
 
     known_atps: set[tuple[int, int]] = set()
+    known_zones: set[int] = set()
+
+    def add_zone_entities() -> None:
+        """Create binary sensors for newly discovered zones."""
+        entities: list[BinarySensorEntity] = []
+
+        for zone_id in coordinator.data.zones:
+            if zone_id in known_zones:
+                continue
+
+            known_zones.add(zone_id)
+
+            entities.append(
+                SpcZoneBinarySensor(
+                    coordinator,
+                    zone_id,
+                )
+            )
+
+        if entities:
+            async_add_entities(entities)
 
     def add_atp_entities() -> None:
         """Create binary sensors for newly discovered ATPs."""
@@ -229,5 +309,11 @@ async def async_setup_entry(
             async_add_entities(entities)
 
     add_atp_entities()
+    add_zone_entities()
 
-    entry.async_on_unload(coordinator.async_add_listener(add_atp_entities))
+    def coordinator_updated() -> None:
+        """Handle newly discovered coordinator objects."""
+        add_atp_entities()
+        add_zone_entities()
+
+    entry.async_on_unload(coordinator.async_add_listener(coordinator_updated))

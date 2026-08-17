@@ -10,13 +10,28 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import AREA_IDS, ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN, ZONE_IDS
+from .const import (
+    AREA_IDS,
+    ATS_IDS,
+    DEFAULT_PANEL_INTERVAL,
+    DOMAIN,
+    ZONE_IDS,
+)
 from .flexc.connection import FlexCClient, FlexCError
 from .flexc.events import apply_event
 from .flexc.flexml import FlexMLError
-from .models import AreaState, AtpState, AtsState, PanelState, SpcState, ZoneState
+from .models import (
+    AreaState,
+    AtpState,
+    AtsState,
+    PanelState,
+    SpcState,
+    ZoneState,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+ZONE_POLL_INTERVAL = 1.0
 
 
 def _float_value(value: Any, suffix: str = "") -> float | None:
@@ -203,18 +218,15 @@ def _zone_state_from_status(
         status=_int_value(raw_zone.get("STATUS")),
         proc_state=_int_value(raw_zone.get("PROC_STATE")),
         alarm_state=_int_value(raw_zone.get("ALARM_STATE")),
-        inhibit_allowed=_bool_value(
-            raw_zone.get("INHIBIT_ALLOWED")
-        ),
-        isolate_allowed=_bool_value(
-            raw_zone.get("ISOLATE_ALLOWED")
-        ),
+        inhibit_allowed=_bool_value(raw_zone.get("INHIBIT_ALLOWED")),
+        isolate_allowed=_bool_value(raw_zone.get("ISOLATE_ALLOWED")),
         actuations_since_last_read=_int_value(
             raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
         ),
         raw=dict(raw_zone),
         updated_at=datetime.now(UTC),
     )
+
 
 class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     """Coordinate SPC FlexC updates."""
@@ -229,33 +241,34 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
         self.entry = entry
         self.state = SpcState()
+
         self.client = FlexCClient(entry.data)
         self.client.set_event_callback(self._handle_flexc_event)
 
-        # ATS IDs successfully discovered during this coordinator lifetime.
         self._detected_ats_ids: set[int] = set()
         self._ats_discovery_complete = False
 
-        # Becomes True only when async_start_ats_discovery() is called
-        # after the config entry/platform setup has completed.
+        self._detected_area_ids: set[int] = set()
+        self._area_discovery_complete = False
+
+        self._detected_zone_ids: set[int] = set()
+        self._zone_discovery_complete = False
+
         self._ats_discovery_requested = False
 
         # Protect complete FlexC command sequences.
         #
-        # FlexCClient already serializes individual FLEXML commands, but
-        # this lock prevents PANEL_SUMMARY / ALERT_STATUS / ATS / area
-        # polling and background discovery sequences from being interleaved.
+        # FlexCClient already serializes individual FLEXML commands.
+        # This lock additionally prevents PANEL_SUMMARY, ALERT_STATUS,
+        # ATS/area polling, zone polling and background discovery
+        # sequences from being interleaved.
         self._client_operation_lock = asyncio.Lock()
 
         self._ats_discovery_task: asyncio.Task[None] | None = None
-
-        self._detected_area_ids: set[int] = set()
-        self._area_discovery_complete = False
-        self._detected_zone_ids: set[int] = set()
-        self._zone_discovery_complete = False
+        self._zone_poll_task: asyncio.Task[None] | None = None
 
     async def _async_update_data(self) -> SpcState:
-        """Update SPC data."""
+        """Update slow-changing SPC data."""
         try:
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
@@ -265,7 +278,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 if summary:
                     self.state.panel = _panel_state_from_summary(summary)
 
-                # Read ALERT_STATUS for current fault state.
                 alerts = await self.client.async_get_alert_status()
 
                 if not alerts:
@@ -277,8 +289,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                 timezone = ZoneInfo(self.hass.config.time_zone)
 
-                # Once discovery is complete, only ATS IDs that really
-                # exist are polled during normal coordinator updates.
+                # Poll only ATS IDs discovered during startup.
                 if self._ats_discovery_complete:
                     for ats_id in sorted(self._detected_ats_ids):
                         try:
@@ -286,7 +297,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 ats_id
                             )
                         except FlexMLError as err:
-                            # Keep the last known ATS/ATP state.
                             _LOGGER.debug(
                                 "Ignoring unavailable previously "
                                 "detected FlexC ATS %d: %s",
@@ -305,8 +315,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                         self.state.ats[ats.ats_id] = ats
 
-                # Once area discovery is complete, update only the
-                # areas that were actually detected.
+                # Poll only areas discovered during startup.
                 if self._area_discovery_complete and self._detected_area_ids:
                     raw_areas = await self.client.async_get_area_status(
                         sorted(self._detected_area_ids)
@@ -320,21 +329,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                         self.state.areas[area.area_id] = area
 
-                # Once zone discovery is complete, update only the
-                # zones that were actually detected.
-                if self._zone_discovery_complete and self._detected_zone_ids:
-                    raw_zones = await self.client.async_get_zone_status(
-                        sorted(self._detected_zone_ids)
-                    )
+            # Zones are deliberately NOT polled here.
+            #
+            # Their dedicated background loop has its own cadence
+            # while sharing the same client operation lock.
 
-                    for raw_zone in raw_zones:
-                        zone = _zone_state_from_status(raw_zone)
-
-                        self.state.zones[zone.zone_id] = zone
-
-            # If the initial background discovery previously failed because
-            # the FlexC transport was unavailable, retry it after a later
-            # successful normal refresh.
             if self._ats_discovery_requested and (
                 not self._ats_discovery_complete
                 or not self._area_discovery_complete
@@ -345,17 +344,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             return self.state
 
         except FlexCError as err:
-            # Preserve the last known PANEL / ATS / ATP / area state when
-            # the FlexC connection itself is lost.
+            # Preserve all last-known states when the FlexC transport
+            # becomes unavailable.
             raise UpdateFailed(f"FlexC update failed: {err}") from err
 
     def async_start_ats_discovery(self) -> None:
-        """Enable and start ATS discovery in the background."""
+        """Enable and start background discovery."""
         self._ats_discovery_requested = True
         self._schedule_ats_discovery()
 
     def _schedule_ats_discovery(self) -> None:
-        """Schedule ATS discovery if it is not already running."""
+        """Schedule discovery if it is not already running."""
         if (
             self._ats_discovery_complete
             and self._area_discovery_complete
@@ -371,17 +370,18 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._ats_discovery_task = self.entry.async_create_background_task(
             self.hass,
             self._async_discover_ats(),
-            name=f"{DOMAIN} ATS discovery",
+            name=f"{DOMAIN} discovery",
             eager_start=False,
         )
 
     async def _async_discover_ats(self) -> None:
-        """Discover available FlexC ATS IDs and SPC areas and zones in the background."""
+        """Discover available ATS IDs, areas and zones."""
         try:
             detected_ats_ids: set[int] = set()
             detected_area_ids: set[int] = set()
-            timezone = ZoneInfo(self.hass.config.time_zone)
             detected_zone_ids: set[int] = set()
+
+            timezone = ZoneInfo(self.hass.config.time_zone)
 
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
@@ -430,24 +430,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 self._area_discovery_complete = True
 
                 # Discover zones.
-                raw_zones = await self.client.async_get_zone_status(
-                    ZONE_IDS
-                )
+                raw_zones = await self.client.async_get_zone_status(ZONE_IDS)
 
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
 
                     self.state.zones[zone.zone_id] = zone
+
                     detected_zone_ids.add(zone.zone_id)
 
                 self._detected_zone_ids.update(detected_zone_ids)
                 self._zone_discovery_complete = True
-
-                _LOGGER.warning(
-                    "SPC zone discovery DONE: ids=%s state=%r",
-                    sorted(self._detected_zone_ids),
-                    self.state.zones,
-                )
 
             _LOGGER.info(
                 "FlexC ATS discovery completed: detected ATS IDs %s",
@@ -464,18 +457,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 sorted(self._detected_zone_ids),
             )
 
-            # Notify coordinator listeners immediately.
-            #
-            # Platforms can then create dynamically discovered
-            # ATS/ATP, area and zone entities
             self.async_set_updated_data(self.state)
+
+            # Start the dedicated zone polling only after
+            # initial discovery and after releasing the operation lock.
+            self._schedule_zone_polling()
 
         except asyncio.CancelledError:
             raise
 
-        except FlexCError as err:
-            # Keep discovery incomplete. It will be retried after a
-            # later successful coordinator refresh.
+        except (FlexCError, FlexMLError) as err:
             _LOGGER.debug(
                 "FlexC background discovery interrupted: %s",
                 err,
@@ -487,18 +478,104 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             if self._ats_discovery_task is current_task:
                 self._ats_discovery_task = None
 
+    def _schedule_zone_polling(self) -> None:
+        """Start dedicated zone polling if not already running."""
+        if not self._zone_discovery_complete:
+            return
+
+        if not self._detected_zone_ids:
+            return
+
+        task = self._zone_poll_task
+
+        if task is not None and not task.done():
+            return
+
+        self._zone_poll_task = self.entry.async_create_background_task(
+            self.hass,
+            self._async_zone_poll_loop(),
+            name=f"{DOMAIN} zone polling",
+            eager_start=False,
+        )
+
+    async def _async_zone_poll_loop(self) -> None:
+        """Poll detected zones independently from the main refresh."""
+        try:
+            while True:
+                await asyncio.sleep(ZONE_POLL_INTERVAL)
+
+                if not self._zone_discovery_complete:
+                    continue
+
+                zone_ids = sorted(self._detected_zone_ids)
+
+                if not zone_ids:
+                    continue
+
+                try:
+                    async with self._client_operation_lock:
+                        await self.client.async_ensure_connected()
+
+                        raw_zones = await self.client.async_get_zone_status(zone_ids)
+
+                except (
+                    FlexCError,
+                    FlexMLError,
+                ) as err:
+                    _LOGGER.debug(
+                        "SPC zone polling failed: %s",
+                        err,
+                    )
+                    continue
+
+                changed = False
+
+                for raw_zone in raw_zones:
+                    zone = _zone_state_from_status(raw_zone)
+
+                    previous = self.state.zones.get(zone.zone_id)
+
+                    if previous is None or (
+                        previous.input_state != zone.input_state
+                        or previous.logic_input != zone.logic_input
+                        or previous.proc_state != zone.proc_state
+                        or previous.status != zone.status
+                        or previous.alarm_state != zone.alarm_state
+                    ):
+                        changed = True
+
+                    self.state.zones[zone.zone_id] = zone
+
+                if changed:
+                    self.async_set_updated_data(self.state)
+
+        finally:
+            current_task = asyncio.current_task()
+
+            if self._zone_poll_task is current_task:
+                self._zone_poll_task = None
+
     async def async_shutdown(self) -> None:
         """Stop background work and close the FlexC connection."""
         self._ats_discovery_requested = False
 
-        task = self._ats_discovery_task
-        self._ats_discovery_task = None
+        zone_task = self._zone_poll_task
+        self._zone_poll_task = None
 
-        if task is not None and not task.done():
-            task.cancel()
+        if zone_task is not None and not zone_task.done():
+            zone_task.cancel()
 
             with suppress(asyncio.CancelledError):
-                await task
+                await zone_task
+
+        discovery_task = self._ats_discovery_task
+        self._ats_discovery_task = None
+
+        if discovery_task is not None and not discovery_task.done():
+            discovery_task.cancel()
+
+            with suppress(asyncio.CancelledError):
+                await discovery_task
 
         await self.client.async_close()
 

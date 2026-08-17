@@ -148,6 +148,14 @@ class FlexCClient:
 
         self._event_callback: Callable[[dict[str, str]], None] | None = None
 
+        # Transport context used to build the next outbound DATA frame.
+        #
+        # A fresh POLL initializes the context. Each validated DATA reply then
+        # becomes the context for the following command. This avoids waiting
+        # for another POLL before every FLEXML request.
+        self._command_context: dict[str, Any] | None = None
+        self._context_event = asyncio.Event()
+
     async def async_ensure_connected(self) -> None:
         """Ensure that the SPC has established a FlexC session."""
         if self.connected and self._writer is not None:
@@ -217,6 +225,8 @@ class FlexCClient:
 
         self._reader = reader
         self._writer = writer
+        self._command_context = None
+        self._context_event.clear()
 
         _LOGGER.info("SPC FlexC TCP connection accepted from %s", peer_host)
 
@@ -261,6 +271,8 @@ class FlexCClient:
                 self._writer = None
                 self.connected = False
                 self._connected_event.clear()
+                self._command_context = None
+                self._context_event.clear()
 
                 if self._pending_reply is not None and not self._pending_reply.done():
                     self._pending_reply.set_exception(
@@ -531,6 +543,8 @@ class FlexCClient:
             await self._send_wire(self._build_connection_ack(message))
 
             self._rct_sequence = INITIAL_RCT_SEQUENCE
+            self._command_context = None
+            self._context_event.clear()
             self.connected = True
             self._connected_event.set()
 
@@ -545,6 +559,8 @@ class FlexCClient:
                 )
             )
 
+            self._command_context = None
+            self._context_event.clear()
             self.connected = True
             self._connected_event.set()
 
@@ -561,6 +577,15 @@ class FlexCClient:
 
             self.connected = True
             self._connected_event.set()
+
+            # A POLL provides a valid synchronization point. If no command is
+            # currently in flight, it can safely seed/refresh the command
+            # context. During an active command, the following DATA reply is
+            # the authoritative context for the next request.
+            if self._pending_reply is None:
+                self._command_context = dict(message)
+                self._rct_sequence = int(message["rct_sequence"])
+                self._context_event.set()
 
             poll_waiter = self._poll_waiter
 
@@ -588,7 +613,7 @@ class FlexCClient:
             return
 
         if message_id == MSG_DATA_ACK:
-            # ACK for our outbound FLEXML DATA command.
+            # ACK for our outbound DATA command.
             return
 
         if message_id == MSG_DATA:
@@ -599,10 +624,20 @@ class FlexCClient:
                 )
             )
 
+            # Promote every validated DATA reply to the transport context for
+            # the next FLEXML command.
+            self._command_context = dict(message)
+            self._rct_sequence = int(message["rct_sequence"])
+            self._context_event.set()
+
             self._handle_incoming_data(message)
             return
 
         if message_id == MSG_ERROR:
+            # The current chain is no longer trusted after an explicit FlexC
+            # error. The next command will wait for a fresh POLL.
+            self._command_context = None
+            self._context_event.clear()
             self._handle_error(message)
             return
 
@@ -717,26 +752,26 @@ class FlexCClient:
         await self.async_ensure_connected()
 
         async with self._command_lock:
-            loop = asyncio.get_running_loop()
+            # Only the first command after a connection or a transport
+            # resynchronization needs to wait for a POLL. Subsequent commands
+            # chain directly from the previous validated DATA reply.
+            if self._command_context is None:
+                try:
+                    async with asyncio.timeout(COMMAND_TIMEOUT):
+                        await self._context_event.wait()
+                except TimeoutError as err:
+                    raise FlexCConnectionError(
+                        "Timeout waiting for initial FlexC POLL 0x20"
+                    ) from err
 
-            # Wait for a fresh SPC POLL 0x20 before emitting DATA 0x80.
-            # This matches the sequence validated by the working prototypes.
-            poll_waiter: asyncio.Future[dict[str, Any]] = loop.create_future()
-            self._poll_waiter = poll_waiter
+            context = self._command_context
 
-            try:
-                async with asyncio.timeout(COMMAND_TIMEOUT):
-                    poll_message = await poll_waiter
-
-            except TimeoutError as err:
+            if context is None:
                 raise FlexCConnectionError(
-                    "Timeout waiting for FlexC POLL 0x20"
-                ) from err
+                    "No valid FlexC command context is available"
+                )
 
-            finally:
-                if self._poll_waiter is poll_waiter:
-                    self._poll_waiter = None
-
+            loop = asyncio.get_running_loop()
             pending: asyncio.Future[str] = loop.create_future()
 
             self._pending_reply = pending
@@ -745,10 +780,10 @@ class FlexCClient:
 
             application = self._build_application_buffer(command)
 
-            self._rct_sequence = (int(poll_message["rct_sequence"]) + 1) & 0xFFFFFFFF
+            self._rct_sequence = (int(context["rct_sequence"]) + 1) & 0xFFFFFFFF
 
             wire = self._build_outbound_data(
-                poll_message,
+                context,
                 self._rct_sequence,
                 application,
             )
@@ -760,6 +795,11 @@ class FlexCClient:
                     return await pending
 
             except TimeoutError as err:
+                # Never reuse a context after a command timeout. Tear down the
+                # current socket so the next connection starts from a clean
+                # handshake/POLL synchronization point.
+                self._command_context = None
+                self._context_event.clear()
                 self.connected = False
                 self._connected_event.clear()
 
@@ -778,6 +818,11 @@ class FlexCClient:
                 raise FlexCCommandError(
                     "Timeout waiting for FlexC FLEXML reply"
                 ) from err
+
+            except FlexCError:
+                self._command_context = None
+                self._context_event.clear()
+                raise
 
             finally:
                 if self._pending_reply is pending:
@@ -854,6 +899,8 @@ class FlexCClient:
         self._closed = True
         self.connected = False
         self._connected_event.clear()
+        self._command_context = None
+        self._context_event.clear()
 
         if self._pending_reply is not None and not self._pending_reply.done():
             self._pending_reply.set_exception(
