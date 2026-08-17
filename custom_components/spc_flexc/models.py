@@ -137,6 +137,30 @@ class FaultState:
 
 
 @dataclass
+class ZoneState:
+    """Last known SPC zone state."""
+
+    zone_id: int
+    name: str | None = None
+    area_id: int | None = None
+    area_name: str | None = None
+    zone_type: int | None = None
+
+    input_state: int | None = None
+    logic_input: int | None = None
+    status: int | None = None
+    proc_state: int | None = None
+    alarm_state: int | None = None
+
+    inhibit_allowed: bool | None = None
+    isolate_allowed: bool | None = None
+    actuations_since_last_read: int | None = None
+
+    raw: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime | None = None
+
+
+@dataclass
 class SpcState:
     """Complete SPC state."""
 
@@ -144,5 +168,5 @@ class SpcState:
     faults: FaultState = field(default_factory=FaultState)
 
     areas: dict[int, AreaState] = field(default_factory=dict)
-    zones: dict[int, dict[str, Any]] = field(default_factory=dict)
+    zones: dict[int, ZoneState] = field(default_factory=dict)
     ats: dict[int, AtsState] = field(default_factory=dict)

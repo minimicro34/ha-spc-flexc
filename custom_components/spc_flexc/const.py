@@ -21,5 +21,5 @@ CONF_COMMAND_USERNAME = "command_username"
 CONF_COMMAND_PASSWORD = "command_password"
 
 ATS_IDS = range(1, 5)
-
 AREA_IDS = range(1, 9)
+ZONE_IDS = range(1, 9)

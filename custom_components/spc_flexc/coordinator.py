@@ -10,11 +10,11 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import AREA_IDS, ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN
+from .const import AREA_IDS, ATS_IDS, DEFAULT_PANEL_INTERVAL, DOMAIN, ZONE_IDS
 from .flexc.connection import FlexCClient, FlexCError
 from .flexc.events import apply_event
 from .flexc.flexml import FlexMLError
-from .models import AreaState, AtpState, AtsState, PanelState, SpcState
+from .models import AreaState, AtpState, AtsState, PanelState, SpcState, ZoneState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -188,6 +188,34 @@ def _area_state_from_status(
     )
 
 
+def _zone_state_from_status(
+    raw_zone: dict[str, str],
+) -> ZoneState:
+    """Convert raw ZONE_STATUS attributes to ZoneState."""
+    return ZoneState(
+        zone_id=int(raw_zone["ZONE_ID"]),
+        name=raw_zone.get("ZONE_NAME"),
+        area_id=_int_value(raw_zone.get("AREA_ID")),
+        area_name=raw_zone.get("AREA_NAME"),
+        zone_type=_int_value(raw_zone.get("TYPE")),
+        input_state=_int_value(raw_zone.get("INPUT")),
+        logic_input=_int_value(raw_zone.get("LOGIC_INPUT")),
+        status=_int_value(raw_zone.get("STATUS")),
+        proc_state=_int_value(raw_zone.get("PROC_STATE")),
+        alarm_state=_int_value(raw_zone.get("ALARM_STATE")),
+        inhibit_allowed=_bool_value(
+            raw_zone.get("INHIBIT_ALLOWED")
+        ),
+        isolate_allowed=_bool_value(
+            raw_zone.get("ISOLATE_ALLOWED")
+        ),
+        actuations_since_last_read=_int_value(
+            raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
+        ),
+        raw=dict(raw_zone),
+        updated_at=datetime.now(UTC),
+    )
+
 class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     """Coordinate SPC FlexC updates."""
 
@@ -223,6 +251,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
         self._detected_area_ids: set[int] = set()
         self._area_discovery_complete = False
+        self._detected_zone_ids: set[int] = set()
+        self._zone_discovery_complete = False
 
     async def _async_update_data(self) -> SpcState:
         """Update SPC data."""
@@ -290,11 +320,25 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                         self.state.areas[area.area_id] = area
 
+                # Once zone discovery is complete, update only the
+                # zones that were actually detected.
+                if self._zone_discovery_complete and self._detected_zone_ids:
+                    raw_zones = await self.client.async_get_zone_status(
+                        sorted(self._detected_zone_ids)
+                    )
+
+                    for raw_zone in raw_zones:
+                        zone = _zone_state_from_status(raw_zone)
+
+                        self.state.zones[zone.zone_id] = zone
+
             # If the initial background discovery previously failed because
             # the FlexC transport was unavailable, retry it after a later
             # successful normal refresh.
             if self._ats_discovery_requested and (
-                not self._ats_discovery_complete or not self._area_discovery_complete
+                not self._ats_discovery_complete
+                or not self._area_discovery_complete
+                or not self._zone_discovery_complete
             ):
                 self._schedule_ats_discovery()
 
@@ -312,7 +356,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
     def _schedule_ats_discovery(self) -> None:
         """Schedule ATS discovery if it is not already running."""
-        if self._ats_discovery_complete:
+        if (
+            self._ats_discovery_complete
+            and self._area_discovery_complete
+            and self._zone_discovery_complete
+        ):
             return
 
         task = self._ats_discovery_task
@@ -328,11 +376,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         )
 
     async def _async_discover_ats(self) -> None:
-        """Discover available FlexC ATS IDs and SPC areas in the background."""
+        """Discover available FlexC ATS IDs and SPC areas and zones in the background."""
         try:
             detected_ats_ids: set[int] = set()
             detected_area_ids: set[int] = set()
             timezone = ZoneInfo(self.hass.config.time_zone)
+            detected_zone_ids: set[int] = set()
 
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
@@ -380,6 +429,26 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 self._detected_area_ids.update(detected_area_ids)
                 self._area_discovery_complete = True
 
+                # Discover zones.
+                raw_zones = await self.client.async_get_zone_status(
+                    ZONE_IDS
+                )
+
+                for raw_zone in raw_zones:
+                    zone = _zone_state_from_status(raw_zone)
+
+                    self.state.zones[zone.zone_id] = zone
+                    detected_zone_ids.add(zone.zone_id)
+
+                self._detected_zone_ids.update(detected_zone_ids)
+                self._zone_discovery_complete = True
+
+                _LOGGER.warning(
+                    "SPC zone discovery DONE: ids=%s state=%r",
+                    sorted(self._detected_zone_ids),
+                    self.state.zones,
+                )
+
             _LOGGER.info(
                 "FlexC ATS discovery completed: detected ATS IDs %s",
                 sorted(self._detected_ats_ids),
@@ -390,10 +459,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 sorted(self._detected_area_ids),
             )
 
+            _LOGGER.info(
+                "SPC zone discovery completed: detected zone IDs %s",
+                sorted(self._detected_zone_ids),
+            )
+
             # Notify coordinator listeners immediately.
             #
-            # Platforms can then create the dynamically discovered
-            # ATS/ATP and area entities.
+            # Platforms can then create dynamically discovered
+            # ATS/ATP, area and zone entities
             self.async_set_updated_data(self.state)
 
         except asyncio.CancelledError:
