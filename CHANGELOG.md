@@ -1,0 +1,273 @@
+# Changelog
+
+All notable changes to SPC FlexC are documented in this file.
+
+The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+---
+
+## [1.0.0] - 2026-08-18
+
+🎉 **First stable release of SPC FlexC for Home Assistant.**
+
+SPC FlexC provides native communication between compatible SPC alarm panels
+and Home Assistant using the FlexC protocol, without requiring an additional
+SPC gateway.
+
+### Added
+
+#### FlexC protocol
+
+- Native FlexC receiver implemented directly in Home Assistant.
+- AES-256 encrypted FlexC communication.
+- FlexC connection handshake.
+- Connection acknowledgement handling.
+- FlexC polling and acknowledgement handling.
+- Encrypted message processing.
+- FLEXML command/reply transport.
+- FlexC connection lifecycle management.
+- Processing of unsolicited FlexC events.
+
+#### Home Assistant integration
+
+- Home Assistant UI configuration flow.
+- Configuration of:
+  - SPC address;
+  - FlexC TCP port;
+  - AES-256 encryption key;
+  - Command Profile username;
+  - Command Profile password.
+- Coordinator-based SPC state management.
+- Dynamic discovery of SPC areas.
+- Dynamic discovery and monitoring of SPC zones.
+- Home Assistant device grouping.
+- English translations.
+- French translations.
+- HACS-compatible repository structure.
+
+#### Alarm control
+
+- Native Home Assistant `alarm_control_panel` entities for SPC areas.
+- Global SPC alarm control panel.
+- Individual area Unset / Disarm.
+- Individual area Full Set / Arm Away.
+- Part Set A / Arm Home when enabled by the SPC area.
+- Part Set B / Arm Night when enabled by the SPC area.
+- Global Full Set across discovered SPC areas.
+- Global Unset across discovered SPC areas.
+- SPC area mode mapping:
+  - `MODE=0` — Unset / Disarmed;
+  - `MODE=1` — Part Set A / Armed Home;
+  - `MODE=2` — Part Set B / Armed Night;
+  - `MODE=3` — Full Set / Armed Away.
+- Area change-mode capability precheck before arming.
+- Global precheck of all areas before the first global Full Set command is sent.
+- Refresh of SPC state following mode-changing operations.
+
+#### Arming error handling
+
+- Human-readable Home Assistant errors when SPC refuses an arming operation.
+- Automatic decoding of validated SPC not-ready reasons in the form `1000 + zone_id`.
+- Automatic lookup of the blocking zone in coordinator zone data.
+- Zone name and zone ID included in Home Assistant error messages.
+- Safe fallback to `Zone <id>` when a zone name is unavailable.
+- Dedicated handling of SPC reason `10006` for Engineer / Installer mode.
+- Generic fallback for unknown SPC reason codes.
+- English translated alarm-control exceptions.
+- French translated alarm-control exceptions.
+
+#### Global alarm safety
+
+- All discovered areas are prechecked before global Full Set begins.
+- Global Full Set is aborted before the first Set command if any area is known
+  to be unable to arm.
+- State-changing FlexC commands are deliberately never automatically retried.
+- Global operation errors preserve visibility of incomplete operations.
+- Individual area states remain available for verification after a global
+  operation.
+
+#### Area information
+
+- Area ID.
+- SPC operating mode.
+- Human-readable mode name.
+- Part Set A capability.
+- Part Set B capability.
+- Last Set timestamp where reported by SPC.
+- Last Set user ID where reported by SPC.
+- Last Set user name where reported by SPC.
+- Last Unset timestamp where reported by SPC.
+- Last Unset user ID where reported by SPC.
+- Last Unset user name where reported by SPC.
+- Last alarm information where reported by SPC.
+- Internal bell state where reported by SPC.
+- External bell state where reported by SPC.
+
+#### Zones
+
+- SPC zone discovery.
+- Zone state monitoring.
+- Zone metadata used for area arming error resolution.
+- Live zone updates from supported FlexC events.
+
+#### Diagnostics
+
+- SPC panel diagnostic information.
+- Panel summary processing.
+- SPC alert status processing.
+- FlexC ATS communication diagnostics.
+- Support for diagnostic information reported by the panel.
+- Graceful handling of optional diagnostic fields that are not available on
+  every SPC installation.
+
+#### Development
+
+- Automated Python compilation checks.
+- Ruff formatting checks.
+- Ruff linting.
+- Type checking.
+- Automated tests.
+- Hassfest validation.
+- Repository-wide `make check` validation workflow.
+- Contribution guidelines.
+- Security guidance for real SPC panel testing.
+
+### Safety
+
+SPC FlexC v1.0 deliberately applies additional safeguards to alarm
+state-changing commands.
+
+#### No automatic command retry
+
+A timeout does not guarantee that an SPC state-changing command was not
+executed.
+
+For this reason, commands such as Full Set and Unset are not automatically
+resent after an uncertain communication failure.
+
+This prevents a command from being executed twice because a reply was lost.
+
+#### Individual arming precheck
+
+Before sending an arming command, the integration asks the SPC panel whether
+the requested mode change is currently allowed.
+
+If SPC reports that the area is not ready, the state-changing command is not
+sent.
+
+#### Global arming precheck
+
+Before global Full Set:
+
+1. every discovered area is checked;
+2. all prechecks must succeed;
+3. only then are individual Full Set commands sent.
+
+If any precheck fails, global arming stops before the first Set command.
+
+### Validated
+
+The v1.0 FlexC implementation has been validated against a real SPC
+installation for:
+
+- FlexC TCP connection;
+- encrypted FlexC communication;
+- connection handshake;
+- polling;
+- FLEXML request/reply handling;
+- panel summary retrieval;
+- alert status retrieval;
+- area status retrieval;
+- zone status retrieval;
+- FlexC ATS status retrieval;
+- individual area Full Set;
+- individual area Unset;
+- global Full Set;
+- global Unset;
+- resulting area state verification;
+- refusal of arming when a zone is not ready;
+- identification of the blocking zone from the SPC reason code;
+- refusal of arming while Engineer / Installer mode is active;
+- Home Assistant translated error reporting.
+
+A complete real-panel Full Set / Unset cycle was validated using
+`MODE 0 → MODE 3 → MODE 0`.
+
+### Authentication
+
+The validated v1.0 configuration uses an SPC FlexC Command Profile with
+**Authentication mode: Command User Only**.
+
+French SPC interfaces may display this as
+**Utilisateur Commandes seulement**.
+
+The Command Profile username and password are configured in Home Assistant and
+used for FLEXML command authentication.
+
+### Known limitations
+
+#### Global Full Set is not atomic
+
+The validated FlexC interface changes individual SPC areas.
+
+Global Full Set is therefore implemented as coordinated individual area
+operations rather than a single atomic all-areas SPC command.
+
+All areas are prechecked first, but a communication failure or panel state
+change after the prechecks can theoretically result in a partially completed
+global operation.
+
+State-changing commands are not automatically retried.
+
+#### Command Profile user attribution
+
+SPC can attribute FlexC Set/Unset operations authenticated through a Command
+Profile to an internal Command Profile user.
+
+The SPC event log may still identify the ATS / ATP Command Profile as the
+technical origin, while user-related fields and native SMS notifications show
+the internal Command Profile user.
+
+This behaviour is generated by the SPC panel.
+
+#### SPC User Only authentication
+
+`SPC User Only / Utilisateur SPC seulement` authentication is not part of the
+validated v1.0 configuration.
+
+The supported and validated configuration for v1.0 is **Command User Only**.
+
+#### Part Set support
+
+Part Set A and Part Set B are only available when enabled and reported as
+supported by the corresponding SPC area.
+
+#### Hardware-dependent diagnostics
+
+Diagnostic availability depends on:
+
+- SPC panel model;
+- firmware version;
+- installed modules;
+- communication configuration;
+- optional hardware.
+
+Not every SPC installation exposes every diagnostic field.
+
+---
+
+## Future development
+
+Possible future improvements include:
+
+- additional SPC diagnostic entities;
+- additional FlexC event decoding;
+- additional optional SPC hardware support;
+- RF module diagnostics where exposed by SPC;
+- modem diagnostics where exposed by SPC;
+- additional FLEXML capabilities;
+- enhanced Home Assistant alarm presentation;
+- a dedicated SPC Lovelace card.
+
+Safety rules introduced in v1.0 for state-changing commands will remain a core
+design requirement for future alarm-control features.
