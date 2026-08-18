@@ -348,7 +348,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             # becomes unavailable.
             raise UpdateFailed(f"FlexC update failed: {err}") from err
 
-    def async_start_ats_discovery(self) -> None:
+    def async_start_background_discovery(self) -> None:
         """Enable and start background discovery."""
         self._ats_discovery_requested = True
         self._schedule_ats_discovery()

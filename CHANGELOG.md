@@ -4,6 +4,55 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - 2026-08-18
+
+### Added
+
+- Added a Home Assistant reconfiguration flow.
+- SPC FlexC connection settings can now be changed directly from the Home
+  Assistant UI without removing and recreating the integration.
+- Existing configuration values are automatically pre-filled when opening the
+  reconfiguration form.
+- Added English and French translations for the reconfiguration flow.
+- Added automated config flow tests.
+- Added documentation for the separate SPC FlexC Lovelace dashboard card.
+
+### Changed
+
+- SPC address can now be changed from Home Assistant.
+- FlexC TCP port can now be changed from Home Assistant.
+- AES-256 encryption key can now be changed from Home Assistant.
+- Command Profile username and password can now be changed from Home Assistant.
+- Config entries now use the SPC panel serial number as their stable unique
+  identifier instead of the panel IP address.
+- Existing config entries using the SPC IP address as their unique identifier
+  are automatically updated to the panel serial number after a successful
+  panel refresh.
+
+### Fixed
+
+- Changing the SPC panel IP address no longer changes the logical identity of
+  the SPC installation in Home Assistant.
+- Duplicate SPC hosts are rejected during initial configuration and
+  reconfiguration.
+
+### Documentation
+
+- Added Home Assistant reconfiguration instructions.
+- Added a link to the separate `ha-spc-flexc-card` project.
+- Documented the SPC FlexC Card as a HACS Dashboard repository.
+
+### Alarm control
+
+No changes were made to the validated alarm-control behaviour introduced in
+v1.0.0.
+
+Individual and global Full Set / Unset, arming prechecks, SPC reason decoding
+and the no-automatic-retry safety behaviour remain unchanged.
+
+**Full Changelog**:
+https://github.com/minimicro34/ha-spc-flexc/compare/v1.0.0...v1.0.1
+
 ---
 
 ## [1.0.0] - 2026-08-18

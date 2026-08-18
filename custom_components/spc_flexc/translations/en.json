@@ -11,6 +11,17 @@
           "command_username": "Command username",
           "command_password": "Command password"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure SPC FlexC",
+        "description": "Update the SPC FlexC connection and command credentials.",
+        "data": {
+          "host": "SPC address",
+          "port": "FlexC port",
+          "encryption_key": "AES-256 key",
+          "command_username": "Command username",
+          "command_password": "Command password"
+        }
       }
     }
   }, 

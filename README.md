@@ -48,7 +48,9 @@ additional SPC gateway.
 - [Installation](#installation)
 - [SPC configuration](#spc-configuration)
 - [Home Assistant configuration](#home-assistant-configuration)
+- [Reconfiguration](#reconfiguration)
 - [Available entities](#available-entities)
+- [SPC FlexC Card](#spc-flexc-card)
 - [Alarm control](#alarm-control)
 - [Global alarm control](#global-alarm-control)
 - [Arming safety and error reporting](#arming-safety-and-error-reporting)
@@ -98,7 +100,8 @@ additional SPC gateway.
 - 🏠 Native `alarm_control_panel` entities
 - 🚪 SPC zone entities
 - 🩺 Diagnostic entities
-- 🔄 UI configuration flow
+- 🔄 UI configuration and reconfiguration flows
+- 🔧 Connection settings can be changed without removing the integration
 - ⚡ Live updates from FlexC events
 - 📦 HACS compatible
 - 🌐 English and French translations
@@ -372,6 +375,45 @@ Assistant.
 
 ---
 
+## Reconfiguration
+
+Starting with v1.0.1, SPC FlexC connection settings can be changed directly
+from the Home Assistant UI without removing and recreating the integration.
+
+Open:
+
+**Settings → Devices & services → SPC FlexC → Reconfigure**
+
+The following settings can be changed:
+
+- SPC address;
+- FlexC TCP port;
+- AES-256 encryption key;
+- Command Profile username;
+- Command Profile password.
+
+The current values are automatically pre-filled in the reconfiguration form.
+
+After validation, the existing config entry is updated and the integration is
+reloaded with the new connection settings.
+
+### Changing the SPC address
+
+The SPC panel IP address is not used as the permanent identity of the config
+entry.
+
+After a successful panel refresh, SPC FlexC uses the panel serial number as the
+stable config entry unique identifier.
+
+This allows the SPC address to be changed through the reconfiguration flow
+without changing the logical identity of the panel in Home Assistant.
+
+Existing config entries that previously used the SPC IP address as their
+unique identifier are updated to the panel serial number after a successful
+panel refresh.
+
+---
+
 ## Available entities
 
 The exact entities depend on the SPC panel, its configuration and the installed
@@ -409,6 +451,31 @@ Diagnostic entities are associated with the appropriate SPC devices and expose
 information reported by the panel and FlexC communication path.
 
 The exact diagnostic entities available depend on what the panel reports.
+
+---
+
+## SPC FlexC Card
+
+A dedicated Lovelace dashboard card for SPC FlexC is planned as a separate
+project:
+
+**SPC FlexC Card**
+
+https://github.com/minimicro34/ha-spc-flexc-card
+
+The card is distributed separately so that the SPC FlexC backend integration
+and the Home Assistant dashboard frontend can evolve independently.
+
+When available, the card will be installable through HACS as a custom
+repository of type:
+
+```text
+Dashboard
+```
+
+> [!NOTE]
+> The `ha-spc-flexc-card` repository may not yet be available when installing
+> SPC FlexC v1.0.1. The project will be published separately.
 
 ---
 
@@ -796,6 +863,15 @@ Check:
 - network connectivity from SPC to Home Assistant.
 
 Remember that the SPC panel initiates the connection to Home Assistant.
+
+### Connection settings need to be changed
+
+Open:
+
+**Settings → Devices & services → SPC FlexC → Reconfigure**
+
+You can change the SPC address, FlexC TCP port, AES-256 key and Command Profile
+credentials without removing and recreating the integration.
 
 ### FlexC connects but FLEXML commands fail
 

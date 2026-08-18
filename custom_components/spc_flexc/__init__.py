@@ -16,6 +16,14 @@ async def async_setup_entry(
     # connection + PANEL_SUMMARY only.
     await coordinator.async_config_entry_first_refresh()
 
+    serial = coordinator.data.panel.serial_number
+
+    if serial and entry.unique_id != str(serial):
+        hass.config_entries.async_update_entry(
+            entry,
+            unique_id=str(serial),
+        )
+
     entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(
@@ -26,9 +34,9 @@ async def async_setup_entry(
     # Do not await this.
     #
     # Platforms are already loaded and their coordinator listeners are
-    # registered. ATS discovery can therefore create dynamic entities
-    # as soon as it completes.
-    coordinator.async_start_ats_discovery()
+    # registered. Background discovery of ATS, areas and zones can therefore
+    # create dynamic entities as soon as data becomes available.
+    coordinator.async_start_background_discovery()
 
     return True
 
