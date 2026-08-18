@@ -6,7 +6,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, SPC_ZONE_TYPES
+from .const import SPC_ZONE_TYPES
 from .coordinator import SpcFlexCCoordinator
 from .flexc.device import (
     build_area_device_info,

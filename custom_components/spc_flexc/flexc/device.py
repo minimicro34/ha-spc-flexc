@@ -1,7 +1,6 @@
 """Home Assistant device helpers for SPC FlexC."""
 
 from homeassistant.const import CONF_HOST
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import DOMAIN
@@ -44,13 +43,7 @@ def build_area_device_info(
 
     serial = panel.serial_number or coordinator.entry.entry_id
 
-    panel_device_id = dr.async_get_device_id_by_identifier(
-        coordinator.hass,
-        (DOMAIN, str(serial)),
-        config_entry_id=coordinator.entry.entry_id,
-    )
-
-    device_info = DeviceInfo(
+    return DeviceInfo(
         identifiers={
             (
                 DOMAIN,
@@ -60,9 +53,5 @@ def build_area_device_info(
         name=area.name or f"Area {area_id}",
         manufacturer="Vanderbilt",
         model="SPC Area",
+        via_device=(DOMAIN, str(serial)),
     )
-
-    if panel_device_id is not None:
-        device_info["via_device_id"] = panel_device_id
-
-    return device_info
