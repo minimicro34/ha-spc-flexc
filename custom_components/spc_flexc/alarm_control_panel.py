@@ -13,14 +13,9 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import (
     AddConfigEntryEntitiesCallback,
 )
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    CONF_COMMAND_PASSWORD,
-    CONF_COMMAND_USERNAME,
-)
+from .const import CONF_COMMAND_PASSWORD, CONF_COMMAND_USERNAME
 from .coordinator import SpcFlexCCoordinator
 from .flexc.device import build_area_device_info
 
@@ -69,6 +64,27 @@ def _reply_is_ok(
         and reply.get("RESULT") == "0"
         and reply.get("CMD_RESULT") == "OK"
     )
+
+
+def _get_area_change_mode_reason(
+    xml_text: str,
+    area_id: int,
+) -> str | None:
+    """Return the SPC reason preventing an area mode change."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return None
+
+    reply = root.find("REPLY_GET_AREA_CHANGE_MODE_STATUS")
+    if reply is None or reply.get("RESULT") != "0" or reply.get("CMD_RESULT") != "OK":
+        return None
+
+    status = reply.find("AREA_CHANGE_MODE_STATUS")
+    if status is None or status.get("AREA_ID") != str(area_id):
+        return None
+
+    return status.get("REASON_0")
 
 
 class SpcAreaAlarmControlPanel(
@@ -193,6 +209,22 @@ class SpcAreaAlarmControlPanel(
                     f"SPC refused area mode precheck: {precheck_reply}"
                 )
 
+            reason = _get_area_change_mode_reason(
+                precheck_reply,
+                self.area_id,
+            )
+
+            if reason is None:
+                raise HomeAssistantError(
+                    f"Invalid SPC area mode precheck response: {precheck_reply}"
+                )
+
+            if reason != "0":
+                raise HomeAssistantError(
+                    f"SPC area {self.area_id} is not ready to change mode "
+                    f"(reason {reason})"
+                )
+
             # IMPORTANT:
             # This state-changing command is intentionally sent exactly once.
             # Never automatically retry it after an exception or timeout.
@@ -213,8 +245,8 @@ class SpcAreaAlarmControlPanel(
                 )
 
         # Refresh only after releasing the FlexC operation lock.
-        # A refresh failure must never cause the state-changing command
-        # above to be resent.
+        # A refresh failure must never cause the state-changing command above
+        # to be resent.
         await self.coordinator.async_request_refresh()
 
     async def async_alarm_disarm(
