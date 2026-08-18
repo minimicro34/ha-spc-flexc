@@ -29,6 +29,12 @@
     },
     "partset_b_not_supported": {
       "message": "{area} does not support Part Set B."
+    },
+    "global_arm_incomplete": {
+      "message": "SPC global arming was incomplete. Areas already commanded: {areas}. Error: {error}"
+    },
+    "global_disarm_incomplete": {
+      "message": "SPC global disarming was incomplete. Errors: {errors}"
     }
   }
 }

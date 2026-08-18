@@ -29,6 +29,12 @@
     },
     "partset_b_not_supported": {
       "message": "{area} ne prend pas en charge la mise en service partielle B."
+    },
+    "global_arm_incomplete": {
+      "message": "La mise en service totale SPC est incomplète. Secteurs déjà commandés : {areas}. Erreur : {error}"
+    },
+    "global_disarm_incomplete": {
+      "message": "La mise hors service totale SPC est incomplète. Erreurs : {errors}"
     }
   }
 }
