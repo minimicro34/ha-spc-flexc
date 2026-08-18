@@ -1,4 +1,6 @@
+import xml.etree.ElementTree as ET
 from typing import Any
+from xml.sax.saxutils import quoteattr
 
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
@@ -7,6 +9,7 @@ from homeassistant.components.alarm_control_panel import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import (
     AddConfigEntryEntitiesCallback,
 )
@@ -14,15 +17,58 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from .const import (
+    CONF_COMMAND_PASSWORD,
+    CONF_COMMAND_USERNAME,
+)
 from .coordinator import SpcFlexCCoordinator
 from .flexc.device import build_area_device_info
 
 MODE_LABELS: dict[int, str] = {
     0: "Unset",
-    1: "Set",
-    2: "PartSetA",
-    3: "PartSetB",
+    1: "PartSetA",
+    2: "PartSetB",
+    3: "Set",
 }
+
+MODE_UNSET = 0
+MODE_PARTSET_A = 1
+MODE_PARTSET_B = 2
+MODE_SET = 3
+
+
+def _flexml_envelope(
+    username: str,
+    password: str,
+    body: str,
+) -> str:
+    """Build one authenticated FLEXML command."""
+    return (
+        '<FLEXML_CMD VER="1.0" '
+        f"PANEL_USERNAME={quoteattr(username)} "
+        f"PANEL_PASSWORD={quoteattr(password)}>"
+        f"{body}"
+        "</FLEXML_CMD>"
+    )
+
+
+def _reply_is_ok(
+    xml_text: str,
+    reply_tag: str,
+) -> bool:
+    """Return whether a FLEXML reply reports protocol success."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return False
+
+    reply = root.find(reply_tag)
+
+    return (
+        reply is not None
+        and reply.get("RESULT") == "0"
+        and reply.get("CMD_RESULT") == "OK"
+    )
 
 
 class SpcAreaAlarmControlPanel(
@@ -33,7 +79,6 @@ class SpcAreaAlarmControlPanel(
 
     _attr_has_entity_name = True
     _attr_code_arm_required = False
-    _attr_supported_features = AlarmControlPanelEntityFeature(0)
 
     def __init__(
         self,
@@ -59,6 +104,21 @@ class SpcAreaAlarmControlPanel(
         return self.area_id in self.coordinator.data.areas
 
     @property
+    def supported_features(self) -> AlarmControlPanelEntityFeature:
+        """Return supported alarm features."""
+        area = self.coordinator.data.areas.get(self.area_id)
+
+        features = AlarmControlPanelEntityFeature.ARM_AWAY
+
+        if area is not None and area.partset_a_enabled:
+            features |= AlarmControlPanelEntityFeature.ARM_HOME
+
+        if area is not None and area.partset_b_enabled:
+            features |= AlarmControlPanelEntityFeature.ARM_NIGHT
+
+        return features
+
+    @property
     def alarm_state(self) -> AlarmControlPanelState | None:
         """Return the SPC area operating state."""
         area = self.coordinator.data.areas.get(self.area_id)
@@ -66,19 +126,124 @@ class SpcAreaAlarmControlPanel(
         if area is None or area.mode is None:
             return None
 
-        if area.mode == 0:
+        if area.mode == MODE_UNSET:
             return AlarmControlPanelState.DISARMED
 
-        if area.mode == 1:
-            return AlarmControlPanelState.ARMED_AWAY
-
-        if area.mode == 2:
+        if area.mode == MODE_PARTSET_A:
             return AlarmControlPanelState.ARMED_HOME
 
-        if area.mode == 3:
+        if area.mode == MODE_PARTSET_B:
             return AlarmControlPanelState.ARMED_NIGHT
 
+        if area.mode == MODE_SET:
+            return AlarmControlPanelState.ARMED_AWAY
+
         return None
+
+    async def _async_change_mode(
+        self,
+        mode: int,
+    ) -> None:
+        """Request one SPC area mode change."""
+        area = self.coordinator.data.areas.get(self.area_id)
+
+        if area is None:
+            raise HomeAssistantError(f"SPC area {self.area_id} is not available")
+
+        if mode == MODE_PARTSET_A and not area.partset_a_enabled:
+            raise HomeAssistantError(
+                f"SPC area {self.area_id} does not support Part Set A"
+            )
+
+        if mode == MODE_PARTSET_B and not area.partset_b_enabled:
+            raise HomeAssistantError(
+                f"SPC area {self.area_id} does not support Part Set B"
+            )
+
+        username = self.coordinator.entry.data[CONF_COMMAND_USERNAME]
+        password = self.coordinator.entry.data[CONF_COMMAND_PASSWORD]
+
+        precheck_body = (
+            "<CMD_GET_AREA_CHANGE_MODE_STATUS "
+            f'AREA_ID="{self.area_id}" MODE="{mode}" />'
+        )
+
+        command_body = (
+            f'<CMD_AREA_CHANGE_MODE AREA_ID="{self.area_id}" MODE="{mode}" />'
+        )
+
+        # The coordinator and entities share one FlexC connection.
+        # Serialize this complete command sequence with normal polling.
+        async with self.coordinator._client_operation_lock:
+            await self.coordinator.client.async_ensure_connected()
+
+            precheck_reply = await self.coordinator.client.async_send_flexml(
+                _flexml_envelope(
+                    username,
+                    password,
+                    precheck_body,
+                )
+            )
+
+            if not _reply_is_ok(
+                precheck_reply,
+                "REPLY_GET_AREA_CHANGE_MODE_STATUS",
+            ):
+                raise HomeAssistantError(
+                    f"SPC refused area mode precheck: {precheck_reply}"
+                )
+
+            # IMPORTANT:
+            # This state-changing command is intentionally sent exactly once.
+            # Never automatically retry it after an exception or timeout.
+            command_reply = await self.coordinator.client.async_send_flexml(
+                _flexml_envelope(
+                    username,
+                    password,
+                    command_body,
+                )
+            )
+
+            if not _reply_is_ok(
+                command_reply,
+                "REPLY_AREA_CHANGE_MODE",
+            ):
+                raise HomeAssistantError(
+                    f"SPC refused area mode change: {command_reply}"
+                )
+
+        # Refresh only after releasing the FlexC operation lock.
+        # A refresh failure must never cause the state-changing command
+        # above to be resent.
+        await self.coordinator.async_request_refresh()
+
+    async def async_alarm_disarm(
+        self,
+        code: str | None = None,
+    ) -> None:
+        """Disarm the SPC area."""
+        await self._async_change_mode(MODE_UNSET)
+
+    async def async_alarm_arm_away(
+        self,
+        code: str | None = None,
+    ) -> None:
+        """Full-set the SPC area."""
+        await self._async_change_mode(MODE_SET)
+
+    async def async_alarm_arm_home(
+        self,
+        code: str | None = None,
+    ) -> None:
+        """Part-set A the SPC area."""
+        await self._async_change_mode(MODE_PARTSET_A)
+
+    async def async_alarm_arm_night(
+        self,
+        code: str | None = None,
+    ) -> None:
+        """Part-set B the SPC area."""
+        await self._async_change_mode(MODE_PARTSET_B)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

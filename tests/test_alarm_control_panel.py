@@ -10,9 +10,9 @@ from custom_components.spc_flexc.alarm_control_panel import (
 def test_area_mode_labels() -> None:
     assert MODE_LABELS == {
         0: "Unset",
-        1: "Set",
-        2: "PartSetA",
-        3: "PartSetB",
+        1: "PartSetA",
+        2: "PartSetB",
+        3: "Set",
     }
 
 
