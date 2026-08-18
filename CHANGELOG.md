@@ -16,6 +16,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Added English and French translations for the reconfiguration flow.
 - Added automated config flow tests.
 - Added documentation for the separate SPC FlexC Lovelace dashboard card.
+- Added native SPC FlexC branding for Home Assistant.
 
 ### Changed
 
