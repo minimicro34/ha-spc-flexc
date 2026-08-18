@@ -13,5 +13,22 @@
         }
       }
     }
+  }, 
+  "exceptions": {
+    "area_not_ready_engineer": {
+      "message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."
+    },
+    "area_not_ready_zone": {
+      "message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."
+    },
+    "area_not_ready": {
+      "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason})."
+    },
+    "partset_a_not_supported": {
+      "message": "{area} does not support Part Set A."
+    },
+    "partset_b_not_supported": {
+      "message": "{area} does not support Part Set B."
+    }
   }
 }

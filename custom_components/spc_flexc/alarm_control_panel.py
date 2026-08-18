@@ -9,13 +9,15 @@ from homeassistant.components.alarm_control_panel import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity_platform import (
-    AddConfigEntryEntitiesCallback,
-)
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_COMMAND_PASSWORD, CONF_COMMAND_USERNAME
+from .const import (
+    CONF_COMMAND_PASSWORD,
+    CONF_COMMAND_USERNAME,
+    DOMAIN,
+)
 from .coordinator import SpcFlexCCoordinator
 from .flexc.device import build_area_device_info
 
@@ -30,6 +32,12 @@ MODE_UNSET = 0
 MODE_PARTSET_A = 1
 MODE_PARTSET_B = 2
 MODE_SET = 3
+
+# Confirmed experimentally on SPC:
+# - 10006: Engineer/Installer mode prevents setting.
+# - 1000 + zone_id: the indicated zone prevents setting.
+REASON_ENGINEER_MODE = "10006"
+ZONE_REASON_BASE = 1000
 
 
 def _flexml_envelope(
@@ -70,7 +78,7 @@ def _get_area_change_mode_reason(
     xml_text: str,
     area_id: int,
 ) -> str | None:
-    """Return the SPC reason preventing an area mode change."""
+    """Return the first SPC reason preventing an area mode change."""
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
@@ -156,6 +164,61 @@ class SpcAreaAlarmControlPanel(
 
         return None
 
+    def _raise_not_ready(
+        self,
+        reason: str,
+    ) -> None:
+        """Raise a translated user-facing error for an SPC not-ready reason."""
+        area = self.coordinator.data.areas.get(self.area_id)
+        area_name = (
+            area.name if area is not None and area.name else f"Area {self.area_id}"
+        )
+
+        # This must be checked before the generic 1000 + zone_id decoding.
+        if reason == REASON_ENGINEER_MODE:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="area_not_ready_engineer",
+                translation_placeholders={
+                    "area": area_name,
+                    "reason": reason,
+                },
+            )
+
+        try:
+            reason_value = int(reason)
+        except ValueError:
+            reason_value = -1
+
+        zone_id = reason_value - ZONE_REASON_BASE
+        zone = self.coordinator.data.zones.get(zone_id) if zone_id > 0 else None
+
+        # Only decode as 1000 + zone_id when the referenced zone really
+        # exists in the current coordinator data. Unknown numeric reasons
+        # therefore fall through to the generic error.
+        if zone is not None:
+            zone_name = getattr(zone, "name", None) or f"Zone {zone_id}"
+
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="area_not_ready_zone",
+                translation_placeholders={
+                    "area": area_name,
+                    "zone": zone_name,
+                    "zone_id": str(zone_id),
+                    "reason": reason,
+                },
+            )
+
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="area_not_ready",
+            translation_placeholders={
+                "area": area_name,
+                "reason": reason,
+            },
+        )
+
     async def _async_change_mode(
         self,
         mode: int,
@@ -167,13 +230,21 @@ class SpcAreaAlarmControlPanel(
             raise HomeAssistantError(f"SPC area {self.area_id} is not available")
 
         if mode == MODE_PARTSET_A and not area.partset_a_enabled:
-            raise HomeAssistantError(
-                f"SPC area {self.area_id} does not support Part Set A"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="partset_a_not_supported",
+                translation_placeholders={
+                    "area": area.name or f"Area {self.area_id}",
+                },
             )
 
         if mode == MODE_PARTSET_B and not area.partset_b_enabled:
-            raise HomeAssistantError(
-                f"SPC area {self.area_id} does not support Part Set B"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="partset_b_not_supported",
+                translation_placeholders={
+                    "area": area.name or f"Area {self.area_id}",
+                },
             )
 
         username = self.coordinator.entry.data[CONF_COMMAND_USERNAME]
@@ -220,10 +291,7 @@ class SpcAreaAlarmControlPanel(
                 )
 
             if reason != "0":
-                raise HomeAssistantError(
-                    f"SPC area {self.area_id} is not ready to change mode "
-                    f"(reason {reason})"
-                )
+                self._raise_not_ready(reason)
 
             # IMPORTANT:
             # This state-changing command is intentionally sent exactly once.

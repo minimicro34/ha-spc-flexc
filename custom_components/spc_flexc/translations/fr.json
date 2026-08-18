@@ -13,5 +13,22 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "area_not_ready_engineer": {
+      "message": "Impossible d’armer {area} : le mode Installateur est actif (raison SPC {reason})."
+    },
+    "area_not_ready_zone": {
+      "message": "Impossible d’armer {area} : la zone « {zone} » (ID {zone_id}) n’est pas prête (raison SPC {reason})."
+    },
+    "area_not_ready": {
+      "message": "Impossible de changer le mode de {area} : le secteur n’est pas prêt (raison SPC {reason})."
+    },
+    "partset_a_not_supported": {
+      "message": "{area} ne prend pas en charge la mise en service partielle A."
+    },
+    "partset_b_not_supported": {
+      "message": "{area} ne prend pas en charge la mise en service partielle B."
+    }
   }
 }
