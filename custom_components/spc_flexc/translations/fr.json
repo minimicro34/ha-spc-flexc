@@ -32,6 +32,9 @@
     "area_not_ready_zone": {
       "message": "Impossible d’armer {area} : la zone « {zone} » (ID {zone_id}) n’est pas prête (raison SPC {reason})."
     },
+    "area_not_ready_faults": {
+      "message": "Impossible de changer le mode de {area} : le secteur n'est pas prêt (raison SPC {reason}). Défauts actifs : {faults}"
+    },
     "area_not_ready": {
       "message": "Impossible de changer le mode de {area} : le secteur n’est pas prêt (raison SPC {reason})."
     },

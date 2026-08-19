@@ -18,7 +18,12 @@ from .const import (
     ZONE_IDS,
 )
 from .flexc.connection import FlexCClient, FlexCError
-from .flexc.events import apply_event
+from .flexc.events import (
+    apply_event,
+    apply_panel_event,
+    apply_xbus_event,
+    apply_zone_event,
+)
 from .flexc.flexml import FlexMLError
 from .models import (
     AreaState,
@@ -535,6 +540,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                     previous = self.state.zones.get(zone.zone_id)
 
+                    if previous is not None:
+                        zone.event_tamper = previous.event_tamper
+                        zone.last_event = previous.last_event
+
                     if previous is None or (
                         previous.input_state != zone.input_state
                         or previous.logic_input != zone.logic_input
@@ -584,10 +593,26 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         event: dict[str, str],
     ) -> None:
         """Apply one unsolicited FlexC EVENT 0x60."""
-        changed = apply_event(
+
+        fault_changed = apply_event(
             self.state.faults,
             event,
         )
 
-        if changed:
+        panel_changed = apply_panel_event(
+            self.state.panel,
+            event,
+        )
+
+        zone_changed = apply_zone_event(
+            self.state.zones,
+            event,
+        )
+
+        xbus_changed = apply_xbus_event(
+            self.state.xbus_devices,
+            event,
+        )
+
+        if fault_changed or panel_changed or zone_changed or xbus_changed:
             self.async_set_updated_data(self.state)

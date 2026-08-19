@@ -5,11 +5,21 @@ from __future__ import annotations
 import html
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
-from ..models import FaultState
+from ..models import FaultState, XBusDeviceState
 
 EVENT_STATE_MAP: dict[int, tuple[str, bool]] = {
+    # Panel power.
+    5000: ("mains_fault", True),
+    5001: ("mains_fault", False),
+    # Panel battery.
+    5006: ("battery_fault", True),
+    5007: ("battery_fault", False),
+    # Panel enclosure tamper.
+    5206: ("panel_tamper", True),
+    5207: ("panel_tamper", False),
     # Modem 1.
     6100: ("modem_1_fault", True),
     6101: ("modem_1_fault", False),
@@ -23,6 +33,11 @@ EVENT_STATE_MAP: dict[int, tuple[str, bool]] = {
     # X-BUS radio jamming.
     5336: ("rf_jamming", True),
     5337: ("rf_jamming", False),
+}
+
+PANEL_EVENT_STATE_MAP: dict[int, tuple[str, bool]] = {
+    7003: ("engineer_mode", True),
+    7004: ("engineer_mode", False),
 }
 
 
@@ -75,3 +90,159 @@ def apply_event(
     setattr(faults, field, value)
 
     return previous != value
+
+
+def apply_zone_event(
+    zones: Mapping[int, Any],
+    event: Mapping[str, Any],
+) -> bool:
+    """Apply a zone-specific FlexC EVENT to the matching zone state."""
+
+    raw_event_id = event.get("EV_ID")
+    raw_zone_id = event.get("ZONE_ID")
+
+    try:
+        event_id = int(str(raw_event_id))
+        zone_id = int(str(raw_zone_id))
+    except (TypeError, ValueError):
+        return False
+
+    # Zone tamper fault / restore.
+    if event_id == 1008:
+        value = True
+    elif event_id == 1108:
+        value = False
+    else:
+        return False
+
+    zone = zones.get(zone_id)
+
+    if zone is None:
+        return False
+
+    previous = zone.event_tamper
+
+    zone.event_tamper = value
+    zone.last_event = dict(event)
+
+    return previous != value
+
+
+def apply_panel_event(
+    panel: Any,
+    event: Mapping[str, Any],
+) -> bool:
+    """Apply a panel-level EVENT to PanelState."""
+
+    raw_event_id = event.get("EV_ID")
+
+    try:
+        event_id = int(str(raw_event_id))
+    except (TypeError, ValueError):
+        return False
+
+    mapping = PANEL_EVENT_STATE_MAP.get(event_id)
+
+    if mapping is None:
+        return False
+
+    field, value = mapping
+    previous = getattr(panel, field)
+
+    setattr(panel, field, value)
+
+    return previous != value
+
+
+def apply_xbus_event(
+    devices: dict[int, XBusDeviceState],
+    event: Mapping[str, Any],
+) -> bool:
+    """Apply an X-BUS device EVENT to persistent device state."""
+
+    raw_event_id = event.get("EV_ID")
+    raw_device_id = event.get("KEYPAD_ID")
+
+    try:
+        event_id = int(str(raw_event_id))
+        device_id = int(str(raw_device_id))
+    except (TypeError, ValueError):
+        return False
+
+    # Validated X-BUS keypad tamper events:
+    #
+    # 5312 = physical tamper fault
+    # 5316 = fault isolated by a user
+    # 5317 = isolation restored / removed
+    #
+    # IMPORTANT:
+    # 5317 does NOT mean the physical tamper fault is cleared.
+    if event_id not in {5312, 5316, 5317}:
+        return False
+
+    device = devices.get(device_id)
+
+    if device is None:
+        raw_sia_address = event.get("SIA_ADDRESS")
+
+        try:
+            sia_address = (
+                int(str(raw_sia_address)) if raw_sia_address is not None else None
+            )
+        except (TypeError, ValueError):
+            sia_address = None
+
+        device = XBusDeviceState(
+            device_id=device_id,
+            name=(
+                str(event["KEYPAD_NAME"])
+                if event.get("KEYPAD_NAME") is not None
+                else None
+            ),
+            sia_address=sia_address,
+        )
+
+        devices[device_id] = device
+
+    changed = False
+
+    # Refresh descriptive metadata whenever SPC provides it.
+    raw_name = event.get("KEYPAD_NAME")
+
+    if raw_name is not None:
+        name = str(raw_name)
+
+        if device.name != name:
+            device.name = name
+            changed = True
+
+    raw_sia_address = event.get("SIA_ADDRESS")
+
+    if raw_sia_address is not None:
+        try:
+            sia_address = int(str(raw_sia_address))
+        except (TypeError, ValueError):
+            sia_address = None
+
+        if sia_address is not None and device.sia_address != sia_address:
+            device.sia_address = sia_address
+            changed = True
+
+    if event_id == 5312:
+        if device.tamper_fault is not True:
+            device.tamper_fault = True
+            changed = True
+
+    elif event_id == 5316:
+        if device.tamper_isolated is not True:
+            device.tamper_isolated = True
+            changed = True
+
+    elif event_id == 5317 and device.tamper_isolated is not False:
+        device.tamper_isolated = False
+        changed = True
+
+    device.last_event = dict(event)
+    device.updated_at = datetime.now(UTC)
+
+    return changed

@@ -103,6 +103,26 @@ def _area_name(
     return f"Area {area_id}"
 
 
+def _active_blocking_faults(
+    coordinator: SpcFlexCCoordinator,
+) -> list[str]:
+    """Return known active panel faults that may explain a not-ready area."""
+
+    faults = coordinator.data.faults
+    active: list[str] = []
+
+    if faults.mains_fault is True:
+        active.append("230 V mains fault")
+
+    if faults.battery_fault is True:
+        active.append("panel battery fault")
+
+    if faults.panel_tamper is True:
+        active.append("panel tamper")
+
+    return active
+
+
 def _raise_not_ready(
     coordinator: SpcFlexCCoordinator,
     area_id: int,
@@ -110,6 +130,29 @@ def _raise_not_ready(
 ) -> None:
     """Raise a translated user-facing SPC not-ready error."""
     area_name = _area_name(coordinator, area_id)
+
+    if reason == "2007":
+        active_faults = _active_blocking_faults(coordinator)
+
+        if active_faults:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="area_not_ready_faults",
+                translation_placeholders={
+                    "area": area_name,
+                    "reason": reason,
+                    "faults": ", ".join(active_faults),
+                },
+            )
+
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="area_not_ready",
+            translation_placeholders={
+                "area": area_name,
+                "reason": reason,
+            },
+        )
 
     if reason == REASON_ENGINEER_MODE:
         raise ServiceValidationError(

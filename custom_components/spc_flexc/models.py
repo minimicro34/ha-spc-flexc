@@ -123,6 +123,10 @@ class PanelState:
 class FaultState:
     """Faults obtained from FlexC events or dedicated status commands."""
 
+    mains_fault: bool | None = None
+    battery_fault: bool | None = None
+    panel_tamper: bool | None = None
+
     modem_1_fault: bool | None = None
     modem_1_line_fault: bool | None = None
     modem_2_fault: bool | None = None
@@ -151,12 +155,29 @@ class ZoneState:
     status: int | None = None
     proc_state: int | None = None
     alarm_state: int | None = None
+    event_tamper: bool | None = None
+    last_event: dict[str, Any] | None = None
 
     inhibit_allowed: bool | None = None
     isolate_allowed: bool | None = None
     actuations_since_last_read: int | None = None
 
     raw: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime | None = None
+
+
+@dataclass
+class XBusDeviceState:
+    """Last known X-BUS device state derived from FlexC events."""
+
+    device_id: int
+    name: str | None = None
+    sia_address: int | None = None
+
+    tamper_fault: bool | None = None
+    tamper_isolated: bool | None = None
+
+    last_event: dict[str, Any] | None = None
     updated_at: datetime | None = None
 
 
@@ -170,3 +191,4 @@ class SpcState:
     areas: dict[int, AreaState] = field(default_factory=dict)
     zones: dict[int, ZoneState] = field(default_factory=dict)
     ats: dict[int, AtsState] = field(default_factory=dict)
+    xbus_devices: dict[int, XBusDeviceState] = field(default_factory=dict)

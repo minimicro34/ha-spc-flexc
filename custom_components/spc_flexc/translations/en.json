@@ -32,6 +32,9 @@
     "area_not_ready_zone": {
       "message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."
     },
+    "area_not_ready_faults": {
+      "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"
+    },
     "area_not_ready": {
       "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason})."
     },
