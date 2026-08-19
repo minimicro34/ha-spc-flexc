@@ -450,7 +450,24 @@ the integration can resolve that ID to the corresponding zone name.
 Diagnostic entities are associated with the appropriate SPC devices and expose
 information reported by the panel and FlexC communication path.
 
-The exact diagnostic entities available depend on what the panel reports.
+Panel-level diagnostic binary sensors include:
+
+- 230 V mains fault;
+- panel battery fault;
+- panel enclosure tamper;
+- modem fault and line fault where reported;
+- RF jamming where reported;
+- X-BUS mains fault;
+- X-BUS battery fault.
+
+Some diagnostic states are updated immediately from unsolicited FlexC events
+without waiting for the next coordinator refresh.
+
+X-BUS devices discovered from FlexC events may also expose device-specific
+tamper and tamper-isolation diagnostics.
+
+The exact diagnostic entities available depend on the SPC panel, firmware,
+installed hardware and events reported by the installation.
 
 ---
 
@@ -472,10 +489,6 @@ repository of type:
 ```text
 Dashboard
 ```
-
-> [!NOTE]
-> The `ha-spc-flexc-card` repository may not yet be available when installing
-> SPC FlexC v1.0.1. The project will be published separately.
 
 ---
 
@@ -671,6 +684,27 @@ operation.
 
 Home Assistant displays a dedicated error instead of attempting the Set
 command.
+
+### Active system faults
+
+The validated SPC reason `2007` indicates that the requested area mode change
+is blocked by an active system fault.
+
+When this reason is returned, SPC FlexC includes known active diagnostic faults
+in the Home Assistant error message when available.
+
+For example, this may identify an active:
+
+- 230 V mains fault;
+- panel battery fault;
+- panel enclosure tamper;
+- X-BUS power fault;
+- X-BUS battery fault;
+- modem fault;
+- RF jamming condition.
+
+The SPC panel remains authoritative: the integration reports the blocking
+condition but does not bypass it or force the arming operation.
 
 ### Unknown SPC reasons
 

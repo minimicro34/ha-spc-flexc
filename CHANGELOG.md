@@ -4,6 +4,60 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-08-19
+
+### Added
+
+- Added real-time FlexC event handling for SPC panel 230 V mains faults.
+- Added real-time FlexC event handling for SPC panel battery faults.
+- Added real-time FlexC event handling for SPC panel enclosure tamper faults.
+- Added real-time Engineer / Installer mode updates from unsolicited FlexC events.
+- Added zone tamper fault and restoration handling from FlexC events.
+- Added dynamic X-BUS device tamper diagnostics.
+- Added X-BUS tamper isolation state tracking.
+- Added active fault information when SPC refuses an arming operation with
+  reason `2007`.
+- Added automated tests for panel, zone and X-BUS FlexC event handling.
+
+### Changed
+
+- Panel fault entities now update from unsolicited FlexC events without waiting
+  for the next coordinator refresh.
+- Zone tamper state can now be updated directly from SPC FlexC events.
+- SPC reason `2007` error reporting now includes known active panel faults when
+  available.
+
+### Diagnostics
+
+- Added `230 V mains fault` diagnostic binary sensor.
+- Added `Panel battery fault` diagnostic binary sensor.
+- Added `Panel tamper` diagnostic binary sensor.
+- Added dynamically discovered X-BUS tamper and tamper-isolation diagnostic
+  entities.
+
+### Validated
+
+Real SPC hardware testing validated the following FlexC event pairs:
+
+- Panel 230 V mains fault / restoration: `5000` / `5001`.
+- Panel battery fault / restoration: `5006` / `5007`.
+- Panel enclosure tamper fault / restoration: `5206` / `5207`.
+- Zone tamper fault / restoration: `1008` / `1108`.
+- X-BUS tamper fault event: `5312`.
+- X-BUS tamper isolation / isolation restoration: `5316` / `5317`.
+- X-BUS event `5317` is deliberately treated as restoration of the isolation
+  state and does not clear the physical X-BUS tamper fault.
+
+### Development
+
+- Extended automated event handling and alarm-control tests.
+- Test suite now contains 39 passing tests.
+
+**Full Changelog**:
+https://github.com/minimicro34/ha-spc-flexc/compare/v1.0.1...v1.0.2
+
+---
+
 ## [1.0.1] - 2026-08-18
 
 ### Added
