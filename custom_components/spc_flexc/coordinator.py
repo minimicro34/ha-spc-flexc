@@ -19,6 +19,7 @@ from .const import (
 )
 from .flexc.connection import FlexCClient, FlexCError
 from .flexc.events import (
+    apply_area_event,
     apply_event,
     apply_panel_event,
     apply_xbus_event,
@@ -604,6 +605,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             event,
         )
 
+        area_changed = apply_area_event(
+            self.state.areas,
+            event,
+        )
+
         zone_changed = apply_zone_event(
             self.state.zones,
             event,
@@ -614,5 +620,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             event,
         )
 
-        if fault_changed or panel_changed or zone_changed or xbus_changed:
+        if (
+            fault_changed
+            or panel_changed
+            or area_changed
+            or zone_changed
+            or xbus_changed
+        ):
             self.async_set_updated_data(self.state)

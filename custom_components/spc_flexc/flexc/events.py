@@ -40,6 +40,11 @@ PANEL_EVENT_STATE_MAP: dict[int, tuple[str, bool]] = {
     7004: ("engineer_mode", False),
 }
 
+AREA_EVENT_MODE_MAP: dict[int, int] = {
+    3501: 0,  # MHS / Unset
+    3504: 3,  # MES Totale / Full Set
+}
+
 
 def parse_event_payload(
     payload: bytes,
@@ -246,3 +251,34 @@ def apply_xbus_event(
     device.updated_at = datetime.now(UTC)
 
     return changed
+
+
+def apply_area_event(
+    areas: Mapping[int, Any],
+    event: Mapping[str, Any],
+) -> bool:
+    """Apply a validated area mode EVENT to the matching area."""
+
+    raw_event_id = event.get("EV_ID")
+    raw_area_id = event.get("AREA_ID")
+
+    try:
+        event_id = int(str(raw_event_id))
+        area_id = int(str(raw_area_id))
+    except (TypeError, ValueError):
+        return False
+
+    mode = AREA_EVENT_MODE_MAP.get(event_id)
+
+    if mode is None:
+        return False
+
+    area = areas.get(area_id)
+
+    if area is None:
+        return False
+
+    previous = area.mode
+    area.mode = mode
+
+    return previous != mode

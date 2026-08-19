@@ -1,4 +1,5 @@
 from custom_components.spc_flexc.flexc.events import (
+    apply_area_event,
     apply_event,
     apply_panel_event,
     apply_xbus_event,
@@ -6,6 +7,7 @@ from custom_components.spc_flexc.flexc.events import (
     parse_event_payload,
 )
 from custom_components.spc_flexc.models import (
+    AreaState,
     FaultState,
     PanelState,
     XBusDeviceState,
@@ -286,3 +288,93 @@ def test_xbus_tamper_isolation_cycle() -> None:
     # 5317 means isolation restored/removed.
     # It must NOT clear the physical X-BUS tamper fault.
     assert device.tamper_fault is True
+
+
+def test_area_full_set_event() -> None:
+    """Test real-time area Full Set event."""
+    areas = {
+        1: AreaState(
+            area_id=1,
+            name="Logis",
+            mode=0,
+        )
+    }
+
+    changed = apply_area_event(
+        areas,
+        {
+            "EV_ID": "3504",
+            "AREA_ID": "1",
+            "AREA_NAME": "Logis",
+        },
+    )
+
+    assert changed is True
+    assert areas[1].mode == 3
+
+
+def test_area_unset_event() -> None:
+    """Test real-time area Unset event."""
+    areas = {
+        1: AreaState(
+            area_id=1,
+            name="Logis",
+            mode=3,
+        )
+    }
+
+    changed = apply_area_event(
+        areas,
+        {
+            "EV_ID": "3501",
+            "AREA_ID": "1",
+            "AREA_NAME": "Logis",
+        },
+    )
+
+    assert changed is True
+    assert areas[1].mode == 0
+
+
+def test_unknown_area_mode_event() -> None:
+    """Test unrelated area event is ignored."""
+    areas = {
+        1: AreaState(
+            area_id=1,
+            name="Logis",
+            mode=0,
+        )
+    }
+
+    changed = apply_area_event(
+        areas,
+        {
+            "EV_ID": "9999",
+            "AREA_ID": "1",
+        },
+    )
+
+    assert changed is False
+    assert areas[1].mode == 0
+
+
+def test_area_mode_event_unknown_area() -> None:
+    """Test area event for an unknown area is ignored."""
+    areas = {
+        1: AreaState(
+            area_id=1,
+            name="Logis",
+            mode=0,
+        )
+    }
+
+    changed = apply_area_event(
+        areas,
+        {
+            "EV_ID": "3504",
+            "AREA_ID": "2",
+        },
+    )
+
+    assert changed is False
+    assert areas[1].mode == 0

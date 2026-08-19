@@ -4,6 +4,38 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] - 2026-08-19
+
+### Added
+
+- Added real-time SPC area mode updates from unsolicited FlexC events.
+- Added handling of validated SPC Full Set (`3504`) and Unset (`3501`) area events.
+
+### Changed
+
+- Area alarm entities now update immediately when the SPC reports a Set or Unset event.
+- Global alarm state now follows real-time area state changes instead of waiting for the next coordinator refresh.
+- Area updates continue to use SPC-reported events as the source of truth; no optimistic alarm state is introduced.
+
+### Validated
+
+Real SPC hardware testing validated:
+
+- Full Set area event: `3504`;
+- Unset area event: `3501`;
+- area identification through `AREA_ID`;
+- immediate individual area state updates;
+- immediate global alarm state recalculation from updated area states.
+
+### Development
+
+- Added automated tests for SPC area Set / Unset FlexC events.
+
+**Full Changelog**:
+https://github.com/minimicro34/ha-spc-flexc/compare/v1.0.2...v1.0.3
+
+---
+
 ## [1.0.2] - 2026-08-19
 
 ### Added
