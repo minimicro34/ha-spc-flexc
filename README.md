@@ -1081,6 +1081,6 @@ Never include passwords, PINs or encryption keys.
 
 ## License
 
-This project is licensed under the MIT License.
+Copyright © 2026 minimicro34.
 
-See [LICENSE](LICENSE) for details.
+This project is licensed under the [GNU General Public License v3.0 or later](LICENSE).
