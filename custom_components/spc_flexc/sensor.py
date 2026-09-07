@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
     EntityCategory,
@@ -10,11 +13,14 @@ from homeassistant.const import (
     UnitOfElectricPotential,
     UnitOfFrequency,
 )
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SpcFlexCCoordinator
+from .models import AtpState
 
 DESCRIPTIONS = (
     SensorEntityDescription(
@@ -40,7 +46,11 @@ DESCRIPTIONS = (
 )
 
 
-async def async_setup_entry(hass, entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
     coordinator: SpcFlexCCoordinator = entry.runtime_data
 
     async_add_entities(
@@ -88,18 +98,25 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entry.async_on_unload(coordinator.async_add_listener(add_ats_entities))
 
 
-class SpcPanelSensor(CoordinatorEntity, SensorEntity):
+class SpcPanelSensor(
+    CoordinatorEntity[SpcFlexCCoordinator],
+    SensorEntity,
+):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, description):
+    def __init__(
+        self,
+        coordinator: SpcFlexCCoordinator,
+        description: SensorEntityDescription,
+    ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{entry_id(coordinator)}_{description.key}"
         self._attr_device_info = build_device_info(coordinator)
 
     @property
-    def native_value(self):
+    def native_value(self) -> float | None:
         """Return the sensor value."""
         return getattr(
             self.coordinator.data.panel,
@@ -107,7 +124,7 @@ class SpcPanelSensor(CoordinatorEntity, SensorEntity):
         )
 
 
-def build_device_info(coordinator) -> DeviceInfo:
+def build_device_info(coordinator: SpcFlexCCoordinator) -> DeviceInfo:
     """Return the SPC panel device information."""
     panel = coordinator.data.panel
 
@@ -131,8 +148,9 @@ def build_device_info(coordinator) -> DeviceInfo:
     )
 
 
-def entry_id(c):
-    return c.entry.entry_id
+def entry_id(coordinator: SpcFlexCCoordinator) -> str:
+    """Return the config entry ID."""
+    return coordinator.entry.entry_id
 
 
 class SpcAtsActivePathSensor(
@@ -207,7 +225,7 @@ class SpcAtpLastTxSensor(
         )
         self._attr_device_info = build_device_info(coordinator)
 
-    def _atp(self):
+    def _atp(self) -> AtpState | None:
         """Return the last known ATP state."""
         ats = self.coordinator.data.ats.get(self.ats_id)
 
@@ -222,7 +240,7 @@ class SpcAtpLastTxSensor(
         return self._atp() is not None
 
     @property
-    def native_value(self):
+    def native_value(self) -> datetime | None:
         """Return the last successful TX timestamp."""
         atp = self._atp()
 
