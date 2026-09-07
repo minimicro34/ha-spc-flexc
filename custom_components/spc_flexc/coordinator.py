@@ -1,3 +1,5 @@
+"""Data update coordinator for the SPC FlexC integration."""
+
 import asyncio
 import logging
 from contextlib import suppress
