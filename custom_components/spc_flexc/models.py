@@ -1,3 +1,5 @@
+"""State models for the SPC FlexC integration."""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -158,14 +160,36 @@ class ZoneState:
     event_tamper: bool | None = None
     last_event: dict[str, Any] | None = None
 
-    inhibited: bool | None = None
     inhibit_allowed: bool | None = None
-    deinhibit_allowed: bool | None = None
     isolate_allowed: bool | None = None
     actuations_since_last_read: int | None = None
 
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
+
+    @property
+    def inhibited(self) -> bool | None:
+        """Return the explicit FlexC inhibition state when it can be inferred."""
+        value = self.raw.get("INHIBITED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if "INHIBIT_ALLOWED" in self.raw:
+            return False
+        return None
+
+    @property
+    def deinhibit_allowed(self) -> bool | None:
+        """Return whether FlexC currently permits de-inhibiting this zone."""
+        value = self.raw.get("DEINHIBIT_ALLOWED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if self.inhibited is False:
+            return False
+        return None
 
 
 @dataclass
