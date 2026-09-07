@@ -19,7 +19,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             if zone.inhibited is True:
                 return
             if zone.inhibit_allowed is not True:
-                raise ValueError(f"SPC zone {zone_id} does not currently allow inhibition")
+                raise ValueError(
+                    f"SPC zone {zone_id} does not currently allow inhibition"
+                )
         else:
             if zone.inhibited is False:
                 return
@@ -52,7 +54,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         refreshed.status = _int_or_none(raw_zone.get("STATUS"))
         refreshed.proc_state = _int_or_none(raw_zone.get("PROC_STATE"))
         refreshed.alarm_state = _int_or_none(raw_zone.get("ALARM_STATE"))
+        refreshed.inhibited = _bool_or_none(raw_zone.get("INHIBITED"))
         refreshed.inhibit_allowed = _bool_or_none(raw_zone.get("INHIBIT_ALLOWED"))
+        refreshed.deinhibit_allowed = _bool_or_none(raw_zone.get("DEINHIBIT_ALLOWED"))
         refreshed.isolate_allowed = _bool_or_none(raw_zone.get("ISOLATE_ALLOWED"))
         refreshed.actuations_since_last_read = _int_or_none(
             raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
