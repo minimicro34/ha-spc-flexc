@@ -21,8 +21,15 @@ CONF_COMMAND_USERNAME = "command_username"
 CONF_COMMAND_PASSWORD = "command_password"
 
 ATS_IDS = range(1, 5)
-AREA_IDS = range(1, 9)
-ZONE_IDS = range(1, 9)
+
+# Discovery is protocol-driven: valid-but-unused IDs may return RESULT=0 with
+# an empty reply, while the first out-of-range IDs return RESULT=102. The
+# generous safety caps below prevent an endless scan if a panel never reports
+# that boundary.
+DISCOVERY_BATCH_SIZE = 8
+AREA_DISCOVERY_MAX_ID = 64
+ZONE_DISCOVERY_MAX_ID = 512
+DOOR_DISCOVERY_MAX_ID = 128
 
 SPC_ZONE_TYPES: dict[int, str] = {
     0: "alarm",
