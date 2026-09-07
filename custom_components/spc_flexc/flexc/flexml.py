@@ -176,9 +176,7 @@ def parse_panel_summary(response: str) -> dict[str, str]:
 
 def parse_zone_status_discovery(response: str) -> FlexMLDiscoveryResult:
     """Parse zone status discovery replies."""
-    return _parse_status_discovery(
-        response, "REPLY_GET_ZONE_STATUS", "ZONE_STATUS"
-    )
+    return _parse_status_discovery(response, "REPLY_GET_ZONE_STATUS", "ZONE_STATUS")
 
 
 def parse_zone_status(response: str) -> list[dict[str, str]]:
@@ -188,9 +186,7 @@ def parse_zone_status(response: str) -> list[dict[str, str]]:
 
 def parse_area_status_discovery(response: str) -> FlexMLDiscoveryResult:
     """Parse area status discovery replies."""
-    return _parse_status_discovery(
-        response, "REPLY_GET_AREA_STATUS", "AREA_STATUS"
-    )
+    return _parse_status_discovery(response, "REPLY_GET_AREA_STATUS", "AREA_STATUS")
 
 
 def parse_area_status(response: str) -> list[dict[str, str]]:
@@ -200,9 +196,7 @@ def parse_area_status(response: str) -> list[dict[str, str]]:
 
 def parse_door_status_discovery(response: str) -> FlexMLDiscoveryResult:
     """Parse door status discovery replies."""
-    return _parse_status_discovery(
-        response, "REPLY_GET_DOOR_STATUS", "DOOR_STATUS"
-    )
+    return _parse_status_discovery(response, "REPLY_GET_DOOR_STATUS", "DOOR_STATUS")
 
 
 def parse_door_status(response: str) -> list[dict[str, str]]:
