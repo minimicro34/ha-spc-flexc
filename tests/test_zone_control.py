@@ -21,10 +21,10 @@ async def test_async_set_zone_inhibited_uses_validated_actions() -> None:
         side_effect=[
             '<FLEXML_REPLY VER="1.0"><REPLY_ZONE_CONTROL RESULT="0" '
             'CMD_RESULT="OK"><ZONE_CONTROL ZONE_ID="1" RESULT="0"/>'
-            '</REPLY_ZONE_CONTROL></FLEXML_REPLY>',
+            "</REPLY_ZONE_CONTROL></FLEXML_REPLY>",
             '<FLEXML_REPLY VER="1.0"><REPLY_ZONE_CONTROL RESULT="0" '
             'CMD_RESULT="OK"><ZONE_CONTROL ZONE_ID="1" RESULT="0"/>'
-            '</REPLY_ZONE_CONTROL></FLEXML_REPLY>',
+            "</REPLY_ZONE_CONTROL></FLEXML_REPLY>",
         ]
     )
 
