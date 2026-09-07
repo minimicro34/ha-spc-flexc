@@ -5,19 +5,22 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from homeassistant.helpers.update_coordinator import (
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    AREA_IDS,
+    AREA_DISCOVERY_MAX_ID,
     ATS_IDS,
     DEFAULT_PANEL_INTERVAL,
+    DOOR_DISCOVERY_MAX_ID,
     DOMAIN,
-    ZONE_IDS,
+    ZONE_DISCOVERY_MAX_ID,
 )
 from .flexc.connection import FlexCClient, FlexCError
+from .flexc.discovery import (
+    async_discover_areas,
+    async_discover_doors,
+    async_discover_zones,
+)
 from .flexc.events import (
     apply_area_event,
     apply_event,
@@ -30,6 +33,7 @@ from .models import (
     AreaState,
     AtpState,
     AtsState,
+    DoorState,
     PanelState,
     SpcState,
     ZoneState,
@@ -46,7 +50,6 @@ def _float_value(value: Any, suffix: str = "") -> float | None:
         return None
 
     text = str(value).strip()
-
     if suffix and text.endswith(suffix):
         text = text[: -len(suffix)].strip()
 
@@ -73,56 +76,33 @@ def _bool_value(value: Any) -> bool | None:
         return None
 
     text = str(value).strip()
-
     if text == "0":
         return False
-
     if text == "1":
         return True
-
     return None
 
 
-def _spc_datetime(
-    value: Any,
-    timezone: ZoneInfo,
-) -> datetime | None:
+def _spc_datetime(value: Any, timezone: ZoneInfo) -> datetime | None:
     """Convert an SPC HHMMSSDDMMYYYY timestamp."""
     if value is None:
         return None
 
-    text = str(value).strip()
-
     try:
-        return datetime.strptime(
-            text,
-            "%H%M%S%d%m%Y",
-        ).replace(tzinfo=timezone)
+        return datetime.strptime(str(value).strip(), "%H%M%S%d%m%Y").replace(
+            tzinfo=timezone
+        )
     except ValueError:
         return None
 
 
-def _panel_state_from_summary(
-    summary: dict[str, str],
-) -> PanelState:
+def _panel_state_from_summary(summary: dict[str, str]) -> PanelState:
     """Convert raw PANEL_SUMMARY attributes to PanelState."""
     return PanelState(
-        battery_voltage=_float_value(
-            summary.get("SPC_BATT_VOLT"),
-            "V",
-        ),
-        aux_voltage=_float_value(
-            summary.get("SPC_AUX_VOLT"),
-            "V",
-        ),
-        aux_current=_float_value(
-            summary.get("SPC_AUX_CURR"),
-            "mA",
-        ),
-        ac_frequency=_float_value(
-            summary.get("SPC_AC_FREQ"),
-            "Hz",
-        ),
+        battery_voltage=_float_value(summary.get("SPC_BATT_VOLT"), "V"),
+        aux_voltage=_float_value(summary.get("SPC_AUX_VOLT"), "V"),
+        aux_current=_float_value(summary.get("SPC_AUX_CURR"), "mA"),
+        ac_frequency=_float_value(summary.get("SPC_AC_FREQ"), "Hz"),
         rf_type=_int_value(summary.get("SPC_RF_TYPE")),
         rf_version=summary.get("SPC_RF_VERSION"),
         internal_bells=_bool_value(summary.get("INTERNAL_BELLS")),
@@ -139,13 +119,9 @@ def _panel_state_from_summary(
     )
 
 
-def _ats_state_from_status(
-    response: dict[str, Any],
-    timezone: ZoneInfo,
-) -> AtsState:
+def _ats_state_from_status(response: dict[str, Any], timezone: ZoneInfo) -> AtsState:
     """Convert raw FlexC ATS status to persistent state."""
     raw_ats = response["ats"]
-
     ats = AtsState(
         ats_id=int(raw_ats["ATS_ID"]),
         name=raw_ats.get("ATS_NAME"),
@@ -158,7 +134,6 @@ def _ats_state_from_status(
 
     for raw_atp in response["atps"]:
         atp_id = int(raw_atp["ATP_ID"])
-
         ats.atps[atp_id] = AtpState(
             atp_id=atp_id,
             name=raw_atp.get("ATP_NAME"),
@@ -167,8 +142,7 @@ def _ats_state_from_status(
             state=_int_value(raw_atp.get("ATP_STATE")),
             connect_state=_int_value(raw_atp.get("ATP_CONNECT_STATE")),
             last_tx_ok_timestamp=_spc_datetime(
-                raw_atp.get("LAST_TX_OK_TIMESTAMP"),
-                timezone,
+                raw_atp.get("LAST_TX_OK_TIMESTAMP"), timezone
             ),
         )
 
@@ -176,8 +150,7 @@ def _ats_state_from_status(
 
 
 def _area_state_from_status(
-    raw_area: dict[str, str],
-    timezone: ZoneInfo,
+    raw_area: dict[str, str], timezone: ZoneInfo
 ) -> AreaState:
     """Convert raw AREA_STATUS attributes to AreaState."""
     return AreaState(
@@ -186,22 +159,13 @@ def _area_state_from_status(
         mode=_int_value(raw_area.get("MODE")),
         partset_a_enabled=_bool_value(raw_area.get("PARTSETA_ENABLE")),
         partset_b_enabled=_bool_value(raw_area.get("PARTSETB_ENABLE")),
-        last_set_time=_spc_datetime(
-            raw_area.get("LAST_SET_TIME"),
-            timezone,
-        ),
+        last_set_time=_spc_datetime(raw_area.get("LAST_SET_TIME"), timezone),
         last_set_user_id=_int_value(raw_area.get("LAST_SET_USER_ID")),
         last_set_user_name=raw_area.get("LAST_SET_USER_NAME"),
-        last_unset_time=_spc_datetime(
-            raw_area.get("LAST_UNSET_TIME"),
-            timezone,
-        ),
+        last_unset_time=_spc_datetime(raw_area.get("LAST_UNSET_TIME"), timezone),
         last_unset_user_id=_int_value(raw_area.get("LAST_UNSET_USER_ID")),
         last_unset_user_name=raw_area.get("LAST_UNSET_USER_NAME"),
-        last_alarm=_spc_datetime(
-            raw_area.get("LAST_ALARM"),
-            timezone,
-        ),
+        last_alarm=_spc_datetime(raw_area.get("LAST_ALARM"), timezone),
         internal_bells=_bool_value(raw_area.get("INTERNAL_BELLS")),
         external_bells=_bool_value(raw_area.get("EXTERNAL_BELLS")),
         raw=dict(raw_area),
@@ -209,9 +173,7 @@ def _area_state_from_status(
     )
 
 
-def _zone_state_from_status(
-    raw_zone: dict[str, str],
-) -> ZoneState:
+def _zone_state_from_status(raw_zone: dict[str, str]) -> ZoneState:
     """Convert raw ZONE_STATUS attributes to ZoneState."""
     return ZoneState(
         zone_id=int(raw_zone["ZONE_ID"]),
@@ -234,6 +196,17 @@ def _zone_state_from_status(
     )
 
 
+def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
+    """Convert raw DOOR_STATUS attributes without assuming undocumented fields."""
+    return DoorState(
+        door_id=int(raw_door["DOOR_ID"]),
+        name=raw_door.get("DOOR_NAME") or raw_door.get("NAME"),
+        mode=_int_value(raw_door.get("DOOR_MODE") or raw_door.get("MODE")),
+        raw=dict(raw_door),
+        updated_at=datetime.now(UTC),
+    )
+
+
 class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     """Coordinate SPC FlexC updates."""
 
@@ -244,7 +217,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             name=DOMAIN,
             update_interval=timedelta(seconds=DEFAULT_PANEL_INTERVAL),
         )
-
         self.entry = entry
         self.state = SpcState()
 
@@ -253,24 +225,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
         self._detected_ats_ids: set[int] = set()
         self._ats_discovery_complete = False
-
         self._detected_area_ids: set[int] = set()
         self._area_discovery_complete = False
-
         self._detected_zone_ids: set[int] = set()
         self._zone_discovery_complete = False
+        self._detected_door_ids: set[int] = set()
+        self._door_discovery_complete = False
 
-        self._ats_discovery_requested = False
-
-        # Protect complete FlexC command sequences.
-        #
-        # FlexCClient already serializes individual FLEXML commands.
-        # This lock additionally prevents PANEL_SUMMARY, ALERT_STATUS,
-        # ATS/area polling, zone polling and background discovery
-        # sequences from being interleaved.
+        self._discovery_requested = False
         self._client_operation_lock = asyncio.Lock()
-
-        self._ats_discovery_task: asyncio.Task[None] | None = None
+        self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
 
     async def _async_update_data(self) -> SpcState:
@@ -278,14 +242,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         try:
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
-
                 summary = await self.client.async_get_panel_summary()
-
                 if summary:
                     self.state.panel = _panel_state_from_summary(summary)
 
                 alerts = await self.client.async_get_alert_status()
-
                 if not alerts:
                     self.state.faults.modem_1_fault = False
                     self.state.faults.modem_1_line_fault = False
@@ -295,7 +256,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                 timezone = ZoneInfo(self.hass.config.time_zone)
 
-                # Poll only ATS IDs discovered during startup.
                 if self._ats_discovery_complete:
                     for ats_id in sorted(self._detected_ats_ids):
                         try:
@@ -304,197 +264,144 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             )
                         except FlexMLError as err:
                             _LOGGER.debug(
-                                "Ignoring unavailable previously "
-                                "detected FlexC ATS %d: %s",
+                                "Ignoring unavailable previously detected FlexC ATS %d: %s",
                                 ats_id,
                                 err,
                             )
                             continue
+                        if ats_status:
+                            ats = _ats_state_from_status(ats_status, timezone)
+                            self.state.ats[ats.ats_id] = ats
 
-                        if not ats_status:
-                            continue
-
-                        ats = _ats_state_from_status(
-                            ats_status,
-                            timezone,
-                        )
-
-                        self.state.ats[ats.ats_id] = ats
-
-                # Poll only areas discovered during startup.
                 if self._area_discovery_complete and self._detected_area_ids:
                     raw_areas = await self.client.async_get_area_status(
                         sorted(self._detected_area_ids)
                     )
-
                     for raw_area in raw_areas:
-                        area = _area_state_from_status(
-                            raw_area,
-                            timezone,
-                        )
-
+                        area = _area_state_from_status(raw_area, timezone)
                         self.state.areas[area.area_id] = area
 
-            # Zones are deliberately NOT polled here.
-            #
-            # Their dedicated background loop has its own cadence
-            # while sharing the same client operation lock.
-
-            if self._ats_discovery_requested and (
-                not self._ats_discovery_complete
-                or not self._area_discovery_complete
-                or not self._zone_discovery_complete
-            ):
-                self._schedule_ats_discovery()
+            if self._discovery_requested and not self._discovery_complete:
+                self._schedule_discovery()
 
             return self.state
-
         except FlexCError as err:
-            # Preserve all last-known states when the FlexC transport
-            # becomes unavailable.
             raise UpdateFailed(f"FlexC update failed: {err}") from err
 
-    def async_start_background_discovery(self) -> None:
-        """Enable and start background discovery."""
-        self._ats_discovery_requested = True
-        self._schedule_ats_discovery()
-
-    def _schedule_ats_discovery(self) -> None:
-        """Schedule discovery if it is not already running."""
-        if (
+    @property
+    def _discovery_complete(self) -> bool:
+        return (
             self._ats_discovery_complete
             and self._area_discovery_complete
             and self._zone_discovery_complete
-        ):
+            and self._door_discovery_complete
+        )
+
+    def async_start_background_discovery(self) -> None:
+        """Enable and start background discovery."""
+        self._discovery_requested = True
+        self._schedule_discovery()
+
+    def _schedule_discovery(self) -> None:
+        """Schedule discovery if it is not already running."""
+        if self._discovery_complete:
             return
 
-        task = self._ats_discovery_task
-
-        if task is not None and not task.done():
+        if self._discovery_task is not None and not self._discovery_task.done():
             return
 
-        self._ats_discovery_task = self.entry.async_create_background_task(
+        self._discovery_task = self.entry.async_create_background_task(
             self.hass,
-            self._async_discover_ats(),
+            self._async_discover_panel_objects(),
             name=f"{DOMAIN} discovery",
             eager_start=False,
         )
 
-    async def _async_discover_ats(self) -> None:
-        """Discover available ATS IDs, areas and zones."""
+    async def _async_discover_panel_objects(self) -> None:
+        """Discover available ATS IDs, areas, zones and doors."""
         try:
-            detected_ats_ids: set[int] = set()
-            detected_area_ids: set[int] = set()
-            detected_zone_ids: set[int] = set()
-
             timezone = ZoneInfo(self.hass.config.time_zone)
 
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
 
-                # Discover ATS.
+                detected_ats_ids: set[int] = set()
                 for ats_id in ATS_IDS:
                     try:
                         ats_status = await self.client.async_get_flexc_ats_status(
                             ats_id
                         )
                     except FlexMLError as err:
-                        _LOGGER.debug(
-                            "FlexC ATS %d not detected: %s",
-                            ats_id,
-                            err,
-                        )
+                        _LOGGER.debug("FlexC ATS %d not detected: %s", ats_id, err)
                         continue
 
-                    if not ats_status:
-                        continue
-
-                    ats = _ats_state_from_status(
-                        ats_status,
-                        timezone,
-                    )
-
-                    self.state.ats[ats.ats_id] = ats
-                    detected_ats_ids.add(ats.ats_id)
+                    if ats_status:
+                        ats = _ats_state_from_status(ats_status, timezone)
+                        self.state.ats[ats.ats_id] = ats
+                        detected_ats_ids.add(ats.ats_id)
 
                 self._detected_ats_ids.update(detected_ats_ids)
                 self._ats_discovery_complete = True
 
-                # Discover areas.
-                raw_areas = await self.client.async_get_area_status(AREA_IDS)
-
+                detected_area_ids: set[int] = set()
+                raw_areas = await async_discover_areas(
+                    self.client, AREA_DISCOVERY_MAX_ID
+                )
                 for raw_area in raw_areas:
-                    area = _area_state_from_status(
-                        raw_area,
-                        timezone,
-                    )
-
+                    area = _area_state_from_status(raw_area, timezone)
                     self.state.areas[area.area_id] = area
                     detected_area_ids.add(area.area_id)
-
                 self._detected_area_ids.update(detected_area_ids)
                 self._area_discovery_complete = True
 
-                # Discover zones.
-                raw_zones = await self.client.async_get_zone_status(ZONE_IDS)
-
+                detected_zone_ids: set[int] = set()
+                raw_zones = await async_discover_zones(
+                    self.client, ZONE_DISCOVERY_MAX_ID
+                )
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
-
                     self.state.zones[zone.zone_id] = zone
-
                     detected_zone_ids.add(zone.zone_id)
-
                 self._detected_zone_ids.update(detected_zone_ids)
                 self._zone_discovery_complete = True
 
+                detected_door_ids: set[int] = set()
+                raw_doors = await async_discover_doors(
+                    self.client, DOOR_DISCOVERY_MAX_ID
+                )
+                for raw_door in raw_doors:
+                    door = _door_state_from_status(raw_door)
+                    self.state.doors[door.door_id] = door
+                    detected_door_ids.add(door.door_id)
+                self._detected_door_ids.update(detected_door_ids)
+                self._door_discovery_complete = True
+
             _LOGGER.info(
-                "FlexC ATS discovery completed: detected ATS IDs %s",
+                "FlexC discovery completed: ATS=%s areas=%s zones=%s doors=%s",
                 sorted(self._detected_ats_ids),
-            )
-
-            _LOGGER.info(
-                "SPC area discovery completed: detected area IDs %s",
                 sorted(self._detected_area_ids),
-            )
-
-            _LOGGER.info(
-                "SPC zone discovery completed: detected zone IDs %s",
                 sorted(self._detected_zone_ids),
+                sorted(self._detected_door_ids),
             )
 
             self.async_set_updated_data(self.state)
-
-            # Start the dedicated zone polling only after
-            # initial discovery and after releasing the operation lock.
             self._schedule_zone_polling()
 
         except asyncio.CancelledError:
             raise
-
         except (FlexCError, FlexMLError) as err:
-            _LOGGER.debug(
-                "FlexC background discovery interrupted: %s",
-                err,
-            )
-
+            _LOGGER.debug("FlexC background discovery interrupted: %s", err)
         finally:
             current_task = asyncio.current_task()
-
-            if self._ats_discovery_task is current_task:
-                self._ats_discovery_task = None
+            if self._discovery_task is current_task:
+                self._discovery_task = None
 
     def _schedule_zone_polling(self) -> None:
         """Start dedicated zone polling if not already running."""
-        if not self._zone_discovery_complete:
+        if not self._zone_discovery_complete or not self._detected_zone_ids:
             return
 
-        if not self._detected_zone_ids:
-            return
-
-        task = self._zone_poll_task
-
-        if task is not None and not task.done():
+        if self._zone_poll_task is not None and not self._zone_poll_task.done():
             return
 
         self._zone_poll_task = self.entry.async_create_background_task(
@@ -509,36 +416,24 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         try:
             while True:
                 await asyncio.sleep(ZONE_POLL_INTERVAL)
-
                 if not self._zone_discovery_complete:
                     continue
 
                 zone_ids = sorted(self._detected_zone_ids)
-
                 if not zone_ids:
                     continue
 
                 try:
                     async with self._client_operation_lock:
                         await self.client.async_ensure_connected()
-
                         raw_zones = await self.client.async_get_zone_status(zone_ids)
-
-                except (
-                    FlexCError,
-                    FlexMLError,
-                ) as err:
-                    _LOGGER.debug(
-                        "SPC zone polling failed: %s",
-                        err,
-                    )
+                except (FlexCError, FlexMLError) as err:
+                    _LOGGER.debug("SPC zone polling failed: %s", err)
                     continue
 
                 changed = False
-
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
-
                     previous = self.state.zones.get(zone.zone_id)
 
                     if previous is not None:
@@ -558,67 +453,38 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
                 if changed:
                     self.async_set_updated_data(self.state)
-
         finally:
             current_task = asyncio.current_task()
-
             if self._zone_poll_task is current_task:
                 self._zone_poll_task = None
 
     async def async_shutdown(self) -> None:
         """Stop background work and close the FlexC connection."""
-        self._ats_discovery_requested = False
+        self._discovery_requested = False
 
         zone_task = self._zone_poll_task
         self._zone_poll_task = None
-
         if zone_task is not None and not zone_task.done():
             zone_task.cancel()
-
             with suppress(asyncio.CancelledError):
                 await zone_task
 
-        discovery_task = self._ats_discovery_task
-        self._ats_discovery_task = None
-
+        discovery_task = self._discovery_task
+        self._discovery_task = None
         if discovery_task is not None and not discovery_task.done():
             discovery_task.cancel()
-
             with suppress(asyncio.CancelledError):
                 await discovery_task
 
         await self.client.async_close()
 
-    def _handle_flexc_event(
-        self,
-        event: dict[str, str],
-    ) -> None:
+    def _handle_flexc_event(self, event: dict[str, str]) -> None:
         """Apply one unsolicited FlexC EVENT 0x60."""
-
-        fault_changed = apply_event(
-            self.state.faults,
-            event,
-        )
-
-        panel_changed = apply_panel_event(
-            self.state.panel,
-            event,
-        )
-
-        area_changed = apply_area_event(
-            self.state.areas,
-            event,
-        )
-
-        zone_changed = apply_zone_event(
-            self.state.zones,
-            event,
-        )
-
-        xbus_changed = apply_xbus_event(
-            self.state.xbus_devices,
-            event,
-        )
+        fault_changed = apply_event(self.state.faults, event)
+        panel_changed = apply_panel_event(self.state.panel, event)
+        area_changed = apply_area_event(self.state.areas, event)
+        zone_changed = apply_zone_event(self.state.zones, event)
+        xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
 
         if (
             fault_changed
