@@ -1,3 +1,5 @@
+"""FlexC protocol message type constants."""
+
 MSG_CONNECTION_REQUEST = 0x02
 MSG_CONNECTION_ACK = 0x03
 MSG_POLL = 0x20
