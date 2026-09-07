@@ -1,5 +1,7 @@
 """Home Assistant device helpers for SPC FlexC."""
 
+from typing import Any, cast
+
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -43,16 +45,28 @@ def build_area_device_info(
     area = coordinator.data.areas[area_id]
 
     serial = panel.serial_number or coordinator.entry.entry_id
-    parent_device_id = dr.async_get_device_id_by_identifier(
-        coordinator.hass,
-        (DOMAIN, str(serial)),
-        config_entry_id=coordinator.entry.entry_id,
-    )
 
-    return DeviceInfo(
+    device_info = DeviceInfo(
         identifiers={(DOMAIN, f"{serial}_area_{area_id}")},
         name=area.name or f"Area {area_id}",
         manufacturer="Vanderbilt",
         model="SPC Area",
-        via_device_id=parent_device_id,
     )
+
+    # via_device_id replaced the deprecated via_device tuple in newer
+    # Home Assistant releases. Access it dynamically so development
+    # environments carrying older Home Assistant type definitions can still
+    # type-check the integration.
+    get_device_id = getattr(dr, "async_get_device_id_by_identifier", None)
+
+    if get_device_id is not None:
+        parent_device_id = get_device_id(
+            coordinator.hass,
+            (DOMAIN, str(serial)),
+            config_entry_id=coordinator.entry.entry_id,
+        )
+
+        if parent_device_id is not None:
+            cast(dict[str, Any], device_info)["via_device_id"] = parent_device_id
+
+    return device_info
