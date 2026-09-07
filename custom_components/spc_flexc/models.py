@@ -167,6 +167,18 @@ class ZoneState:
 
 
 @dataclass
+class DoorState:
+    """Last known SPC access-control door state."""
+
+    door_id: int
+    name: str | None = None
+    mode: int | None = None
+
+    raw: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime | None = None
+
+
+@dataclass
 class XBusDeviceState:
     """Last known X-BUS device state derived from FlexC events."""
 
@@ -190,5 +202,6 @@ class SpcState:
 
     areas: dict[int, AreaState] = field(default_factory=dict)
     zones: dict[int, ZoneState] = field(default_factory=dict)
+    doors: dict[int, DoorState] = field(default_factory=dict)
     ats: dict[int, AtsState] = field(default_factory=dict)
     xbus_devices: dict[int, XBusDeviceState] = field(default_factory=dict)
