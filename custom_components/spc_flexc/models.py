@@ -158,7 +158,9 @@ class ZoneState:
     event_tamper: bool | None = None
     last_event: dict[str, Any] | None = None
 
+    inhibited: bool | None = None
     inhibit_allowed: bool | None = None
+    deinhibit_allowed: bool | None = None
     isolate_allowed: bool | None = None
     actuations_since_last_read: int | None = None
 
