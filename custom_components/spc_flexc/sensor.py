@@ -1,3 +1,5 @@
+"""Sensor entities for the SPC FlexC integration."""
+
 from datetime import datetime
 
 from homeassistant.components.sensor import (
