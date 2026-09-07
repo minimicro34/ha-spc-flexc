@@ -1,3 +1,5 @@
+"""Binary sensor entities for the SPC FlexC integration."""
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
