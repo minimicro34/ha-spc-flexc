@@ -25,7 +25,7 @@ lint:
 	$(PYTHON) -m ruff check .
 
 typecheck:
-	$(PYTHON) -m mypy custom_components/spc_flexc
+	$(PYTHON) -m mypy --check-untyped-defs custom_components/spc_flexc
 
 test:
 	$(PYTHON) -m pytest -q
