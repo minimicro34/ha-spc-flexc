@@ -1,8 +1,10 @@
+"""Home Assistant setup for the SPC FlexC integration."""
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import PLATFORMS
-from .coordinator import SpcFlexCCoordinator
+from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
 
 
 async def async_setup_entry(
@@ -10,7 +12,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
 ) -> bool:
     """Set up SPC FlexC."""
-    coordinator = SpcFlexCCoordinator(hass, entry)
+    coordinator = SpcFlexCZoneControlCoordinator(hass, entry)
 
     # Fast first refresh:
     # connection + PANEL_SUMMARY only.
