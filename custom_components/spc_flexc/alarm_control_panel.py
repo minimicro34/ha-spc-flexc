@@ -1,3 +1,5 @@
+"""Alarm control panel entities and area mode commands for SPC FlexC."""
+
 import xml.etree.ElementTree as ET
 from typing import Any
 from xml.sax.saxutils import quoteattr
