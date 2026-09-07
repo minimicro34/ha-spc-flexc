@@ -223,9 +223,7 @@ def parse_zone_control(response: str, zone_id: int) -> None:
         )
 
     if result.get("RESULT") != "0":
-        raise FlexMLReplyError(
-            f"ZONE_CONTROL failed: RESULT={result.get('RESULT')!r}"
-        )
+        raise FlexMLReplyError(f"ZONE_CONTROL failed: RESULT={result.get('RESULT')!r}")
 
 
 def parse_area_status_discovery(response: str) -> FlexMLDiscoveryResult:
