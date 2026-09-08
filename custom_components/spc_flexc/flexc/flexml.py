@@ -122,6 +122,26 @@ def build_door_status_batch(
     return _build_command_envelope(body, username, password)
 
 
+def build_door_control_command(
+    door_id: int,
+    action: int,
+    username: str,
+    password: str,
+) -> str:
+    """Build CMD_DOOR_CONTROL using actions recovered from Vanderbilt SPCLink."""
+    if action not in (5, 6, 7, 8):
+        raise ValueError(
+            "Door action must be 5 (open temporarily), 6 (open permanently), "
+            "7 (set normal), or 8 (lock)"
+        )
+
+    return _build_command_envelope(
+        f'<CMD_DOOR_CONTROL DOOR_ID="{door_id}" ACTION="{action}" />',
+        username,
+        password,
+    )
+
+
 def build_alert_status_command(username: str, password: str) -> str:
     """Build CMD_GET_ALERT_STATUS."""
     return _build_command_envelope("<CMD_GET_ALERT_STATUS />", username, password)
