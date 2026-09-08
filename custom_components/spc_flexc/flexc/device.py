@@ -53,20 +53,50 @@ def build_area_device_info(
         model="SPC Area",
     )
 
-    # via_device_id replaced the deprecated via_device tuple in newer
-    # Home Assistant releases. Access it dynamically so development
-    # environments carrying older Home Assistant type definitions can still
-    # type-check the integration.
+    _set_parent_device(coordinator, device_info, (DOMAIN, str(serial)))
+    return device_info
+
+
+def build_door_device_info(
+    coordinator: SpcFlexCCoordinator,
+    door_id: int,
+) -> DeviceInfo:
+    """Return the Home Assistant device for one SPC access-control door."""
+    panel = coordinator.data.panel
+    door = coordinator.data.doors[door_id]
+    serial = panel.serial_number or coordinator.entry.entry_id
+
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, f"{serial}_door_{door_id}")},
+        name=door.name or door.zone_name or f"Door {door_id}",
+        manufacturer="Vanderbilt",
+        model="SPC Door",
+    )
+
+    parent_identifier = (DOMAIN, str(serial))
+    if door.area_id is not None and door.area_id in coordinator.data.areas:
+        parent_identifier = (DOMAIN, f"{serial}_area_{door.area_id}")
+
+    _set_parent_device(coordinator, device_info, parent_identifier)
+    return device_info
+
+
+def _set_parent_device(
+    coordinator: SpcFlexCCoordinator,
+    device_info: DeviceInfo,
+    parent_identifier: tuple[str, str],
+) -> None:
+    """Attach a device using via_device_id when supported by Home Assistant."""
     get_device_id = getattr(dr, "async_get_device_id_by_identifier", None)
 
-    if get_device_id is not None:
-        parent_device_id = get_device_id(
-            coordinator.hass,
-            (DOMAIN, str(serial)),
-            config_entry_id=coordinator.entry.entry_id,
-        )
+    if get_device_id is None:
+        return
 
-        if parent_device_id is not None:
-            cast(dict[str, Any], device_info)["via_device_id"] = parent_device_id
+    parent_device_id = get_device_id(
+        coordinator.hass,
+        parent_identifier,
+        config_entry_id=coordinator.entry.entry_id,
+    )
 
-    return device_info
+    if parent_device_id is not None:
+        cast(dict[str, Any], device_info)["via_device_id"] = parent_device_id
