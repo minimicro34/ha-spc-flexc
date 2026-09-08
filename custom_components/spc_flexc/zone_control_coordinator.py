@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import suppress
 from datetime import UTC, datetime
 
@@ -18,6 +19,8 @@ from .flexc.flexml import (
 )
 from .flexc.zone_control import async_set_zone_inhibited
 from .models import DoorState
+
+_LOGGER = logging.getLogger(__name__)
 
 DOOR_POLL_INTERVAL = 1.0
 
@@ -69,7 +72,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                         response = await self.client.async_send_flexml(command)
                         raw_doors = parse_door_status(response)
                 except (FlexCError, FlexMLError) as err:
-                    self.logger.debug("SPC door polling failed: %s", err)
+                    _LOGGER.debug("SPC door polling failed: %s", err)
                     continue
 
                 changed = False
