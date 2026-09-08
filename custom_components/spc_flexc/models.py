@@ -15,6 +15,8 @@ class AreaState:
     mode: int | None = None
     partset_a_enabled: bool | None = None
     partset_b_enabled: bool | None = None
+    partset_a_name: str | None = None
+    partset_b_name: str | None = None
 
     last_set_time: datetime | None = None
     last_set_user_id: int | None = None
