@@ -49,7 +49,9 @@ async def test_inhibit_zone_refreshes_explicit_inhibition_state() -> None:
     original = module.async_set_zone_inhibited
     module.async_set_zone_inhibited = AsyncMock()
     try:
-        await SpcFlexCZoneControlCoordinator.async_inhibit_zone(coordinator, 1)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(
+            coordinator, 1, True
+        )
     finally:
         module.async_set_zone_inhibited = original
 
