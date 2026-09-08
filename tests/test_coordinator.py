@@ -1,3 +1,5 @@
+"""Tests for the SPC FlexC data update coordinator."""
+
 from unittest.mock import MagicMock
 
 from custom_components.spc_flexc.coordinator import (
