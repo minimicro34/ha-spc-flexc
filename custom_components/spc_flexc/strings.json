@@ -33,7 +33,9 @@
       "lock": {"name": "Lock"}
     },
     "switch": {
-      "inhibition": {"name": "Inhibition"}
+      "inhibition": {
+          "name": "Inhibition {zone_name}"
+      }
     }
   },
   "exceptions": {

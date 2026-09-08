@@ -23,7 +23,12 @@ class SpcZoneInhibitionSwitch(
         super().__init__(coordinator)
         self.zone_id = zone_id
         zone = coordinator.data.zones[zone_id]
+
+        zone_name = zone.name or f"Zone {zone_id}"
+        self._attr_translation_placeholders = {"zone_name": zone_name}
+
         self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_inhibition"
+
         if zone.area_id is not None and zone.area_id in coordinator.data.areas:
             self._attr_device_info = build_area_device_info(coordinator, zone.area_id)
         else:
