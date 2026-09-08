@@ -198,7 +198,24 @@ class DoorState:
 
     door_id: int
     name: str | None = None
+    status: int | None = None
     mode: int | None = None
+
+    dps_input: int | None = None
+    drs_input: int | None = None
+    reader1_format: int | None = None
+    reader2_format: int | None = None
+
+    zone_id: int | None = None
+    zone_name: str | None = None
+    area_id: int | None = None
+    area_name: str | None = None
+    area_side_1: int | None = None
+    area_side_1_name: str | None = None
+
+    entry_exit: bool | None = None
+    normal_allowed: bool | None = None
+    lock_allowed: bool | None = None
 
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
