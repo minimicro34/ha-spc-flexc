@@ -1,3 +1,5 @@
+"""Tests for SPC FlexC alarm control panel behavior."""
+
 from types import SimpleNamespace
 
 import pytest
