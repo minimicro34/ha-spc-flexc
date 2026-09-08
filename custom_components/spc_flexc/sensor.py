@@ -22,7 +22,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SpcFlexCCoordinator
-from .models import AtpState
+from .flexc.device import build_door_device_info
+from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
     SensorEntityDescription(
@@ -61,8 +62,9 @@ async def async_setup_entry(
 
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
+    known_doors: set[int] = set()
 
-    def add_ats_entities() -> None:
+    def add_dynamic_entities() -> None:
         entities: list[SensorEntity] = []
 
         for ats_id, ats in coordinator.data.ats.items():
@@ -92,12 +94,24 @@ async def async_setup_entry(
                     )
                 )
 
+        for door_id in coordinator.data.doors:
+            if door_id in known_doors:
+                continue
+
+            known_doors.add(door_id)
+            entities.extend(
+                (
+                    SpcDoorStatusSensor(coordinator, door_id),
+                    SpcDoorModeSensor(coordinator, door_id),
+                )
+            )
+
         if entities:
             async_add_entities(entities)
 
-    add_ats_entities()
+    add_dynamic_entities()
 
-    entry.async_on_unload(coordinator.async_add_listener(add_ats_entities))
+    entry.async_on_unload(coordinator.async_add_listener(add_dynamic_entities))
 
 
 class SpcPanelSensor(
@@ -250,3 +264,82 @@ class SpcAtpLastTxSensor(
             return None
 
         return atp.last_tx_ok_timestamp
+
+
+class SpcDoorSensorBase(
+    CoordinatorEntity[SpcFlexCCoordinator],
+    SensorEntity,
+):
+    """Base class for raw SPC door status sensors."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, door_id: int) -> None:
+        super().__init__(coordinator)
+        self.door_id = door_id
+        self._attr_device_info = build_door_device_info(coordinator, door_id)
+
+    def _door(self) -> DoorState | None:
+        """Return the latest known door state."""
+        return self.coordinator.data.doors.get(self.door_id)
+
+    @property
+    def available(self) -> bool:
+        """Return whether the door is currently known."""
+        return self._door() is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Expose raw, non-interpreted FlexC door metadata."""
+        door = self._door()
+        if door is None:
+            return {}
+
+        return {
+            "door_id": door.door_id,
+            "zone_id": door.zone_id,
+            "zone_name": door.zone_name,
+            "area_id": door.area_id,
+            "area_name": door.area_name,
+            "area_side_1": door.area_side_1,
+            "area_side_1_name": door.area_side_1_name,
+            "dps_input": door.dps_input,
+            "drs_input": door.drs_input,
+            "reader1_format": door.reader1_format,
+            "reader2_format": door.reader2_format,
+            "entry_exit": door.entry_exit,
+            "normal_allowed": door.normal_allowed,
+            "lock_allowed": door.lock_allowed,
+            "raw_status": door.status,
+            "raw_mode": door.mode,
+        }
+
+
+class SpcDoorStatusSensor(SpcDoorSensorBase):
+    """Expose the raw SPC door STATUS value for beta validation."""
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, door_id: int) -> None:
+        super().__init__(coordinator, door_id)
+        self._attr_name = "Status"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_door_{door_id}_status"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the unmodified numeric STATUS value from FlexC."""
+        door = self._door()
+        return None if door is None else door.status
+
+
+class SpcDoorModeSensor(SpcDoorSensorBase):
+    """Expose the raw SPC door MODE value for beta validation."""
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, door_id: int) -> None:
+        super().__init__(coordinator, door_id)
+        self._attr_name = "Mode"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_door_{door_id}_mode"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the unmodified numeric MODE value from FlexC."""
+        door = self._door()
+        return None if door is None else door.mode
