@@ -10,7 +10,14 @@ below with the same values used by the existing local FlexC probes.
 from __future__ import annotations
 
 import asyncio
+import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
+# Allow direct execution with: python3 tools/flexc_probe_outputs.py
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from custom_components.spc_flexc.flexc.connection import FlexCClient
 from custom_components.spc_flexc.flexc.flexml import _build_command_envelope
