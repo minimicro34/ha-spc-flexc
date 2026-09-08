@@ -9,26 +9,17 @@ from .flexc.device import build_area_device_info, build_panel_device_info
 from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
 
 
-class SpcZoneInhibitionSwitch(
-    CoordinatorEntity[SpcFlexCZoneControlCoordinator],
-    SwitchEntity,
-):
+class SpcZoneInhibitionSwitch(CoordinatorEntity[SpcFlexCZoneControlCoordinator], SwitchEntity):
     """Represent the inhibition state of one SPC zone."""
 
     _attr_has_entity_name = True
-    _attr_name = "Inhibition"
+    _attr_translation_key = "inhibition"
 
-    def __init__(
-        self,
-        coordinator: SpcFlexCZoneControlCoordinator,
-        zone_id: int,
-    ) -> None:
+    def __init__(self, coordinator: SpcFlexCZoneControlCoordinator, zone_id: int) -> None:
         super().__init__(coordinator)
         self.zone_id = zone_id
-
         zone = coordinator.data.zones[zone_id]
         self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_inhibition"
-
         if zone.area_id is not None and zone.area_id in coordinator.data.areas:
             self._attr_device_info = build_area_device_info(coordinator, zone.area_id)
         else:
@@ -69,11 +60,7 @@ class SpcZoneInhibitionSwitch(
         await self.coordinator.async_deinhibit_zone(self.zone_id)
 
 
-async def async_setup_entry(
-    hass,
-    entry,
-    async_add_entities,
-) -> None:
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up SPC FlexC zone inhibition switches."""
     coordinator: SpcFlexCZoneControlCoordinator = entry.runtime_data
     known_zones: set[int] = set()
@@ -81,17 +68,13 @@ async def async_setup_entry(
     def add_zone_switches() -> None:
         """Create inhibition switches for newly discovered zones."""
         entities: list[SwitchEntity] = []
-
         for zone_id, zone in coordinator.data.zones.items():
             if zone_id in known_zones:
                 continue
-
             if zone.inhibit_allowed is not True and zone.inhibited is not True:
                 continue
-
             known_zones.add(zone_id)
             entities.append(SpcZoneInhibitionSwitch(coordinator, zone_id))
-
         if entities:
             async_add_entities(entities)
 
