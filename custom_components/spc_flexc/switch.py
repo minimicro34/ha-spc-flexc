@@ -9,13 +9,17 @@ from .flexc.device import build_area_device_info, build_panel_device_info
 from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
 
 
-class SpcZoneInhibitionSwitch(CoordinatorEntity[SpcFlexCZoneControlCoordinator], SwitchEntity):
+class SpcZoneInhibitionSwitch(
+    CoordinatorEntity[SpcFlexCZoneControlCoordinator], SwitchEntity
+):
     """Represent the inhibition state of one SPC zone."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "inhibition"
 
-    def __init__(self, coordinator: SpcFlexCZoneControlCoordinator, zone_id: int) -> None:
+    def __init__(
+        self, coordinator: SpcFlexCZoneControlCoordinator, zone_id: int
+    ) -> None:
         super().__init__(coordinator)
         self.zone_id = zone_id
         zone = coordinator.data.zones[zone_id]

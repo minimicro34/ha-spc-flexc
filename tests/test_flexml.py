@@ -33,7 +33,10 @@ def test_credentials_are_xml_escaped() -> None:
     """Special characters in credentials must be XML escaped."""
     xml = build_panel_summary_command("Home&Assistant", 'P@ss"word&Test')
     assert 'PANEL_USERNAME="Home&amp;Assistant"' in xml
-    assert "PANEL_PASSWORD='P@ss\"word&amp;Test'" in xml or 'PANEL_PASSWORD="P@ss&quot;word&amp;Test"' in xml
+    assert (
+        "PANEL_PASSWORD='P@ss\"word&amp;Test'" in xml
+        or 'PANEL_PASSWORD="P@ss&quot;word&amp;Test"' in xml
+    )
 
 
 def test_zone_batch_uses_credentials() -> None:
@@ -45,8 +48,12 @@ def test_zone_batch_uses_credentials() -> None:
 
 def test_zone_control_builds_validated_actions() -> None:
     """Only real-panel validated inhibit actions may be emitted."""
-    assert '<CMD_ZONE_CONTROL ZONE_ID="1" ACTION="0" />' in build_zone_control_command(1, 0, "HomeAssistant", "MyPassword")
-    assert '<CMD_ZONE_CONTROL ZONE_ID="1" ACTION="1" />' in build_zone_control_command(1, 1, "HomeAssistant", "MyPassword")
+    assert '<CMD_ZONE_CONTROL ZONE_ID="1" ACTION="0" />' in build_zone_control_command(
+        1, 0, "HomeAssistant", "MyPassword"
+    )
+    assert '<CMD_ZONE_CONTROL ZONE_ID="1" ACTION="1" />' in build_zone_control_command(
+        1, 1, "HomeAssistant", "MyPassword"
+    )
     with pytest.raises(ValueError):
         build_zone_control_command(1, 2, "HomeAssistant", "MyPassword")
 
@@ -116,13 +123,19 @@ def test_parse_empty_alert_status() -> None:
 def test_parse_alert_status_objects() -> None:
     """Test ALERT_STATUS containing alert objects."""
     response = '<FLEXML_REPLY VER="1.0"><REPLY_GET_ALERT_STATUS RESULT="0" CMD_RESULT="OK"><ALERT EV_ID="5336" STATE="1" /><ALERT EV_ID="6100" STATE="1" /></REPLY_GET_ALERT_STATUS></FLEXML_REPLY>'
-    assert parse_alert_status(response) == [{"EV_ID": "5336", "STATE": "1"}, {"EV_ID": "6100", "STATE": "1"}]
+    assert parse_alert_status(response) == [
+        {"EV_ID": "5336", "STATE": "1"},
+        {"EV_ID": "6100", "STATE": "1"},
+    ]
 
 
 def test_parse_area_status_valid_and_empty_replies() -> None:
     """Keep valid areas and ignore successful empty replies."""
     response = '<FLEXML_REPLY VER="1.0"><REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK"><AREA_STATUS AREA_ID="1" AREA_NAME="Logis" MODE="0" /></REPLY_GET_AREA_STATUS><REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK"><AREA_STATUS AREA_ID="2" AREA_NAME="Garage" MODE="0" /></REPLY_GET_AREA_STATUS><REPLY_GET_AREA_STATUS RESULT="0" CMD_RESULT="OK"></REPLY_GET_AREA_STATUS></FLEXML_REPLY>'
-    assert parse_area_status(response) == [{"AREA_ID": "1", "AREA_NAME": "Logis", "MODE": "0"}, {"AREA_ID": "2", "AREA_NAME": "Garage", "MODE": "0"}]
+    assert parse_area_status(response) == [
+        {"AREA_ID": "1", "AREA_NAME": "Logis", "MODE": "0"},
+        {"AREA_ID": "2", "AREA_NAME": "Garage", "MODE": "0"},
+    ]
 
 
 def test_area_discovery_preserves_boundary_with_valid_objects() -> None:

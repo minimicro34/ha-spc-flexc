@@ -19,14 +19,20 @@ class SpcDoorButtonDescription(ButtonEntityDescription):
 
 
 DOOR_BUTTONS = (
-    SpcDoorButtonDescription(key="open_momentarily", translation_key="open_momentarily", action=5),
-    SpcDoorButtonDescription(key="open_permanently", translation_key="open_permanently", action=6),
+    SpcDoorButtonDescription(
+        key="open_momentarily", translation_key="open_momentarily", action=5
+    ),
+    SpcDoorButtonDescription(
+        key="open_permanently", translation_key="open_permanently", action=6
+    ),
     SpcDoorButtonDescription(key="set_normal", translation_key="set_normal", action=7),
     SpcDoorButtonDescription(key="lock", translation_key="lock", action=8),
 )
 
 
-class SpcDoorActionButton(CoordinatorEntity[SpcFlexCZoneControlCoordinator], ButtonEntity):
+class SpcDoorActionButton(
+    CoordinatorEntity[SpcFlexCZoneControlCoordinator], ButtonEntity
+):
     """Represent one momentary SPC door-control action."""
 
     _attr_has_entity_name = True

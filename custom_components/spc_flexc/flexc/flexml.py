@@ -43,47 +43,77 @@ def build_panel_summary_command(username: str, password: str) -> str:
 
 def build_zone_status_command(zone_id: int, username: str, password: str) -> str:
     """Build one CMD_GET_ZONE_STATUS command."""
-    return _build_command_envelope(f'<CMD_GET_ZONE_STATUS ZONE_ID="{zone_id}" />', username, password)
+    return _build_command_envelope(
+        f'<CMD_GET_ZONE_STATUS ZONE_ID="{zone_id}" />', username, password
+    )
 
 
-def build_zone_status_batch(zone_ids: Iterable[int], username: str, password: str) -> str:
+def build_zone_status_batch(
+    zone_ids: Iterable[int], username: str, password: str
+) -> str:
     """Build a batch of CMD_GET_ZONE_STATUS commands."""
-    body = "".join(f'<CMD_GET_ZONE_STATUS ZONE_ID="{zone_id}" />' for zone_id in zone_ids)
+    body = "".join(
+        f'<CMD_GET_ZONE_STATUS ZONE_ID="{zone_id}" />' for zone_id in zone_ids
+    )
     return _build_command_envelope(body, username, password)
 
 
-def build_zone_control_command(zone_id: int, action: int, username: str, password: str) -> str:
+def build_zone_control_command(
+    zone_id: int, action: int, username: str, password: str
+) -> str:
     """Build validated CMD_ZONE_CONTROL (0=inhibit, 1=deinhibit)."""
     if action not in (0, 1):
-        raise ValueError("Only validated zone actions 0 (inhibit) and 1 (deinhibit) are supported")
-    return _build_command_envelope(f'<CMD_ZONE_CONTROL ZONE_ID="{zone_id}" ACTION="{action}" />', username, password)
+        raise ValueError(
+            "Only validated zone actions 0 (inhibit) and 1 (deinhibit) are supported"
+        )
+    return _build_command_envelope(
+        f'<CMD_ZONE_CONTROL ZONE_ID="{zone_id}" ACTION="{action}" />',
+        username,
+        password,
+    )
 
 
 def build_area_status_command(area_id: int, username: str, password: str) -> str:
     """Build one CMD_GET_AREA_STATUS command."""
-    return _build_command_envelope(f'<CMD_GET_AREA_STATUS AREA_ID="{area_id}" />', username, password)
+    return _build_command_envelope(
+        f'<CMD_GET_AREA_STATUS AREA_ID="{area_id}" />', username, password
+    )
 
 
-def build_area_status_batch(area_ids: Iterable[int], username: str, password: str) -> str:
+def build_area_status_batch(
+    area_ids: Iterable[int], username: str, password: str
+) -> str:
     """Build a batch of CMD_GET_AREA_STATUS commands."""
-    body = "".join(f'<CMD_GET_AREA_STATUS AREA_ID="{area_id}" />' for area_id in area_ids)
+    body = "".join(
+        f'<CMD_GET_AREA_STATUS AREA_ID="{area_id}" />' for area_id in area_ids
+    )
     return _build_command_envelope(body, username, password)
 
 
-def build_door_status_batch(door_ids: Iterable[int], username: str, password: str) -> str:
+def build_door_status_batch(
+    door_ids: Iterable[int], username: str, password: str
+) -> str:
     """Build a batch of CMD_GET_DOOR_STATUS commands."""
-    body = "".join(f'<CMD_GET_DOOR_STATUS DOOR_ID="{door_id}" />' for door_id in door_ids)
+    body = "".join(
+        f'<CMD_GET_DOOR_STATUS DOOR_ID="{door_id}" />' for door_id in door_ids
+    )
     return _build_command_envelope(body, username, password)
 
 
-def build_door_control_command(door_id: int, action: int, username: str, password: str) -> str:
+def build_door_control_command(
+    door_id: int, action: int, username: str, password: str
+) -> str:
     """Build CMD_DOOR_CONTROL using actions recovered from Vanderbilt SPCLink."""
     if action not in (5, 6, 7, 8):
         raise ValueError(
             "Door action must be 5 (open temporarily), 6 (open permanently), "
             "7 (set normal), or 8 (lock)"
         )
-    return _build_command_envelope(f'<CMD_DOOR_CONTROL DOOR_ID="{door_id}" ACTION="{action}" />', username, password)
+    return _build_command_envelope(
+        f'<CMD_DOOR_CONTROL DOOR_ID="{door_id}" ACTION="{action}" />',
+        username,
+        password,
+    )
 
 
 def build_alert_status_command(username: str, password: str) -> str:
@@ -109,10 +139,14 @@ def _validate_reply(reply: ET.Element, expected_tag: str) -> None:
     result = reply.get("RESULT")
     command_result = reply.get("CMD_RESULT")
     if result != "0" or command_result != "OK":
-        raise FlexMLReplyError(f"{expected_tag} failed: RESULT={result!r}, CMD_RESULT={command_result!r}")
+        raise FlexMLReplyError(
+            f"{expected_tag} failed: RESULT={result!r}, CMD_RESULT={command_result!r}"
+        )
 
 
-def _parse_status_discovery(response: str, reply_tag: str, status_tag: str) -> FlexMLDiscoveryResult:
+def _parse_status_discovery(
+    response: str, reply_tag: str, status_tag: str
+) -> FlexMLDiscoveryResult:
     """Parse a discovery batch while preserving the RESULT=102 boundary."""
     root = _parse_reply_root(response)
     statuses: list[dict[str, str]] = []
@@ -163,7 +197,9 @@ def parse_zone_control(response: str, zone_id: int) -> None:
         raise FlexMLError("ZONE_CONTROL not found")
     returned_zone_id = result.get("ZONE_ID")
     if returned_zone_id != str(zone_id):
-        raise FlexMLError(f"ZONE_CONTROL returned unexpected ZONE_ID={returned_zone_id!r}")
+        raise FlexMLError(
+            f"ZONE_CONTROL returned unexpected ZONE_ID={returned_zone_id!r}"
+        )
     if result.get("RESULT") != "0":
         raise FlexMLReplyError(f"ZONE_CONTROL failed: RESULT={result.get('RESULT')!r}")
 
@@ -199,7 +235,9 @@ def parse_door_control(response: str) -> None:
 
 def build_flexc_ats_status_command(ats_id: int, username: str, password: str) -> str:
     """Build CMD_GET_FLEXC_ATS_STATUS."""
-    return _build_command_envelope(f'<CMD_GET_FLEXC_ATS_STATUS ATS_ID="{ats_id}" />', username, password)
+    return _build_command_envelope(
+        f'<CMD_GET_FLEXC_ATS_STATUS ATS_ID="{ats_id}" />', username, password
+    )
 
 
 def parse_flexc_ats_status(response: str) -> dict[str, Any]:

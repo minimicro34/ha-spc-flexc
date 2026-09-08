@@ -47,7 +47,10 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         if self._door_poll_task is not None and not self._door_poll_task.done():
             return
         self._door_poll_task = self.entry.async_create_background_task(
-            self.hass, self._async_door_poll_loop(), name="spc_flexc door polling", eager_start=False
+            self.hass,
+            self._async_door_poll_loop(),
+            name="spc_flexc door polling",
+            eager_start=False,
         )
 
     async def _async_door_poll_loop(self) -> None:
@@ -103,7 +106,10 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         async with self._client_operation_lock:
             await self.client.async_ensure_connected()
             command = build_door_control_command(
-                door_id, action, self.client.command_username, self.client.command_password
+                door_id,
+                action,
+                self.client.command_username,
+                self.client.command_password,
             )
             response = await self.client.async_send_flexml(command)
             parse_door_control(response)
@@ -131,12 +137,16 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             if zone.inhibited is True:
                 return
             if zone.inhibit_allowed is not True:
-                raise ValueError(f"SPC zone {zone_id} does not currently allow inhibition")
+                raise ValueError(
+                    f"SPC zone {zone_id} does not currently allow inhibition"
+                )
         else:
             if zone.inhibited is False:
                 return
             if zone.deinhibit_allowed is not True:
-                raise ValueError(f"SPC zone {zone_id} does not currently allow de-inhibition")
+                raise ValueError(
+                    f"SPC zone {zone_id} does not currently allow de-inhibition"
+                )
 
         async with self._client_operation_lock:
             await self.client.async_ensure_connected()
@@ -147,7 +157,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             raise ValueError(f"SPC zone {zone_id} returned no status after control")
         raw_zone = raw_zones[0]
         if int(raw_zone["ZONE_ID"]) != zone_id:
-            raise ValueError(f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}")
+            raise ValueError(
+                f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}"
+            )
 
         refreshed = self.state.zones[zone_id]
         refreshed.name = raw_zone.get("ZONE_NAME")
@@ -161,11 +173,15 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         refreshed.alarm_state = _int_or_none(raw_zone.get("ALARM_STATE"))
         refreshed.inhibit_allowed = _bool_or_none(raw_zone.get("INHIBIT_ALLOWED"))
         refreshed.isolate_allowed = _bool_or_none(raw_zone.get("ISOLATE_ALLOWED"))
-        refreshed.actuations_since_last_read = _int_or_none(raw_zone.get("ACTUATIONS_SINCE_LAST_READ"))
+        refreshed.actuations_since_last_read = _int_or_none(
+            raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
+        )
         refreshed.raw = dict(raw_zone)
 
         if refreshed.inhibited is not inhibited:
-            raise ValueError(f"SPC zone {zone_id} did not confirm the requested inhibition state")
+            raise ValueError(
+                f"SPC zone {zone_id} did not confirm the requested inhibition state"
+            )
         self.async_set_updated_data(self.state)
 
     async def async_inhibit_zone(self, zone_id: int) -> None:
@@ -191,7 +207,9 @@ def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
     """Build a door state while preserving all raw FlexC values."""
     return DoorState(
         door_id=int(raw_door["DOOR_ID"]),
-        name=raw_door.get("DOOR_NAME") or raw_door.get("NAME") or raw_door.get("ZONE_NAME"),
+        name=raw_door.get("DOOR_NAME")
+        or raw_door.get("NAME")
+        or raw_door.get("ZONE_NAME"),
         status=_int_or_none(raw_door.get("STATUS")),
         mode=_int_or_none(raw_door.get("DOOR_MODE") or raw_door.get("MODE")),
         dps_input=_int_or_none(raw_door.get("DPS_INPUT")),
