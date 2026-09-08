@@ -1,13 +1,91 @@
-"""Zone-control coordinator extensions for SPC FlexC."""
+"""Zone-control and door-status coordinator extensions for SPC FlexC."""
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
+from datetime import UTC, datetime
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
 from .coordinator import SpcFlexCCoordinator
+from .flexc.connection import FlexCError
+from .flexc.flexml import (
+    FlexMLError,
+    build_door_status_batch,
+    parse_door_status,
+)
 from .flexc.zone_control import async_set_zone_inhibited
+from .models import DoorState
+
+DOOR_POLL_INTERVAL = 1.0
 
 
 class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
-    """SPC coordinator with validated zone inhibition controls."""
+    """SPC coordinator with validated zone control and live door status."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        """Initialize SPC zone-control and door-status extensions."""
+        super().__init__(hass, entry)
+        self._door_poll_task: asyncio.Task[None] | None = None
+
+    async def _async_discover_panel_objects(self) -> None:
+        """Run standard discovery and start polling any detected doors."""
+        await super()._async_discover_panel_objects()
+        self._schedule_door_polling()
+
+    def _schedule_door_polling(self) -> None:
+        """Start periodic status polling for discovered access-control doors."""
+        if not self._door_discovery_complete or not self._detected_door_ids:
+            return
+        if self._door_poll_task is not None and not self._door_poll_task.done():
+            return
+        self._door_poll_task = self.entry.async_create_background_task(
+            self.hass,
+            self._async_door_poll_loop(),
+            name="spc_flexc door polling",
+            eager_start=False,
+        )
+
+    async def _async_door_poll_loop(self) -> None:
+        """Poll discovered doors without interpreting undocumented mode values."""
+        try:
+            while True:
+                await asyncio.sleep(DOOR_POLL_INTERVAL)
+                if not self._door_discovery_complete:
+                    continue
+                door_ids = sorted(self._detected_door_ids)
+                if not door_ids:
+                    continue
+                try:
+                    async with self._client_operation_lock:
+                        await self.client.async_ensure_connected()
+                        command = build_door_status_batch(
+                            door_ids,
+                            self.client.command_username,
+                            self.client.command_password,
+                        )
+                        response = await self.client.async_send_flexml(command)
+                        raw_doors = parse_door_status(response)
+                except (FlexCError, FlexMLError) as err:
+                    self.logger.debug("SPC door polling failed: %s", err)
+                    continue
+
+                changed = False
+                for raw_door in raw_doors:
+                    door = _door_state_from_status(raw_door)
+                    previous = self.state.doors.get(door.door_id)
+                    if previous is None or previous.raw != door.raw:
+                        changed = True
+                    self.state.doors[door.door_id] = door
+
+                if changed:
+                    self.async_set_updated_data(self.state)
+        finally:
+            current_task = asyncio.current_task()
+            if self._door_poll_task is current_task:
+                self._door_poll_task = None
 
     async def async_set_zone_inhibited(self, zone_id: int, inhibited: bool) -> None:
         """Set zone inhibition and refresh the zone state immediately."""
@@ -75,6 +153,45 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
     async def async_deinhibit_zone(self, zone_id: int) -> None:
         """De-inhibit one SPC zone using the validated FlexC command."""
         await self.async_set_zone_inhibited(zone_id, False)
+
+    async def async_shutdown(self) -> None:
+        """Stop door polling and shut down the base coordinator."""
+        door_task = self._door_poll_task
+        self._door_poll_task = None
+        if door_task is not None and not door_task.done():
+            door_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await door_task
+        await super().async_shutdown()
+
+
+def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
+    """Build a door state while preserving all raw FlexC values."""
+    return DoorState(
+        door_id=int(raw_door["DOOR_ID"]),
+        name=(
+            raw_door.get("DOOR_NAME")
+            or raw_door.get("NAME")
+            or raw_door.get("ZONE_NAME")
+        ),
+        status=_int_or_none(raw_door.get("STATUS")),
+        mode=_int_or_none(raw_door.get("DOOR_MODE") or raw_door.get("MODE")),
+        dps_input=_int_or_none(raw_door.get("DPS_INPUT")),
+        drs_input=_int_or_none(raw_door.get("DRS_INPUT")),
+        reader1_format=_int_or_none(raw_door.get("READER1_FORMAT")),
+        reader2_format=_int_or_none(raw_door.get("READER2_FORMAT")),
+        zone_id=_int_or_none(raw_door.get("ZONE_ID")),
+        zone_name=raw_door.get("ZONE_NAME"),
+        area_id=_int_or_none(raw_door.get("AREA_ID")),
+        area_name=raw_door.get("AREA_NAME"),
+        area_side_1=_int_or_none(raw_door.get("AREA_SIDE_1")),
+        area_side_1_name=raw_door.get("AREA_SIDE_1_NAME"),
+        entry_exit=_bool_or_none(raw_door.get("ENTRY_EXIT")),
+        normal_allowed=_bool_or_none(raw_door.get("NORMAL_ALLOWED")),
+        lock_allowed=_bool_or_none(raw_door.get("LOCK_ALLOWED")),
+        raw=dict(raw_door),
+        updated_at=datetime.now(UTC),
+    )
 
 
 def _int_or_none(value: object) -> int | None:
