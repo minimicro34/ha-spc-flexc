@@ -14,15 +14,17 @@ from .coordinator import SpcFlexCCoordinator
 from .flexc.connection import FlexCError
 from .flexc.flexml import (
     FlexMLError,
+    build_door_control_command,
     build_door_status_batch,
+    parse_door_control,
     parse_door_status,
 )
 from .flexc.zone_control import async_set_zone_inhibited
 from .models import DoorState
 
 _LOGGER = logging.getLogger(__name__)
-
 DOOR_POLL_INTERVAL = 1.0
+DOOR_ACTIONS = {5, 6, 7, 8}
 
 
 class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
@@ -45,10 +47,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         if self._door_poll_task is not None and not self._door_poll_task.done():
             return
         self._door_poll_task = self.entry.async_create_background_task(
-            self.hass,
-            self._async_door_poll_loop(),
-            name="spc_flexc door polling",
-            eager_start=False,
+            self.hass, self._async_door_poll_loop(), name="spc_flexc door polling", eager_start=False
         )
 
     async def _async_door_poll_loop(self) -> None:
@@ -62,54 +61,82 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                 if not door_ids:
                     continue
                 try:
-                    async with self._client_operation_lock:
-                        await self.client.async_ensure_connected()
-                        command = build_door_status_batch(
-                            door_ids,
-                            self.client.command_username,
-                            self.client.command_password,
-                        )
-                        response = await self.client.async_send_flexml(command)
-                        raw_doors = parse_door_status(response)
+                    raw_doors = await self._async_read_doors(door_ids)
                 except (FlexCError, FlexMLError) as err:
                     _LOGGER.debug("SPC door polling failed: %s", err)
                     continue
-
-                changed = False
-                for raw_door in raw_doors:
-                    door = _door_state_from_status(raw_door)
-                    previous = self.state.doors.get(door.door_id)
-                    if previous is None or previous.raw != door.raw:
-                        changed = True
-                    self.state.doors[door.door_id] = door
-
-                if changed:
+                if self._update_door_states(raw_doors):
                     self.async_set_updated_data(self.state)
         finally:
             current_task = asyncio.current_task()
             if self._door_poll_task is current_task:
                 self._door_poll_task = None
 
+    async def _async_read_doors(self, door_ids: list[int]) -> list[dict[str, str]]:
+        """Read current FlexC status for the requested doors."""
+        async with self._client_operation_lock:
+            await self.client.async_ensure_connected()
+            command = build_door_status_batch(
+                door_ids, self.client.command_username, self.client.command_password
+            )
+            response = await self.client.async_send_flexml(command)
+        return parse_door_status(response)
+
+    def _update_door_states(self, raw_doors: list[dict[str, str]]) -> bool:
+        """Store raw door states and return whether anything changed."""
+        changed = False
+        for raw_door in raw_doors:
+            door = _door_state_from_status(raw_door)
+            previous = self.state.doors.get(door.door_id)
+            if previous is None or previous.raw != door.raw:
+                changed = True
+            self.state.doors[door.door_id] = door
+        return changed
+
+    async def async_control_door(self, door_id: int, action: int) -> None:
+        """Send one SPCLink-proven door action and immediately refresh status."""
+        if door_id not in self.state.doors:
+            raise ValueError(f"Unknown SPC door {door_id}")
+        if action not in DOOR_ACTIONS:
+            raise ValueError(f"Unsupported SPC door action {action}")
+
+        async with self._client_operation_lock:
+            await self.client.async_ensure_connected()
+            command = build_door_control_command(
+                door_id, action, self.client.command_username, self.client.command_password
+            )
+            response = await self.client.async_send_flexml(command)
+            parse_door_control(response)
+            status_command = build_door_status_batch(
+                [door_id], self.client.command_username, self.client.command_password
+            )
+            status_response = await self.client.async_send_flexml(status_command)
+
+        raw_doors = parse_door_status(status_response)
+        if not raw_doors:
+            raise ValueError(f"SPC door {door_id} returned no status after control")
+        if int(raw_doors[0]["DOOR_ID"]) != door_id:
+            raise ValueError(
+                f"SPC returned door {raw_doors[0].get('DOOR_ID')} while refreshing door {door_id}"
+            )
+        self._update_door_states(raw_doors)
+        self.async_set_updated_data(self.state)
+
     async def async_set_zone_inhibited(self, zone_id: int, inhibited: bool) -> None:
         """Set zone inhibition and refresh the zone state immediately."""
         zone = self.state.zones.get(zone_id)
         if zone is None:
             raise ValueError(f"Unknown SPC zone {zone_id}")
-
         if inhibited:
             if zone.inhibited is True:
                 return
             if zone.inhibit_allowed is not True:
-                raise ValueError(
-                    f"SPC zone {zone_id} does not currently allow inhibition"
-                )
+                raise ValueError(f"SPC zone {zone_id} does not currently allow inhibition")
         else:
             if zone.inhibited is False:
                 return
             if zone.deinhibit_allowed is not True:
-                raise ValueError(
-                    f"SPC zone {zone_id} does not currently allow de-inhibition"
-                )
+                raise ValueError(f"SPC zone {zone_id} does not currently allow de-inhibition")
 
         async with self._client_operation_lock:
             await self.client.async_ensure_connected()
@@ -118,12 +145,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
 
         if not raw_zones:
             raise ValueError(f"SPC zone {zone_id} returned no status after control")
-
         raw_zone = raw_zones[0]
         if int(raw_zone["ZONE_ID"]) != zone_id:
-            raise ValueError(
-                f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}"
-            )
+            raise ValueError(f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}")
 
         refreshed = self.state.zones[zone_id]
         refreshed.name = raw_zone.get("ZONE_NAME")
@@ -137,16 +161,11 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         refreshed.alarm_state = _int_or_none(raw_zone.get("ALARM_STATE"))
         refreshed.inhibit_allowed = _bool_or_none(raw_zone.get("INHIBIT_ALLOWED"))
         refreshed.isolate_allowed = _bool_or_none(raw_zone.get("ISOLATE_ALLOWED"))
-        refreshed.actuations_since_last_read = _int_or_none(
-            raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
-        )
+        refreshed.actuations_since_last_read = _int_or_none(raw_zone.get("ACTUATIONS_SINCE_LAST_READ"))
         refreshed.raw = dict(raw_zone)
 
         if refreshed.inhibited is not inhibited:
-            raise ValueError(
-                f"SPC zone {zone_id} did not confirm the requested inhibition state"
-            )
-
+            raise ValueError(f"SPC zone {zone_id} did not confirm the requested inhibition state")
         self.async_set_updated_data(self.state)
 
     async def async_inhibit_zone(self, zone_id: int) -> None:
@@ -172,11 +191,7 @@ def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
     """Build a door state while preserving all raw FlexC values."""
     return DoorState(
         door_id=int(raw_door["DOOR_ID"]),
-        name=(
-            raw_door.get("DOOR_NAME")
-            or raw_door.get("NAME")
-            or raw_door.get("ZONE_NAME")
-        ),
+        name=raw_door.get("DOOR_NAME") or raw_door.get("NAME") or raw_door.get("ZONE_NAME"),
         status=_int_or_none(raw_door.get("STATUS")),
         mode=_int_or_none(raw_door.get("DOOR_MODE") or raw_door.get("MODE")),
         dps_input=_int_or_none(raw_door.get("DPS_INPUT")),
