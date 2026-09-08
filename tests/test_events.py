@@ -1,3 +1,5 @@
+"""Tests for SPC FlexC event parsing and state updates."""
+
 from custom_components.spc_flexc.flexc.events import (
     apply_area_event,
     apply_event,
