@@ -44,17 +44,45 @@ def test_expected_home_assistant_mode_mapping() -> None:
 
 
 def test_partset_names_from_spc_raw_area() -> None:
-    """Test custom SPC partial-set names and empty-name fallback."""
+    """Test that area-specific partial-set names take precedence."""
+    coordinator = SimpleNamespace(
+        data=SimpleNamespace(
+            panel=SimpleNamespace(
+                raw={
+                    "PARTA_NAME": "Panel A",
+                    "PARTB_NAME": "Panel B",
+                }
+            )
+        )
+    )
     area = AreaState(
         area_id=1,
         raw={
             "PARTA_NAME": "Nuit",
-            "PARTB_NAME": "  ",
+            "PARTB_NAME": "Soir",
         },
     )
 
-    assert _partset_name(area, "a") == "Nuit"
-    assert _partset_name(area, "b") is None
+    assert _partset_name(coordinator, area, "a") == "Nuit"
+    assert _partset_name(coordinator, area, "b") == "Soir"
+
+
+def test_partset_names_fall_back_to_spc_raw_panel() -> None:
+    """Test panel-level partial-set names and empty-name fallback."""
+    coordinator = SimpleNamespace(
+        data=SimpleNamespace(
+            panel=SimpleNamespace(
+                raw={
+                    "PARTA_NAME": "Nuit",
+                    "PARTB_NAME": "  ",
+                }
+            )
+        )
+    )
+    area = AreaState(area_id=1)
+
+    assert _partset_name(coordinator, area, "a") == "Nuit"
+    assert _partset_name(coordinator, area, "b") is None
 
 
 def test_active_blocking_faults() -> None:
