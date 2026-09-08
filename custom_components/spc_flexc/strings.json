@@ -24,32 +24,26 @@
         }
       }
     }
-  }, 
-  "exceptions": {
-    "area_not_ready_engineer": {
-      "message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."
+  },
+  "entity": {
+    "button": {
+      "open_momentarily": {"name": "Open momentarily"},
+      "open_permanently": {"name": "Open permanently"},
+      "set_normal": {"name": "Set normal"},
+      "lock": {"name": "Lock"}
     },
-    "area_not_ready_zone": {
-      "message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."
-    },
-    "area_not_ready_faults": {
-      "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"
-    },
-    "area_not_ready": {
-      "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason})."
-    },
-    "partset_a_not_supported": {
-      "message": "{area} does not support Part Set A."
-    },
-    "partset_b_not_supported": {
-      "message": "{area} does not support Part Set B."
-    },
-    "global_arm_incomplete": {
-      "message": "SPC global arming was incomplete. Areas already commanded: {areas}. Error: {error}"
-    },
-    "global_disarm_incomplete": {
-      "message": "SPC global disarming was incomplete. Errors: {errors}"
+    "switch": {
+      "inhibition": {"name": "Inhibition"}
     }
+  },
+  "exceptions": {
+    "area_not_ready_engineer": {"message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."},
+    "area_not_ready_zone": {"message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."},
+    "area_not_ready_faults": {"message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"},
+    "area_not_ready": {"message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason})."},
+    "partset_a_not_supported": {"message": "{area} does not support Part Set A."},
+    "partset_b_not_supported": {"message": "{area} does not support Part Set B."},
+    "global_arm_incomplete": {"message": "SPC global arming was incomplete. Areas already commanded: {areas}. Error: {error}"},
+    "global_disarm_incomplete": {"message": "SPC global disarming was incomplete. Errors: {errors}"}
   }
 }
-
