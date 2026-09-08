@@ -11,6 +11,7 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.spc_flexc.alarm_control_panel import (
     MODE_LABELS,
     _active_blocking_faults,
+    _partset_name,
     _raise_not_ready,
 )
 from custom_components.spc_flexc.models import (
@@ -40,6 +41,20 @@ def test_expected_home_assistant_mode_mapping() -> None:
     assert mapping[1] is AlarmControlPanelState.ARMED_AWAY
     assert mapping[2] is AlarmControlPanelState.ARMED_HOME
     assert mapping[3] is AlarmControlPanelState.ARMED_NIGHT
+
+
+def test_partset_names_from_spc_raw_area() -> None:
+    """Test custom SPC partial-set names and empty-name fallback."""
+    area = AreaState(
+        area_id=1,
+        raw={
+            "PARTA_NAME": "Nuit",
+            "PARTB_NAME": "  ",
+        },
+    )
+
+    assert _partset_name(area, "a") == "Nuit"
+    assert _partset_name(area, "b") is None
 
 
 def test_active_blocking_faults() -> None:
