@@ -1,5 +1,6 @@
 """Diagnostics support for the SPC FlexC integration."""
 
+
 async def async_get_config_entry_diagnostics(hass, entry):
     c = entry.runtime_data
     return {
