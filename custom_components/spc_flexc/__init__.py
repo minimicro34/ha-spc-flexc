@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import PLATFORMS
-from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
+from .mapping_gate_coordinator import SpcFlexCMappingGateCoordinator
 
 
 async def async_setup_entry(
@@ -12,7 +12,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
 ) -> bool:
     """Set up SPC FlexC."""
-    coordinator = SpcFlexCZoneControlCoordinator(hass, entry)
+    coordinator = SpcFlexCMappingGateCoordinator(hass, entry)
 
     # Fast first refresh:
     # connection + PANEL_SUMMARY only.
@@ -33,11 +33,8 @@ async def async_setup_entry(
         PLATFORMS,
     )
 
-    # Do not await this.
-    #
-    # Platforms are already loaded and their coordinator listeners are
-    # registered. Background discovery of ATS, areas and zones can therefore
-    # create dynamic entities as soon as data becomes available.
+    # Do not await this. Platforms are already loaded and their coordinator
+    # listeners can create dynamic entities as discovery completes.
     coordinator.async_start_background_discovery()
 
     return True
