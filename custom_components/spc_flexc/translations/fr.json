@@ -27,10 +27,10 @@
   },
   "entity": {
     "button": {
-      "open_momentarily": {"name": "Ouverture momentanée"},
-      "open_permanently": {"name": "Ouverture permanente"},
-      "set_normal": {"name": "Retour au mode normal"},
-      "lock": {"name": "Verrouiller"}
+      "open_momentarily": {"name": "Mode libre temporaire"},
+      "open_permanently": {"name": "Mode libre"},
+      "set_normal": {"name": "Mode normal"},
+      "lock": {"name": "Mode accès interdit"}
     },
     "switch": {
       "inhibition": {
