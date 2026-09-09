@@ -25,7 +25,7 @@ def test_parse_mg_status_multiple_mapping_gates() -> None:
         '<REPLY_GET_MG_STATUS RESULT="0" CMD_RESULT="OK">'
         '<MG_STATUS MG_ID="1" MG_NAME="Test one" STATE="0" />'
         '<MG_STATUS MG_ID="4" MG_NAME="Test four" STATE="1" />'
-        '</REPLY_GET_MG_STATUS></FLEXML_REPLY>'
+        "</REPLY_GET_MG_STATUS></FLEXML_REPLY>"
     )
     assert parse_mg_status(response) == [
         {"MG_ID": "1", "MG_NAME": "Test one", "STATE": "0"},
@@ -38,7 +38,7 @@ def test_parse_empty_mg_status() -> None:
     response = (
         '<FLEXML_REPLY VER="1.0">'
         '<REPLY_GET_MG_STATUS RESULT="0" CMD_RESULT="OK">'
-        '</REPLY_GET_MG_STATUS></FLEXML_REPLY>'
+        "</REPLY_GET_MG_STATUS></FLEXML_REPLY>"
     )
     assert parse_mg_status(response) == []
 
@@ -61,7 +61,7 @@ def test_parse_mg_control_real_panel_reply() -> None:
         '<FLEXML_REPLY VER="1.0">'
         '<REPLY_MG_CONTROL RESULT="0" CMD_RESULT="OK">'
         '<MG_CONTROL MG_ID="1" RESULT="0"/>'
-        '</REPLY_MG_CONTROL></FLEXML_REPLY>'
+        "</REPLY_MG_CONTROL></FLEXML_REPLY>"
     )
     parse_mg_control(response, 1)
 
@@ -72,7 +72,7 @@ def test_parse_mg_control_rejects_wrong_id() -> None:
         '<FLEXML_REPLY VER="1.0">'
         '<REPLY_MG_CONTROL RESULT="0" CMD_RESULT="OK">'
         '<MG_CONTROL MG_ID="2" RESULT="0"/>'
-        '</REPLY_MG_CONTROL></FLEXML_REPLY>'
+        "</REPLY_MG_CONTROL></FLEXML_REPLY>"
     )
     with pytest.raises(FlexMLError):
         parse_mg_control(response, 1)
@@ -84,7 +84,7 @@ def test_parse_mg_control_rejects_inner_error() -> None:
         '<FLEXML_REPLY VER="1.0">'
         '<REPLY_MG_CONTROL RESULT="0" CMD_RESULT="OK">'
         '<MG_CONTROL MG_ID="1" RESULT="54"/>'
-        '</REPLY_MG_CONTROL></FLEXML_REPLY>'
+        "</REPLY_MG_CONTROL></FLEXML_REPLY>"
     )
     with pytest.raises(FlexMLReplyError):
         parse_mg_control(response, 1)

@@ -66,9 +66,7 @@ class SpcMappingGateSwitch(
 
     _attr_has_entity_name = True
 
-    def __init__(
-        self, coordinator: SpcFlexCMappingGateCoordinator, mg_id: int
-    ) -> None:
+    def __init__(self, coordinator: SpcFlexCMappingGateCoordinator, mg_id: int) -> None:
         super().__init__(coordinator)
         self.mg_id = mg_id
         mapping_gate = coordinator.data.mapping_gates[mg_id]
