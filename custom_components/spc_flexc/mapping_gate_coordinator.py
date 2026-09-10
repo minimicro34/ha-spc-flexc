@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from .coordinator import poll_delay_for_phase
 from .flexc.connection import FlexCError
 from .flexc.flexml import (
     FlexMLError,
@@ -23,6 +24,7 @@ from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 MG_POLL_INTERVAL = 1.0
+MG_POLL_PHASE = 2.0 / 3.0
 
 
 class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
@@ -111,7 +113,9 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
         _LOGGER.debug("SPC Mapping Gate polling started")
         try:
             while True:
-                await asyncio.sleep(MG_POLL_INTERVAL)
+                await asyncio.sleep(
+                    poll_delay_for_phase(MG_POLL_PHASE, MG_POLL_INTERVAL)
+                )
                 try:
                     raw_mapping_gates = await self._async_read_mapping_gates()
                     if self._update_mapping_gate_states(raw_mapping_gates):
