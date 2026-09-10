@@ -1,6 +1,7 @@
 """Tests for validated FlexC zone-control operations."""
 
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -8,6 +9,9 @@ from custom_components.spc_flexc.flexc.zone_control import (
     ZONE_ACTION_DEINHIBIT,
     ZONE_ACTION_INHIBIT,
     async_set_zone_inhibited,
+)
+from custom_components.spc_flexc.zone_control_coordinator import (
+    SpcFlexCZoneControlCoordinator,
 )
 
 
@@ -40,3 +44,26 @@ async def test_async_set_zone_inhibited_uses_validated_actions() -> None:
 
     assert f'ACTION="{ZONE_ACTION_INHIBIT}"' in first_command
     assert f'ACTION="{ZONE_ACTION_DEINHIBIT}"' in second_command
+
+
+def test_door_polling_restarts_if_task_stops_unexpectedly() -> None:
+    """Test an unexpectedly stopped door polling task schedules a replacement."""
+    coordinator = MagicMock()
+    coordinator._discovery_requested = True
+    coordinator._schedule_door_polling = MagicMock()
+
+    async def _run() -> None:
+        coordinator._door_poll_task = asyncio.current_task()
+        sleep = AsyncMock(side_effect=asyncio.CancelledError())
+        with patch(
+            "custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep",
+            sleep,
+        ):
+            try:
+                await SpcFlexCZoneControlCoordinator._async_door_poll_loop(coordinator)
+            except asyncio.CancelledError:
+                pass
+
+    asyncio.run(_run())
+
+    coordinator._schedule_door_polling.assert_called_once_with()
