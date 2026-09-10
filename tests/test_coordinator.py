@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.spc_flexc.coordinator import (
     SpcFlexCCoordinator,
+    poll_delay_for_phase,
 )
 from custom_components.spc_flexc.models import SpcState
 
@@ -17,6 +18,21 @@ class _AsyncLock:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         return None
+
+
+def test_poll_delay_for_phase_uses_fixed_monotonic_slots() -> None:
+    """Test poll phases stay anchored instead of accumulating work-time drift."""
+    loop = MagicMock()
+    loop.time.side_effect = [10.10, 10.10, 10.10, 110.91]
+
+    with patch(
+        "custom_components.spc_flexc.coordinator.asyncio.get_running_loop",
+        return_value=loop,
+    ):
+        assert poll_delay_for_phase(0.0, 1.0) == pytest.approx(0.90)
+        assert poll_delay_for_phase(1.0 / 3.0, 1.0) == pytest.approx(0.2333333333)
+        assert poll_delay_for_phase(2.0 / 3.0, 1.0) == pytest.approx(0.5666666667)
+        assert poll_delay_for_phase(0.0, 1.0) == pytest.approx(0.09)
 
 
 def test_handle_flexc_event() -> None:
