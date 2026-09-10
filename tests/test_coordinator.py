@@ -9,7 +9,7 @@ from custom_components.spc_flexc.coordinator import (
     SpcFlexCCoordinator,
     poll_delay_for_phase,
 )
-from custom_components.spc_flexc.models import SpcState
+from custom_components.spc_flexc.models import SpcState, ZoneState
 
 
 class _AsyncLock:
@@ -107,6 +107,47 @@ async def test_zone_polling_continues_after_malformed_reply() -> None:
     assert coordinator.state.zones[1].input_state == 1
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
     assert coordinator._zone_poll_task is None
+
+
+@pytest.mark.asyncio
+async def test_zone_actuation_change_notifies_entities() -> None:
+    """Test a missed short activation still produces a coordinator update."""
+    coordinator = MagicMock()
+    coordinator.state = SpcState()
+    coordinator.state.zones[1] = ZoneState(
+        zone_id=1,
+        zone_type=0,
+        logic_input=0,
+        actuations_since_last_read=0,
+    )
+    coordinator._zone_discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._discovery_requested = False
+    coordinator._client_operation_lock = _AsyncLock()
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_get_zone_status = AsyncMock(
+        return_value=[
+            {
+                "ZONE_ID": "1",
+                "TYPE": "0",
+                "LOGIC_INPUT": "0",
+                "ACTUATIONS_SINCE_LAST_READ": "3",
+            }
+        ]
+    )
+    coordinator.async_set_updated_data = MagicMock()
+    coordinator._zone_poll_task = asyncio.current_task()
+    sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+
+    with (
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+
+    assert coordinator.state.zones[1].logic_input == 0
+    assert coordinator.state.zones[1].actuations_since_last_read == 3
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 @pytest.mark.asyncio
