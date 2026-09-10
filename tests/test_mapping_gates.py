@@ -96,24 +96,20 @@ def test_parse_mg_control_rejects_inner_error() -> None:
         parse_mg_control(response, 1)
 
 
-def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
+@pytest.mark.asyncio
+async def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
     """Test an unexpectedly stopped Mapping Gate task schedules a replacement."""
     coordinator = MagicMock()
     coordinator._discovery_requested = True
     coordinator._schedule_mg_polling = MagicMock()
+    coordinator._mg_poll_task = asyncio.current_task()
+    sleep = AsyncMock(side_effect=asyncio.CancelledError())
 
-    async def _run() -> None:
-        coordinator._mg_poll_task = asyncio.current_task()
-        sleep = AsyncMock(side_effect=asyncio.CancelledError())
-        with patch(
-            "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep",
-            sleep,
-        ):
-            try:
-                await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
-            except asyncio.CancelledError:
-                pass
-
-    asyncio.run(_run())
+    with patch(
+        "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep",
+        sleep,
+    ):
+        with pytest.raises(asyncio.CancelledError):
+            await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
 
     coordinator._schedule_mg_polling.assert_called_once_with()
