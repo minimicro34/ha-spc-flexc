@@ -55,6 +55,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
 
     async def _async_door_poll_loop(self) -> None:
         """Poll discovered doors without interpreting undocumented mode values."""
+        _LOGGER.debug("SPC door polling started")
         try:
             while True:
                 await asyncio.sleep(DOOR_POLL_INTERVAL)
@@ -65,12 +66,18 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                     continue
                 try:
                     raw_doors = await self._async_read_doors(door_ids)
+                    if self._update_door_states(raw_doors):
+                        self.async_set_updated_data(self.state)
+                except asyncio.CancelledError:
+                    raise
                 except (FlexCError, FlexMLError) as err:
                     _LOGGER.debug("SPC door polling failed: %s", err)
-                    continue
-                if self._update_door_states(raw_doors):
-                    self.async_set_updated_data(self.state)
+                except Exception:
+                    _LOGGER.exception(
+                        "Unexpected error while polling SPC doors; polling will continue"
+                    )
         finally:
+            _LOGGER.debug("SPC door polling stopped")
             current_task = asyncio.current_task()
             if self._door_poll_task is current_task:
                 self._door_poll_task = None
@@ -177,6 +184,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
         )
         refreshed.raw = dict(raw_zone)
+        refreshed.updated_at = datetime.now(UTC)
 
         if refreshed.inhibited is not inhibited:
             raise ValueError(
