@@ -19,6 +19,7 @@ from .flexc.flexml import (
     parse_door_control,
     parse_door_status,
 )
+from .flexc.read_retry import async_retry_read_once
 from .flexc.zone_control import async_set_zone_inhibited
 from .models import DoorState
 
@@ -95,7 +96,10 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             command = build_door_status_batch(
                 door_ids, self.client.command_username, self.client.command_password
             )
-            response = await self.client.async_send_flexml(command)
+            response = await async_retry_read_once(
+                lambda: self.client.async_send_flexml(command),
+                description="reading door status",
+            )
         return parse_door_status(response)
 
     def _update_door_states(self, raw_doors: list[dict[str, str]]) -> bool:
@@ -129,7 +133,10 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             status_command = build_door_status_batch(
                 [door_id], self.client.command_username, self.client.command_password
             )
-            status_response = await self.client.async_send_flexml(status_command)
+            status_response = await async_retry_read_once(
+                lambda: self.client.async_send_flexml(status_command),
+                description=f"refreshing door {door_id} after control",
+            )
 
         raw_doors = parse_door_status(status_response)
         if not raw_doors:
@@ -164,7 +171,10 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         async with self._client_operation_lock:
             await self.client.async_ensure_connected()
             await async_set_zone_inhibited(self.client, zone_id, inhibited)
-            raw_zones = await self.client.async_get_zone_status([zone_id])
+            raw_zones = await async_retry_read_once(
+                lambda: self.client.async_get_zone_status([zone_id]),
+                description=f"refreshing zone {zone_id} after inhibition control",
+            )
 
         if not raw_zones:
             raise ValueError(f"SPC zone {zone_id} returned no status after control")
