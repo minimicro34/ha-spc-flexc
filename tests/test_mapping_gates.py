@@ -1,5 +1,8 @@
 """Tests for SPC Mapping Gate support."""
 
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from custom_components.spc_flexc.flexc.flexml import (
@@ -9,6 +12,9 @@ from custom_components.spc_flexc.flexc.flexml import (
     build_mg_status_command,
     parse_mg_control,
     parse_mg_status,
+)
+from custom_components.spc_flexc.mapping_gate_coordinator import (
+    SpcFlexCMappingGateCoordinator,
 )
 
 
@@ -88,3 +94,26 @@ def test_parse_mg_control_rejects_inner_error() -> None:
     )
     with pytest.raises(FlexMLReplyError):
         parse_mg_control(response, 1)
+
+
+def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
+    """Test an unexpectedly stopped Mapping Gate task schedules a replacement."""
+    coordinator = MagicMock()
+    coordinator._discovery_requested = True
+    coordinator._schedule_mg_polling = MagicMock()
+
+    async def _run() -> None:
+        coordinator._mg_poll_task = asyncio.current_task()
+        sleep = AsyncMock(side_effect=asyncio.CancelledError())
+        with patch(
+            "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep",
+            sleep,
+        ):
+            try:
+                await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
+            except asyncio.CancelledError:
+                pass
+
+    asyncio.run(_run())
+
+    coordinator._schedule_mg_polling.assert_called_once_with()
