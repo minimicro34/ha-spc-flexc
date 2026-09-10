@@ -81,6 +81,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             current_task = asyncio.current_task()
             if self._door_poll_task is current_task:
                 self._door_poll_task = None
+                if self._discovery_requested:
+                    _LOGGER.warning("SPC door polling stopped unexpectedly; restarting")
+                    self._schedule_door_polling()
 
     async def _async_read_doors(self, door_ids: list[int]) -> list[dict[str, str]]:
         """Read current FlexC status for the requested doors."""
@@ -202,6 +205,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
 
     async def async_shutdown(self) -> None:
         """Stop door polling and shut down the base coordinator."""
+        self._discovery_requested = False
         door_task = self._door_poll_task
         self._door_poll_task = None
         if door_task is not None and not door_task.done():
