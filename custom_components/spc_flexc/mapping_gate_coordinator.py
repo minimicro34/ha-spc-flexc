@@ -19,6 +19,7 @@ from .flexc.flexml import (
     parse_mg_control,
     parse_mg_status,
 )
+from .flexc.read_retry import async_retry_read_once
 from .models import MappingGateState
 from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
 
@@ -62,7 +63,10 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 self.client.command_username,
                 self.client.command_password,
             )
-            response = await self.client.async_send_flexml(command)
+            response = await async_retry_read_once(
+                lambda: self.client.async_send_flexml(command),
+                description="reading Mapping Gate status",
+            )
         return parse_mg_status(response)
 
     def _update_mapping_gate_states(
@@ -159,7 +163,10 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 self.client.command_username,
                 self.client.command_password,
             )
-            status_response = await self.client.async_send_flexml(status_command)
+            status_response = await async_retry_read_once(
+                lambda: self.client.async_send_flexml(status_command),
+                description=f"refreshing Mapping Gate {mg_id} after control",
+            )
 
         raw_mapping_gates = parse_mg_status(status_response)
         self._update_mapping_gate_states(raw_mapping_gates)
