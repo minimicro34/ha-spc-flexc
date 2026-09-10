@@ -129,6 +129,11 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
             current_task = asyncio.current_task()
             if self._mg_poll_task is current_task:
                 self._mg_poll_task = None
+                if self._discovery_requested:
+                    _LOGGER.warning(
+                        "SPC Mapping Gate polling stopped unexpectedly; restarting"
+                    )
+                    self._schedule_mg_polling()
 
     async def async_set_mapping_gate(self, mg_id: int, state: bool) -> None:
         """Set one Mapping Gate and immediately verify its state."""
@@ -163,6 +168,7 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
 
     async def async_shutdown(self) -> None:
         """Stop Mapping Gate polling and shut down the base coordinator."""
+        self._discovery_requested = False
         mg_task = self._mg_poll_task
         self._mg_poll_task = None
         if mg_task is not None and not mg_task.done():
