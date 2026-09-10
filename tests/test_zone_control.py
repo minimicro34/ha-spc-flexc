@@ -55,11 +55,13 @@ async def test_door_polling_restarts_if_task_stops_unexpectedly() -> None:
     coordinator._door_poll_task = asyncio.current_task()
     sleep = AsyncMock(side_effect=asyncio.CancelledError())
 
-    with patch(
-        "custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep",
-        sleep,
+    with (
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep",
+            sleep,
+        ),
+        pytest.raises(asyncio.CancelledError),
     ):
-        with pytest.raises(asyncio.CancelledError):
-            await SpcFlexCZoneControlCoordinator._async_door_poll_loop(coordinator)
+        await SpcFlexCZoneControlCoordinator._async_door_poll_loop(coordinator)
 
     coordinator._schedule_door_polling.assert_called_once_with()
