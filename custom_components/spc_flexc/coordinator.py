@@ -415,6 +415,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             current_task = asyncio.current_task()
             if self._zone_poll_task is current_task:
                 self._zone_poll_task = None
+                if self._discovery_requested:
+                    _LOGGER.warning("SPC zone polling stopped unexpectedly; restarting")
+                    self._schedule_zone_polling()
 
     async def async_shutdown(self) -> None:
         self._discovery_requested = False
