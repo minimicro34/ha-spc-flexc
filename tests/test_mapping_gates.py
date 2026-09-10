@@ -105,11 +105,13 @@ async def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
     coordinator._mg_poll_task = asyncio.current_task()
     sleep = AsyncMock(side_effect=asyncio.CancelledError())
 
-    with patch(
-        "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep",
-        sleep,
+    with (
+        patch(
+            "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep",
+            sleep,
+        ),
+        pytest.raises(asyncio.CancelledError),
     ):
-        with pytest.raises(asyncio.CancelledError):
-            await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
+        await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
 
     coordinator._schedule_mg_polling.assert_called_once_with()
