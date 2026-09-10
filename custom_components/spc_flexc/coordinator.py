@@ -33,6 +33,7 @@ from .flexc.events import (
     apply_zone_event,
 )
 from .flexc.flexml import FlexMLError
+from .flexc.read_retry import async_retry_read_once
 from .models import (
     AreaState,
     AtpState,
@@ -233,10 +234,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         try:
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
-                summary = await self.client.async_get_panel_summary()
+                summary = await async_retry_read_once(
+                    self.client.async_get_panel_summary,
+                    description="reading panel summary",
+                )
                 if summary:
                     self.state.panel = _panel_state_from_summary(summary)
-                alerts = await self.client.async_get_alert_status()
+                alerts = await async_retry_read_once(
+                    self.client.async_get_alert_status,
+                    description="reading panel alerts",
+                )
                 if not alerts:
                     self.state.faults.modem_1_fault = False
                     self.state.faults.modem_1_line_fault = False
@@ -247,8 +254,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 if self._ats_discovery_complete:
                     for ats_id in sorted(self._detected_ats_ids):
                         try:
-                            ats_status = await self.client.async_get_flexc_ats_status(
-                                ats_id
+                            ats_status = await async_retry_read_once(
+                                lambda ats_id=ats_id: self.client.async_get_flexc_ats_status(
+                                    ats_id
+                                ),
+                                description=f"reading ATS {ats_id}",
                             )
                         except FlexMLError as err:
                             _LOGGER.debug(
@@ -261,8 +271,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             ats = _ats_state_from_status(ats_status, timezone)
                             self.state.ats[ats.ats_id] = ats
                 if self._area_discovery_complete and self._detected_area_ids:
-                    raw_areas = await self.client.async_get_area_status(
-                        sorted(self._detected_area_ids)
+                    area_ids = sorted(self._detected_area_ids)
+                    raw_areas = await async_retry_read_once(
+                        lambda: self.client.async_get_area_status(area_ids),
+                        description="reading area status",
                     )
                     for raw_area in raw_areas:
                         area = _area_state_from_status(raw_area, timezone)
@@ -306,8 +318,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 detected_ats_ids: set[int] = set()
                 for ats_id in ATS_IDS:
                     try:
-                        ats_status = await self.client.async_get_flexc_ats_status(
-                            ats_id
+                        ats_status = await async_retry_read_once(
+                            lambda ats_id=ats_id: self.client.async_get_flexc_ats_status(
+                                ats_id
+                            ),
+                            description=f"discovering ATS {ats_id}",
                         )
                     except FlexMLError as err:
                         _LOGGER.debug("FlexC ATS %d not detected: %s", ats_id, err)
@@ -319,8 +334,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 self._detected_ats_ids.update(detected_ats_ids)
                 self._ats_discovery_complete = True
                 detected_area_ids: set[int] = set()
-                raw_areas = await async_discover_areas(
-                    self.client, AREA_DISCOVERY_MAX_ID
+                raw_areas = await async_retry_read_once(
+                    lambda: async_discover_areas(self.client, AREA_DISCOVERY_MAX_ID),
+                    description="discovering areas",
                 )
                 for raw_area in raw_areas:
                     area = _area_state_from_status(raw_area, timezone)
@@ -329,8 +345,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 self._detected_area_ids.update(detected_area_ids)
                 self._area_discovery_complete = True
                 detected_zone_ids: set[int] = set()
-                raw_zones = await async_discover_zones(
-                    self.client, ZONE_DISCOVERY_MAX_ID
+                raw_zones = await async_retry_read_once(
+                    lambda: async_discover_zones(self.client, ZONE_DISCOVERY_MAX_ID),
+                    description="discovering zones",
                 )
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
@@ -339,8 +356,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 self._detected_zone_ids.update(detected_zone_ids)
                 self._zone_discovery_complete = True
                 detected_door_ids: set[int] = set()
-                raw_doors = await async_discover_doors(
-                    self.client, DOOR_DISCOVERY_MAX_ID
+                raw_doors = await async_retry_read_once(
+                    lambda: async_discover_doors(self.client, DOOR_DISCOVERY_MAX_ID),
+                    description="discovering doors",
                 )
                 for raw_door in raw_doors:
                     door = _door_state_from_status(raw_door)
@@ -394,7 +412,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 try:
                     async with self._client_operation_lock:
                         await self.client.async_ensure_connected()
-                        raw_zones = await self.client.async_get_zone_status(zone_ids)
+                        raw_zones = await async_retry_read_once(
+                            lambda: self.client.async_get_zone_status(zone_ids),
+                            description="polling zones",
+                        )
 
                     changed = False
                     for raw_zone in raw_zones:
