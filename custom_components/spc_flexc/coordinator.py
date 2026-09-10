@@ -4,6 +4,7 @@ import asyncio
 import logging
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -255,9 +256,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     for ats_id in sorted(self._detected_ats_ids):
                         try:
                             ats_status = await async_retry_read_once(
-                                lambda ats_id=ats_id: self.client.async_get_flexc_ats_status(
-                                    ats_id
-                                ),
+                                partial(self.client.async_get_flexc_ats_status, ats_id),
                                 description=f"reading ATS {ats_id}",
                             )
                         except FlexMLError as err:
@@ -319,9 +318,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 for ats_id in ATS_IDS:
                     try:
                         ats_status = await async_retry_read_once(
-                            lambda ats_id=ats_id: self.client.async_get_flexc_ats_status(
-                                ats_id
-                            ),
+                            partial(self.client.async_get_flexc_ats_status, ats_id),
                             description=f"discovering ATS {ats_id}",
                         )
                     except FlexMLError as err:
@@ -413,7 +410,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     async with self._client_operation_lock:
                         await self.client.async_ensure_connected()
                         raw_zones = await async_retry_read_once(
-                            lambda: self.client.async_get_zone_status(zone_ids),
+                            partial(self.client.async_get_zone_status, zone_ids),
                             description="polling zones",
                         )
 
