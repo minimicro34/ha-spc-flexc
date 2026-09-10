@@ -65,6 +65,7 @@ def test_zone_polling_continues_after_malformed_reply() -> None:
     coordinator.state = SpcState()
     coordinator._zone_discovery_complete = True
     coordinator._detected_zone_ids = {1}
+    coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
     coordinator.client.async_get_zone_status = AsyncMock(
@@ -90,3 +91,23 @@ def test_zone_polling_continues_after_malformed_reply() -> None:
     assert coordinator.state.zones[1].input_state == 1
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
     assert coordinator._zone_poll_task is None
+
+
+def test_zone_polling_restarts_if_task_stops_unexpectedly() -> None:
+    """Test an unexpectedly stopped zone polling task schedules a replacement."""
+    coordinator = MagicMock()
+    coordinator._discovery_requested = True
+    coordinator._schedule_zone_polling = MagicMock()
+
+    async def _run() -> None:
+        coordinator._zone_poll_task = asyncio.current_task()
+        sleep = AsyncMock(side_effect=asyncio.CancelledError())
+        with patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep):
+            try:
+                await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+            except asyncio.CancelledError:
+                pass
+
+    asyncio.run(_run())
+
+    coordinator._schedule_zone_polling.assert_called_once_with()
