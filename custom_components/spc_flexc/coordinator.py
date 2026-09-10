@@ -428,6 +428,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             or previous.status != zone.status
                             or previous.alarm_state != zone.alarm_state
                             or previous.inhibited != zone.inhibited
+                            or previous.actuations_since_last_read
+                            != zone.actuations_since_last_read
                         ):
                             changed = True
                         self.state.zones[zone.zone_id] = zone
