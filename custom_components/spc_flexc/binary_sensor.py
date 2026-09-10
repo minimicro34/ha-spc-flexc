@@ -1,5 +1,7 @@
 """Binary sensor entities for the SPC FlexC integration."""
 
+import asyncio
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -14,6 +16,8 @@ from .flexc.device import (
     build_area_device_info,
     build_panel_device_info,
 )
+
+ZONE_ACTIVITY_PULSE_SECONDS = 2.0
 
 PANEL = (
     BinarySensorEntityDescription(
@@ -231,6 +235,8 @@ class SpcZoneBinarySensor(
         super().__init__(coordinator)
 
         self.zone_id = zone_id
+        self._activity_pulse_active = False
+        self._activity_pulse_handle: asyncio.TimerHandle | None = None
 
         zone = coordinator.data.zones[zone_id]
 
@@ -253,7 +259,7 @@ class SpcZoneBinarySensor(
         if zone is None:
             return None
 
-        return bool(zone.logic_input)
+        return bool(zone.logic_input) or self._activity_pulse_active
 
     @property
     def available(self) -> bool:
@@ -284,6 +290,41 @@ class SpcZoneBinarySensor(
             "event_tamper": zone.event_tamper,
             "last_event": zone.last_event,
         }
+
+    def _handle_coordinator_update(self) -> None:
+        """Handle live zone state and recover short motion activations."""
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        if (
+            zone is not None
+            and self._attr_device_class == BinarySensorDeviceClass.MOTION
+            and not zone.logic_input
+            and (zone.actuations_since_last_read or 0) > 0
+        ):
+            self._start_activity_pulse()
+        super()._handle_coordinator_update()
+
+    def _start_activity_pulse(self) -> None:
+        """Keep a missed short PIR activation visible for a short local pulse."""
+        self._activity_pulse_active = True
+        if self._activity_pulse_handle is not None:
+            self._activity_pulse_handle.cancel()
+        self._activity_pulse_handle = asyncio.get_running_loop().call_later(
+            ZONE_ACTIVITY_PULSE_SECONDS,
+            self._end_activity_pulse,
+        )
+
+    def _end_activity_pulse(self) -> None:
+        """End the local activity pulse without changing raw SPC state."""
+        self._activity_pulse_handle = None
+        self._activity_pulse_active = False
+        self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Cancel a pending local activity pulse when removing the entity."""
+        if self._activity_pulse_handle is not None:
+            self._activity_pulse_handle.cancel()
+            self._activity_pulse_handle = None
+        await super().async_will_remove_from_hass()
 
 
 class SpcXBusDeviceBinarySensor(
