@@ -217,7 +217,7 @@ class FlexCClient:
             return
 
         if self._writer is not None and self._writer is not writer:
-            _LOGGER.warning(
+            _LOGGER.info(
                 "Replacing existing FlexC connection with new connection from %s",
                 peer_host,
             )
@@ -258,6 +258,9 @@ class FlexCClient:
 
         except (ConnectionError, OSError) as err:
             _LOGGER.warning("FlexC connection lost: %s", err)
+
+        except FlexCProtocolError as err:
+            _LOGGER.warning("FlexC protocol error: %s", err)
 
         except asyncio.CancelledError:
             raise
@@ -715,8 +718,9 @@ class FlexCClient:
             if xml_part.startswith("<FLEXML_REPLY"):
                 return xml_part
 
-        _LOGGER.warning(
-            "FlexC DATA without FLEXML_REPLY: xml_parts=%r raw=%s",
+        _LOGGER.warning("FlexC DATA without FLEXML_REPLY")
+        _LOGGER.debug(
+            "FlexC DATA without FLEXML_REPLY details: xml_parts=%r raw=%s",
             xml_parts,
             application.hex(" "),
         )
