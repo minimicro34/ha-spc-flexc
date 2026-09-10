@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .coordinator import SpcFlexCCoordinator
+from .coordinator import SpcFlexCCoordinator, poll_delay_for_phase
 from .flexc.connection import FlexCError
 from .flexc.flexml import (
     FlexMLError,
@@ -24,6 +24,7 @@ from .models import DoorState
 
 _LOGGER = logging.getLogger(__name__)
 DOOR_POLL_INTERVAL = 1.0
+DOOR_POLL_PHASE = 1.0 / 3.0
 DOOR_ACTIONS = {5, 6, 7, 8}
 
 
@@ -58,7 +59,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         _LOGGER.debug("SPC door polling started")
         try:
             while True:
-                await asyncio.sleep(DOOR_POLL_INTERVAL)
+                await asyncio.sleep(
+                    poll_delay_for_phase(DOOR_POLL_PHASE, DOOR_POLL_INTERVAL)
+                )
                 if not self._door_discovery_complete:
                     continue
                 door_ids = sorted(self._detected_door_ids)
