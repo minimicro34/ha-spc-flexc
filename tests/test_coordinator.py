@@ -81,9 +81,11 @@ async def test_zone_polling_continues_after_malformed_reply() -> None:
     coordinator._zone_poll_task = asyncio.current_task()
     sleep = AsyncMock(side_effect=[None, None, asyncio.CancelledError()])
 
-    with patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep):
-        with pytest.raises(asyncio.CancelledError):
-            await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+    with (
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
 
     assert coordinator.client.async_get_zone_status.await_count == 2
     assert coordinator.state.zones[1].input_state == 1
@@ -100,8 +102,10 @@ async def test_zone_polling_restarts_if_task_stops_unexpectedly() -> None:
     coordinator._zone_poll_task = asyncio.current_task()
     sleep = AsyncMock(side_effect=asyncio.CancelledError())
 
-    with patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep):
-        with pytest.raises(asyncio.CancelledError):
-            await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+    with (
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
 
     coordinator._schedule_zone_polling.assert_called_once_with()
