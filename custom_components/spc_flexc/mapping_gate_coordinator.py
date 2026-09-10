@@ -10,7 +10,6 @@ from datetime import UTC, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .coordinator import ZONE_POLL_INTERVAL, _zone_state_from_status
 from .flexc.connection import FlexCError
 from .flexc.flexml import (
     FlexMLError,
@@ -52,55 +51,6 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
         )
         self.async_set_updated_data(self.state)
         self._schedule_mg_polling()
-
-    async def _async_zone_poll_loop(self) -> None:
-        """Poll zones without allowing one malformed reply to stop live updates."""
-        _LOGGER.debug("SPC zone polling started")
-        try:
-            while True:
-                await asyncio.sleep(ZONE_POLL_INTERVAL)
-                if not self._zone_discovery_complete:
-                    continue
-                zone_ids = sorted(self._detected_zone_ids)
-                if not zone_ids:
-                    continue
-                try:
-                    async with self._client_operation_lock:
-                        await self.client.async_ensure_connected()
-                        raw_zones = await self.client.async_get_zone_status(zone_ids)
-
-                    changed = False
-                    for raw_zone in raw_zones:
-                        zone = _zone_state_from_status(raw_zone)
-                        previous = self.state.zones.get(zone.zone_id)
-                        if previous is not None:
-                            zone.event_tamper = previous.event_tamper
-                            zone.last_event = previous.last_event
-                        if previous is None or (
-                            previous.input_state != zone.input_state
-                            or previous.logic_input != zone.logic_input
-                            or previous.proc_state != zone.proc_state
-                            or previous.status != zone.status
-                            or previous.alarm_state != zone.alarm_state
-                            or previous.inhibited != zone.inhibited
-                        ):
-                            changed = True
-                        self.state.zones[zone.zone_id] = zone
-                    if changed:
-                        self.async_set_updated_data(self.state)
-                except asyncio.CancelledError:
-                    raise
-                except (FlexCError, FlexMLError) as err:
-                    _LOGGER.debug("SPC zone polling failed: %s", err)
-                except Exception:
-                    _LOGGER.exception(
-                        "Unexpected error while polling SPC zones; polling will continue"
-                    )
-        finally:
-            _LOGGER.debug("SPC zone polling stopped")
-            current_task = asyncio.current_task()
-            if self._zone_poll_task is current_task:
-                self._zone_poll_task = None
 
     async def _async_read_mapping_gates(self) -> list[dict[str, str]]:
         """Read all configured Mapping Gates using aggregate MG_ID=0."""
