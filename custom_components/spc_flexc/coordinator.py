@@ -46,6 +46,17 @@ from .models import (
 _LOGGER = logging.getLogger(__name__)
 
 ZONE_POLL_INTERVAL = 1.0
+ZONE_POLL_PHASE = 0.0
+
+
+def poll_delay_for_phase(phase: float, interval: float) -> float:
+    """Return the delay to the next fixed phase on the monotonic loop clock."""
+    now = asyncio.get_running_loop().time()
+    position = now % interval
+    delay = (phase - position) % interval
+    if delay < 0.001:
+        return interval
+    return delay
 
 
 def _float_value(value: Any, suffix: str = "") -> float | None:
@@ -372,7 +383,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         _LOGGER.debug("SPC zone polling started")
         try:
             while True:
-                await asyncio.sleep(ZONE_POLL_INTERVAL)
+                await asyncio.sleep(
+                    poll_delay_for_phase(ZONE_POLL_PHASE, ZONE_POLL_INTERVAL)
+                )
                 if not self._zone_discovery_complete:
                     continue
                 zone_ids = sorted(self._detected_zone_ids)
