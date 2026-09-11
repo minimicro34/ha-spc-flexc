@@ -189,8 +189,11 @@ def zone_device_class(
     zone_type: int | None,
 ) -> BinarySensorDeviceClass | None:
     """Return the Home Assistant device class for an SPC zone type."""
-    if zone_type in (0, 1, 2, 30):
+    if zone_type in (0, 2):
         return BinarySensorDeviceClass.MOTION
+
+    if zone_type in (1, 30):
+        return BinarySensorDeviceClass.OPENING
 
     if zone_type == 3:
         return BinarySensorDeviceClass.SMOKE
