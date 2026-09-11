@@ -16,6 +16,7 @@ from .const import (
     AREA_DISCOVERY_MAX_ID,
     ATS_IDS,
     DEFAULT_PANEL_INTERVAL,
+    DISCOVERY_BATCH_SIZE,
     DOMAIN,
     DOOR_DISCOVERY_MAX_ID,
     ZONE_DISCOVERY_MAX_ID,
@@ -49,6 +50,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ZONE_POLL_INTERVAL = 1.0
 ZONE_POLL_PHASE = 0.0
+ZONE_POLL_BATCH_SIZE = DISCOVERY_BATCH_SIZE
 
 
 def poll_delay_for_phase(phase: float, interval: float) -> float:
@@ -407,12 +409,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 if not zone_ids:
                     continue
                 try:
+                    raw_zones: list[dict[str, str]] = []
                     async with self._client_operation_lock:
                         await self.client.async_ensure_connected()
-                        raw_zones = await async_retry_read_once(
-                            partial(self.client.async_get_zone_status, zone_ids),
-                            description="polling zones",
-                        )
+                        for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
+                            batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                            batch_zones = await async_retry_read_once(
+                                partial(self.client.async_get_zone_status, batch),
+                                description=f"polling zones {batch[0]}..{batch[-1]}",
+                            )
+                            raw_zones.extend(batch_zones)
 
                     changed = False
                     for raw_zone in raw_zones:
