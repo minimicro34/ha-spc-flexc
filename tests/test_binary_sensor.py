@@ -8,6 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from custom_components.spc_flexc.binary_sensor import (
     ZONE_ACTIVITY_PULSE_SECONDS,
     SpcZoneBinarySensor,
+    zone_device_class,
 )
 from custom_components.spc_flexc.models import SpcState, ZoneState
 
@@ -39,6 +40,22 @@ def test_zone_uses_live_logic_input() -> None:
 
     assert sensor.is_on is True
     assert coordinator.data.zones[1].logic_input == 1
+
+
+def test_entry_exit_zone_types_use_generic_opening_class() -> None:
+    """Test SPC entry/exit types are exposed as generic openings."""
+    assert zone_device_class(1) == BinarySensorDeviceClass.OPENING
+    assert zone_device_class(30) == BinarySensorDeviceClass.OPENING
+
+
+def test_technical_zone_keeps_generic_binary_sensor_class() -> None:
+    """Test an SPC technical zone is not given misleading HA semantics."""
+    assert zone_device_class(9) is None
+
+
+def test_autosurveillance_zone_uses_tamper_class() -> None:
+    """Test an SPC autosurveillance zone is exposed as tamper."""
+    assert zone_device_class(8) == BinarySensorDeviceClass.TAMPER
 
 
 def test_missed_motion_starts_two_second_local_pulse() -> None:
