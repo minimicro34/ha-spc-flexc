@@ -2,6 +2,7 @@
 
 from homeassistant.const import Platform
 
+# Integration
 DOMAIN = "spc_flexc"
 
 PLATFORMS = (
@@ -12,9 +13,8 @@ PLATFORMS = (
     Platform.SWITCH,
 )
 
+# Configuration
 DEFAULT_PORT = 52000
-DEFAULT_ZONE_INTERVAL = 1.0
-DEFAULT_AREA_INTERVAL = 1.0
 DEFAULT_PANEL_INTERVAL = 60.0
 
 CONF_PORT = "port"
@@ -22,6 +22,18 @@ CONF_KEY = "encryption_key"
 CONF_COMMAND_USERNAME = "command_username"
 CONF_COMMAND_PASSWORD = "command_password"
 
+# Live polling
+ZONE_POLL_INTERVAL = 1.0
+ZONE_POLL_PHASE = 0.0
+ZONE_POLL_BATCH_SIZE = 16
+
+DOOR_POLL_INTERVAL = 1.0
+DOOR_POLL_PHASE = 1.0 / 3.0
+
+MG_POLL_INTERVAL = 1.0
+MG_POLL_PHASE = 2.0 / 3.0
+
+# FlexC ATS
 ATS_IDS = range(1, 5)
 
 # Discovery is protocol-driven: valid-but-unused IDs may return RESULT=0 with
@@ -33,6 +45,7 @@ AREA_DISCOVERY_MAX_ID = 64
 ZONE_DISCOVERY_MAX_ID = 512
 DOOR_DISCOVERY_MAX_ID = 128
 
+# SPC zone types
 SPC_ZONE_TYPES: dict[int, str] = {
     0: "alarm",
     1: "entry_exit",
