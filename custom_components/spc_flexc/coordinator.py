@@ -19,6 +19,9 @@ from .const import (
     DOMAIN,
     DOOR_DISCOVERY_MAX_ID,
     ZONE_DISCOVERY_MAX_ID,
+    ZONE_POLL_BATCH_SIZE,
+    ZONE_POLL_INTERVAL,
+    ZONE_POLL_PHASE,
 )
 from .flexc.connection import FlexCClient, FlexCError
 from .flexc.discovery import (
@@ -46,10 +49,6 @@ from .models import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-ZONE_POLL_INTERVAL = 1.0
-ZONE_POLL_PHASE = 0.0
-ZONE_POLL_BATCH_SIZE = 16
 
 
 def poll_delay_for_phase(phase: float, interval: float) -> float:
