@@ -50,7 +50,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ZONE_POLL_INTERVAL = 1.0
 ZONE_POLL_PHASE = 0.0
-ZONE_POLL_BATCH_SIZE = DISCOVERY_BATCH_SIZE
+ZONE_POLL_BATCH_SIZE = 16
 
 
 def poll_delay_for_phase(phase: float, interval: float) -> float:
