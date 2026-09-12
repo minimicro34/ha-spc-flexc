@@ -153,19 +153,19 @@ async def test_zone_actuation_change_notifies_entities() -> None:
 
 @pytest.mark.asyncio
 async def test_zone_polling_uses_bounded_batches() -> None:
-    """Test large zone sets are split into small FlexC requests."""
+    """Test large zone sets are split into bounded FlexC requests."""
     coordinator = MagicMock()
     coordinator.state = SpcState()
     coordinator._zone_discovery_complete = True
-    coordinator._detected_zone_ids = set(range(1, 18))
+    coordinator._detected_zone_ids = set(range(1, 34))
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
     coordinator.client.async_get_zone_status = AsyncMock(
         side_effect=[
-            [{"ZONE_ID": str(zone_id)} for zone_id in range(1, 9)],
-            [{"ZONE_ID": str(zone_id)} for zone_id in range(9, 17)],
-            [{"ZONE_ID": "17"}],
+            [{"ZONE_ID": str(zone_id)} for zone_id in range(1, 17)],
+            [{"ZONE_ID": str(zone_id)} for zone_id in range(17, 33)],
+            [{"ZONE_ID": "33"}],
         ]
     )
     coordinator.async_set_updated_data = MagicMock()
@@ -178,13 +178,13 @@ async def test_zone_polling_uses_bounded_batches() -> None:
     ):
         await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
 
-    assert ZONE_POLL_BATCH_SIZE == 8
+    assert ZONE_POLL_BATCH_SIZE == 16
     assert coordinator.client.async_get_zone_status.await_args_list == [
-        call(list(range(1, 9))),
-        call(list(range(9, 17))),
-        call([17]),
+        call(list(range(1, 17))),
+        call(list(range(17, 33))),
+        call([33]),
     ]
-    assert set(coordinator.state.zones) == set(range(1, 18))
+    assert set(coordinator.state.zones) == set(range(1, 34))
 
 
 @pytest.mark.asyncio
