@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from .const import DOOR_POLL_INTERVAL, DOOR_POLL_PHASE
 from .coordinator import SpcFlexCCoordinator, poll_delay_for_phase
 from .flexc.connection import FlexCError
 from .flexc.flexml import (
@@ -24,8 +25,6 @@ from .flexc.zone_control import async_set_zone_inhibited
 from .models import DoorState
 
 _LOGGER = logging.getLogger(__name__)
-DOOR_POLL_INTERVAL = 1.0
-DOOR_POLL_PHASE = 1.0 / 3.0
 DOOR_ACTIONS = {5, 6, 7, 8}
 
 
