@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from .const import MG_POLL_INTERVAL, MG_POLL_PHASE
 from .coordinator import poll_delay_for_phase
 from .flexc.connection import FlexCError
 from .flexc.flexml import (
@@ -24,8 +25,6 @@ from .models import MappingGateState
 from .zone_control_coordinator import SpcFlexCZoneControlCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-MG_POLL_INTERVAL = 1.0
-MG_POLL_PHASE = 2.0 / 3.0
 
 
 class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
