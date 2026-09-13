@@ -8,9 +8,10 @@ import pytest
 from custom_components.spc_flexc.coordinator import (
     ZONE_POLL_BATCH_SIZE,
     SpcFlexCCoordinator,
+    _xbus_device_state_from_status,
     poll_delay_for_phase,
 )
-from custom_components.spc_flexc.models import SpcState, ZoneState
+from custom_components.spc_flexc.models import SpcState, XBusDeviceState, ZoneState
 
 
 class _AsyncLock:
@@ -203,3 +204,108 @@ async def test_zone_polling_restarts_if_task_stops_unexpectedly() -> None:
         await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
 
     coordinator._schedule_zone_polling.assert_called_once_with()
+
+
+def test_xbus_status_mapping_preserves_raw_and_event_state() -> None:
+    """Map validated ENETNODE metadata without guessing raw bit semantics."""
+    previous = XBusDeviceState(
+        device_id=1,
+        sia_address=7,
+        tamper_fault=True,
+        tamper_isolated=True,
+        last_event={"EV_ID": "5316"},
+    )
+    raw = {
+        "ID": "1",
+        "SN": "4CADF0DA",
+        "NAME": "CLA 1",
+        "TYPE": "1",
+        "HARDWARE_ID": "1",
+        "ICOUNT": "0",
+        "OCOUNT": "0",
+        "VERSION": "2.09 13MAR13",
+        "RF_TYPE": "0",
+        "RF_VERSION": "0",
+        "READER_TYPE": "0",
+        "STATUS": "00000004",
+        "POSITION_1": "1",
+        "POSITION_2": "0",
+        "PSU_TYPE": "0",
+        "AUX_VOLT": "13.7V",
+        "AUX_CURR": "0mA",
+        "INPUT": "0002",
+        "ALERT": "0000",
+        "INHIBIT": "0000",
+        "ISOLATE": "0002",
+    }
+
+    device = _xbus_device_state_from_status(raw, previous)
+
+    assert device is not None
+    assert device.device_id == 1
+    assert device.name == "CLA 1"
+    assert device.serial_number == "4CADF0DA"
+    assert device.aux_voltage == pytest.approx(13.7)
+    assert device.aux_current == pytest.approx(0.0)
+    assert device.status_raw == "00000004"
+    assert device.input_raw == "0002"
+    assert device.isolate_raw == "0002"
+    assert device.sia_address == 7
+    assert device.tamper_fault is True
+    assert device.tamper_isolated is True
+    assert device.last_event == {"EV_ID": "5316"}
+    assert device.raw == raw
+
+
+@pytest.mark.asyncio
+async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None:
+    """Periodic STATUS_XBUS refreshes inventory without overwriting event state."""
+    coordinator = MagicMock()
+    coordinator.state = SpcState()
+    coordinator.state.xbus_devices[1] = XBusDeviceState(
+        device_id=1,
+        name="CLA 1",
+        tamper_fault=True,
+        tamper_isolated=True,
+        last_event={"EV_ID": "5316"},
+        raw={"ID": "1", "INPUT": "0000"},
+    )
+    coordinator._xbus_discovery_complete = True
+    coordinator._detected_xbus_ids = {1}
+    coordinator._discovery_requested = False
+    coordinator._client_operation_lock = _AsyncLock()
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.async_set_updated_data = MagicMock()
+    coordinator._xbus_poll_task = asyncio.current_task()
+    sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+    read_xbus = AsyncMock(
+        return_value=[
+            {
+                "ID": "1",
+                "NAME": "CLA 1",
+                "STATUS": "00000004",
+                "INPUT": "0002",
+                "ISOLATE": "0002",
+            }
+        ]
+    )
+
+    with (
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_get_xbus_status",
+            read_xbus,
+        ),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_xbus_poll_loop(coordinator)
+
+    device = coordinator.state.xbus_devices[1]
+    assert device.status_raw == "00000004"
+    assert device.input_raw == "0002"
+    assert device.isolate_raw == "0002"
+    assert device.tamper_fault is True
+    assert device.tamper_isolated is True
+    assert device.last_event == {"EV_ID": "5316"}
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+    assert coordinator._xbus_poll_task is None
