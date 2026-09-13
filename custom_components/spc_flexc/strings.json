@@ -32,7 +32,8 @@
     },
     "sensor": {
       "xbus_aux_voltage": {"name": "Auxiliary voltage"},
-      "xbus_aux_current": {"name": "Auxiliary current"}
+      "xbus_aux_current": {"name": "Auxiliary current"},
+      "xbus_diagnostics": {"name": "X-BUS diagnostics"}
     },
     "button": {
       "open_momentarily": {"name": "Momentary free mode"},
