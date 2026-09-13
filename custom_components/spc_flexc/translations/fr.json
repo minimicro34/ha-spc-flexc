@@ -26,6 +26,10 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "xbus_tamper_fault": {"name": "Défaut d’autoprotection"},
+      "xbus_tamper_isolated": {"name": "Autoprotection isolée"}
+    },
     "button": {
       "open_momentarily": {"name": "Mode libre temporaire"},
       "open_permanently": {"name": "Mode libre"},
@@ -34,7 +38,7 @@
     },
     "switch": {
       "inhibition": {
-          "name": "Inhibition {zone_name}"
+        "name": "Inhibition {zone_name}"
       }
     }
   },
