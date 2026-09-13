@@ -350,23 +350,14 @@ class SpcXBusDeviceBinarySensor(
 
         self.device_id = device_id
         self.state_key = state_key
-
-        device = coordinator.data.xbus_devices[device_id]
-
-        base_name = device.name or f"X-BUS {device_id}"
+        self._attr_translation_key = f"xbus_{state_key}"
 
         if state_key == "tamper_fault":
-            self._attr_name = f"{base_name} tamper fault"
             self._attr_device_class = BinarySensorDeviceClass.PROBLEM
-        elif state_key == "tamper_isolated":
-            self._attr_name = f"{base_name} tamper isolated"
-        else:
-            self._attr_name = f"{base_name} {state_key}"
 
         self._attr_unique_id = (
             f"{coordinator.entry.entry_id}_xbus_{device_id}_{state_key}"
         )
-
         self._attr_device_info = build_xbus_device_info(coordinator, device_id)
 
     @property
