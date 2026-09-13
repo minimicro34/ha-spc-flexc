@@ -10,7 +10,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import SPC_ZONE_TYPES
+from .const import SPC_ZONE_TYPES, XBUS_TAMPER_INPUT_MASK, XBUS_TAMPER_ISOLATE_MASK
 from .coordinator import SpcFlexCCoordinator
 from .flexc.device import (
     build_area_device_info,
@@ -21,53 +21,20 @@ from .flexc.device import (
 ZONE_ACTIVITY_PULSE_SECONDS = 2.0
 
 PANEL = (
-    BinarySensorEntityDescription(
-        key="internal_bells",
-        name="Internal bells",
-    ),
-    BinarySensorEntityDescription(
-        key="external_bells",
-        name="External bells",
-    ),
-    BinarySensorEntityDescription(
-        key="engineer_mode",
-        name="Engineer mode",
-    ),
+    BinarySensorEntityDescription(key="internal_bells", name="Internal bells"),
+    BinarySensorEntityDescription(key="external_bells", name="External bells"),
+    BinarySensorEntityDescription(key="engineer_mode", name="Engineer mode"),
 )
 
 FAULTS = (
-    BinarySensorEntityDescription(
-        key="mains_fault",
-        name="230 V mains fault",
-    ),
-    BinarySensorEntityDescription(
-        key="battery_fault",
-        name="Panel battery fault",
-    ),
-    BinarySensorEntityDescription(
-        key="panel_tamper",
-        name="Panel tamper",
-    ),
-    BinarySensorEntityDescription(
-        key="modem_1_fault",
-        name="Modem 1 fault",
-    ),
-    BinarySensorEntityDescription(
-        key="modem_1_line_fault",
-        name="Modem 1 line fault",
-    ),
-    BinarySensorEntityDescription(
-        key="rf_jamming",
-        name="RF jamming",
-    ),
-    BinarySensorEntityDescription(
-        key="xbus_mains_fault",
-        name="X-BUS mains fault",
-    ),
-    BinarySensorEntityDescription(
-        key="xbus_battery_fault",
-        name="X-BUS battery fault",
-    ),
+    BinarySensorEntityDescription(key="mains_fault", name="230 V mains fault"),
+    BinarySensorEntityDescription(key="battery_fault", name="Panel battery fault"),
+    BinarySensorEntityDescription(key="panel_tamper", name="Panel tamper"),
+    BinarySensorEntityDescription(key="modem_1_fault", name="Modem 1 fault"),
+    BinarySensorEntityDescription(key="modem_1_line_fault", name="Modem 1 line fault"),
+    BinarySensorEntityDescription(key="rf_jamming", name="RF jamming"),
+    BinarySensorEntityDescription(key="xbus_mains_fault", name="X-BUS mains fault"),
+    BinarySensorEntityDescription(key="xbus_battery_fault", name="X-BUS battery fault"),
 )
 
 
@@ -79,89 +46,55 @@ class SpcBinary(CoordinatorEntity, BinarySensorEntity):
 
     def __init__(self, coordinator, description, section):
         super().__init__(coordinator)
-
         self.entity_description = description
         self.section = section
-
         if section == "faults":
             self._attr_device_class = BinarySensorDeviceClass.PROBLEM
-
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
         self._attr_device_info = build_panel_device_info(coordinator)
 
     @property
     def is_on(self) -> bool | None:
         """Return the binary sensor state."""
-        section = getattr(
-            self.coordinator.data,
-            self.section,
-        )
-
-        return getattr(
-            section,
-            self.entity_description.key,
-        )
+        section = getattr(self.coordinator.data, self.section)
+        return getattr(section, self.entity_description.key)
 
 
-class SpcAtpFaultSensor(
-    CoordinatorEntity[SpcFlexCCoordinator],
-    BinarySensorEntity,
-):
+class SpcAtpFaultSensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEntity):
     """Represent the last known FlexC ATP fault state."""
 
     _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(
-        self,
-        coordinator: SpcFlexCCoordinator,
-        ats_id: int,
-        atp_id: int,
-    ) -> None:
+    def __init__(self, coordinator: SpcFlexCCoordinator, ats_id: int, atp_id: int) -> None:
         super().__init__(coordinator)
-
         self.ats_id = ats_id
         self.atp_id = atp_id
-
         atp = coordinator.data.ats[ats_id].atps[atp_id]
-
         self._attr_name = f"{atp.name or f'ATP {atp_id}'} fault"
-        self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_ats_{ats_id}_atp_{atp_id}_fault"
-        )
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_ats_{ats_id}_atp_{atp_id}_fault"
         self._attr_device_info = build_panel_device_info(coordinator)
 
     @property
     def is_on(self) -> bool | None:
         """Return whether the ATP is in fault."""
         ats = self.coordinator.data.ats.get(self.ats_id)
-
         if ats is None:
             return None
-
         atp = ats.atps.get(self.atp_id)
-
         if atp is None:
             return None
-
         return atp.fault
 
     @property
     def available(self) -> bool:
         """Return whether a last known ATP state exists."""
         ats = self.coordinator.data.ats.get(self.ats_id)
-
-        if ats is None:
-            return False
-
-        return self.atp_id in ats.atps
+        return ats is not None and self.atp_id in ats.atps
 
 
-class SpcFlexCConnectionSensor(
-    CoordinatorEntity[SpcFlexCCoordinator],
-    BinarySensorEntity,
-):
+class SpcFlexCConnectionSensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEntity):
     """FlexC connection availability."""
 
     _attr_name = "FlexC connection"
@@ -169,89 +102,58 @@ class SpcFlexCConnectionSensor(
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(
-        self,
-        coordinator: SpcFlexCCoordinator,
-    ) -> None:
+    def __init__(self, coordinator: SpcFlexCCoordinator) -> None:
         super().__init__(coordinator)
-
         self._attr_unique_id = f"{coordinator.entry.entry_id}_flexc_connection"
         self._attr_device_info = build_panel_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
         """Return whether the SPC FlexC connection is healthy."""
-        return bool(
-            self.coordinator.last_update_success and self.coordinator.client.connected
-        )
+        return bool(self.coordinator.last_update_success and self.coordinator.client.connected)
 
 
-def zone_device_class(
-    zone_type: int | None,
-) -> BinarySensorDeviceClass | None:
+def zone_device_class(zone_type: int | None) -> BinarySensorDeviceClass | None:
     """Return the Home Assistant device class for an SPC zone type."""
     if zone_type in (0, 2):
         return BinarySensorDeviceClass.MOTION
-
     if zone_type in (1, 30):
         return BinarySensorDeviceClass.OPENING
-
     if zone_type == 3:
         return BinarySensorDeviceClass.SMOKE
-
     if zone_type == 4:
         return BinarySensorDeviceClass.DOOR
-
     if zone_type == 8:
         return BinarySensorDeviceClass.TAMPER
-
     if zone_type in (15, 19, 20):
         return BinarySensorDeviceClass.PROBLEM
-
     if zone_type == 23:
         return BinarySensorDeviceClass.VIBRATION
-
     if zone_type == 24:
         return BinarySensorDeviceClass.MOISTURE
-
     if zone_type == 25:
         return BinarySensorDeviceClass.HEAT
-
     if zone_type in (27, 29):
         return BinarySensorDeviceClass.GAS
-
     return None
 
 
-class SpcZoneBinarySensor(
-    CoordinatorEntity[SpcFlexCCoordinator],
-    BinarySensorEntity,
-):
+class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEntity):
     """Represent the live state of an SPC zone."""
 
     _attr_has_entity_name = True
 
-    def __init__(
-        self,
-        coordinator: SpcFlexCCoordinator,
-        zone_id: int,
-    ) -> None:
+    def __init__(self, coordinator: SpcFlexCCoordinator, zone_id: int) -> None:
         super().__init__(coordinator)
-
         self.zone_id = zone_id
         self._activity_pulse_active = False
         self._activity_pulse_handle: asyncio.TimerHandle | None = None
-
         zone = coordinator.data.zones[zone_id]
-
         self._attr_device_class = zone_device_class(zone.zone_type)
         self._attr_name = zone.name or f"Zone {zone_id}"
         self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_motion"
         if zone.area_id is not None and zone.area_id in coordinator.data.areas:
-            self._attr_device_info = build_area_device_info(
-                coordinator,
-                zone.area_id,
-            )
+            self._attr_device_info = build_area_device_info(coordinator, zone.area_id)
         else:
             self._attr_device_info = build_panel_device_info(coordinator)
 
@@ -259,10 +161,8 @@ class SpcZoneBinarySensor(
     def is_on(self) -> bool | None:
         """Return whether the zone is currently active."""
         zone = self.coordinator.data.zones.get(self.zone_id)
-
         if zone is None:
             return None
-
         return bool(zone.logic_input) or self._activity_pulse_active
 
     @property
@@ -274,18 +174,12 @@ class SpcZoneBinarySensor(
     def extra_state_attributes(self) -> dict:
         """Return diagnostic information for the zone."""
         zone = self.coordinator.data.zones.get(self.zone_id)
-
         if zone is None:
             return {}
-
         return {
             "zone_id": zone.zone_id,
             "area_id": zone.area_id,
-            "spc_zone_type": (
-                SPC_ZONE_TYPES.get(zone.zone_type)
-                if zone.zone_type is not None
-                else None
-            ),
+            "spc_zone_type": SPC_ZONE_TYPES.get(zone.zone_type) if zone.zone_type is not None else None,
             "logic_input": zone.logic_input,
             "status": zone.status,
             "proc_state": zone.proc_state,
@@ -298,12 +192,7 @@ class SpcZoneBinarySensor(
     def _handle_coordinator_update(self) -> None:
         """Handle live zone state and recover short motion activations."""
         zone = self.coordinator.data.zones.get(self.zone_id)
-        if (
-            zone is not None
-            and self._attr_device_class == BinarySensorDeviceClass.MOTION
-            and not zone.logic_input
-            and (zone.actuations_since_last_read or 0) > 0
-        ):
+        if zone is not None and self._attr_device_class == BinarySensorDeviceClass.MOTION and not zone.logic_input and (zone.actuations_since_last_read or 0) > 0:
             self._start_activity_pulse()
         super()._handle_coordinator_update()
 
@@ -312,10 +201,7 @@ class SpcZoneBinarySensor(
         self._activity_pulse_active = True
         if self._activity_pulse_handle is not None:
             self._activity_pulse_handle.cancel()
-        self._activity_pulse_handle = asyncio.get_running_loop().call_later(
-            ZONE_ACTIVITY_PULSE_SECONDS,
-            self._end_activity_pulse,
-        )
+        self._activity_pulse_handle = asyncio.get_running_loop().call_later(ZONE_ACTIVITY_PULSE_SECONDS, self._end_activity_pulse)
 
     def _end_activity_pulse(self) -> None:
         """End the local activity pulse without changing raw SPC state."""
@@ -331,44 +217,46 @@ class SpcZoneBinarySensor(
         await super().async_will_remove_from_hass()
 
 
-class SpcXBusDeviceBinarySensor(
-    CoordinatorEntity[SpcFlexCCoordinator],
-    BinarySensorEntity,
-):
+def _xbus_mask_state(raw_value: str | None, mask: int) -> bool | None:
+    """Return a validated X-BUS bit state from a hexadecimal status field."""
+    if raw_value is None:
+        return None
+    try:
+        return bool(int(raw_value, 16) & mask)
+    except ValueError:
+        return None
+
+
+class SpcXBusDeviceBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEntity):
     """Represent an X-BUS device state discovered from FlexC status/events."""
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(
-        self,
-        coordinator: SpcFlexCCoordinator,
-        device_id: int,
-        state_key: str,
-    ) -> None:
+    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int, state_key: str) -> None:
         super().__init__(coordinator)
-
         self.device_id = device_id
         self.state_key = state_key
         self._attr_translation_key = f"xbus_{state_key}"
-
         if state_key == "tamper_fault":
             self._attr_device_class = BinarySensorDeviceClass.PROBLEM
-
-        self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_xbus_{device_id}_{state_key}"
-        )
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{device_id}_{state_key}"
         self._attr_device_info = build_xbus_device_info(coordinator, device_id)
 
     @property
     def is_on(self) -> bool | None:
         """Return the X-BUS device state."""
         device = self.coordinator.data.xbus_devices.get(self.device_id)
-
         if device is None:
             return None
-
-        return getattr(device, self.state_key)
+        event_state = getattr(device, self.state_key)
+        if event_state is not None:
+            return event_state
+        if self.state_key == "tamper_fault":
+            return _xbus_mask_state(device.input_raw, XBUS_TAMPER_INPUT_MASK)
+        if self.state_key == "tamper_isolated":
+            return _xbus_mask_state(device.isolate_raw, XBUS_TAMPER_ISOLATE_MASK)
+        return None
 
     @property
     def available(self) -> bool:
@@ -379,10 +267,8 @@ class SpcXBusDeviceBinarySensor(
     def extra_state_attributes(self) -> dict:
         """Return diagnostic metadata for the X-BUS device."""
         device = self.coordinator.data.xbus_devices.get(self.device_id)
-
         if device is None:
             return {}
-
         return {
             "xbus_device_id": device.device_id,
             "xbus_device_name": device.name,
@@ -404,20 +290,14 @@ class SpcXBusDeviceBinarySensor(
         }
 
 
-async def async_setup_entry(
-    hass,
-    entry,
-    async_add_entities,
-) -> None:
+async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up SPC FlexC binary sensors."""
     coordinator: SpcFlexCCoordinator = entry.runtime_data
-
     async_add_entities(
         [SpcBinary(coordinator, description, "panel") for description in PANEL]
         + [SpcBinary(coordinator, description, "faults") for description in FAULTS]
         + [SpcFlexCConnectionSensor(coordinator)]
     )
-
     known_atps: set[tuple[int, int]] = set()
     known_zones: set[int] = set()
     known_xbus_entities: set[tuple[int, str]] = set()
@@ -425,71 +305,37 @@ async def async_setup_entry(
     def add_zone_entities() -> None:
         """Create binary sensors for newly discovered zones."""
         entities: list[BinarySensorEntity] = []
-
         for zone_id in coordinator.data.zones:
             if zone_id in known_zones:
                 continue
-
             known_zones.add(zone_id)
-
-            entities.append(
-                SpcZoneBinarySensor(
-                    coordinator,
-                    zone_id,
-                )
-            )
-
+            entities.append(SpcZoneBinarySensor(coordinator, zone_id))
         if entities:
             async_add_entities(entities)
 
     def add_atp_entities() -> None:
         """Create binary sensors for newly discovered ATPs."""
         entities: list[BinarySensorEntity] = []
-
         for ats_id, ats in coordinator.data.ats.items():
             for atp_id in ats.atps:
                 key = (ats_id, atp_id)
-
                 if key in known_atps:
                     continue
-
                 known_atps.add(key)
-
-                entities.append(
-                    SpcAtpFaultSensor(
-                        coordinator,
-                        ats_id,
-                        atp_id,
-                    )
-                )
-
+                entities.append(SpcAtpFaultSensor(coordinator, ats_id, atp_id))
         if entities:
             async_add_entities(entities)
 
     def add_xbus_entities() -> None:
         """Create binary sensors for newly discovered X-BUS devices."""
         entities: list[BinarySensorEntity] = []
-
         for device_id in coordinator.data.xbus_devices:
-            for state_key in (
-                "tamper_fault",
-                "tamper_isolated",
-            ):
+            for state_key in ("tamper_fault", "tamper_isolated"):
                 key = (device_id, state_key)
-
                 if key in known_xbus_entities:
                     continue
-
                 known_xbus_entities.add(key)
-
-                entities.append(
-                    SpcXBusDeviceBinarySensor(
-                        coordinator,
-                        device_id,
-                        state_key,
-                    )
-                )
-
+                entities.append(SpcXBusDeviceBinarySensor(coordinator, device_id, state_key))
         if entities:
             async_add_entities(entities)
 
