@@ -600,7 +600,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             if self._xbus_poll_task is current_task:
                 self._xbus_poll_task = None
                 if self._discovery_requested:
-                    _LOGGER.warning("SPC X-BUS polling stopped unexpectedly; restarting")
+                    _LOGGER.warning(
+                        "SPC X-BUS polling stopped unexpectedly; restarting"
+                    )
                     self._schedule_xbus_polling()
 
     async def async_shutdown(self) -> None:

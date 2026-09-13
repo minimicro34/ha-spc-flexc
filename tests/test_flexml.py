@@ -174,7 +174,7 @@ def test_parse_area_status_raises_on_real_error() -> None:
 def test_xbus_status_command_uses_validated_read_only_command() -> None:
     """Build the STATUS_XBUS command captured from a real panel."""
     xml = build_xbus_status_command("HomeAssistant", "MyPassword")
-    assert '<CMD_STATUS_XBUS />' in xml
+    assert "<CMD_STATUS_XBUS />" in xml
     assert 'PANEL_USERNAME="HomeAssistant"' in xml
     assert 'PANEL_PASSWORD="MyPassword"' in xml
 
@@ -191,8 +191,8 @@ def test_parse_xbus_status_real_panel_reply() -> None:
         'ISOALTE_ALLOWED_2="1" INHIBIT_ALLOWED_4="1" ISOALTE_ALLOWED_4="1" '
         'INHIBIT_ALLOWED_11="1" ISOALTE_ALLOWED_11="1" PSU_TYPE="0" AUX_VOLT="13.7V" '
         'AUX_CURR="0mA" INPUT="0002" ALERT="0000" INHIBIT="0000" ISOLATE="0002" />'
-        '</REPLY_STATUS_XBUS>'
-        '</FLEXML_REPLY>'
+        "</REPLY_STATUS_XBUS>"
+        "</FLEXML_REPLY>"
     )
     devices = parse_xbus_status(response)
     assert devices == [
