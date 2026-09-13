@@ -116,6 +116,7 @@ async def async_setup_entry(
                 (
                     SpcXBusAuxVoltageSensor(coordinator, device_id),
                     SpcXBusAuxCurrentSensor(coordinator, device_id),
+                    SpcXBusDiagnosticSensor(coordinator, device_id),
                 )
             )
 
@@ -416,3 +417,51 @@ class SpcXBusAuxCurrentSensor(SpcXBusSensorBase):
         """Return the last reported X-BUS auxiliary current."""
         device = self.coordinator.data.xbus_devices.get(self.device_id)
         return None if device is None else device.aux_current
+
+
+class SpcXBusDiagnosticSensor(SpcXBusSensorBase):
+    """Expose raw X-BUS metadata without interpreting unvalidated fields."""
+
+    _attr_translation_key = "xbus_diagnostics"
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{device_id}_diagnostics"
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the raw X-BUS STATUS value."""
+        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        return None if device is None else device.status_raw
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Expose X-BUS inventory and raw status metadata."""
+        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        if device is None:
+            return {}
+
+        return {
+            "xbus_device_id": device.device_id,
+            "name": device.name,
+            "serial_number": device.serial_number,
+            "device_type": device.device_type,
+            "hardware_id": device.hardware_id,
+            "input_count": device.input_count,
+            "output_count": device.output_count,
+            "version": device.version,
+            "rf_type": device.rf_type,
+            "rf_version": device.rf_version,
+            "reader_type": device.reader_type,
+            "position_1": device.position_1,
+            "position_2": device.position_2,
+            "psu_type": device.psu_type,
+            "sia_address": device.sia_address,
+            "status_raw": device.status_raw,
+            "input_raw": device.input_raw,
+            "alert_raw": device.alert_raw,
+            "inhibit_raw": device.inhibit_raw,
+            "isolate_raw": device.isolate_raw,
+        }
