@@ -15,6 +15,7 @@ from .coordinator import SpcFlexCCoordinator
 from .flexc.device import (
     build_area_device_info,
     build_panel_device_info,
+    build_xbus_device_info,
 )
 
 ZONE_ACTIVITY_PULSE_SECONDS = 2.0
@@ -334,7 +335,7 @@ class SpcXBusDeviceBinarySensor(
     CoordinatorEntity[SpcFlexCCoordinator],
     BinarySensorEntity,
 ):
-    """Represent an X-BUS device state discovered from FlexC events."""
+    """Represent an X-BUS device state discovered from FlexC status/events."""
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -366,7 +367,7 @@ class SpcXBusDeviceBinarySensor(
             f"{coordinator.entry.entry_id}_xbus_{device_id}_{state_key}"
         )
 
-        self._attr_device_info = build_panel_device_info(coordinator)
+        self._attr_device_info = build_xbus_device_info(coordinator, device_id)
 
     @property
     def is_on(self) -> bool | None:
@@ -394,6 +395,17 @@ class SpcXBusDeviceBinarySensor(
         return {
             "xbus_device_id": device.device_id,
             "xbus_device_name": device.name,
+            "serial_number": device.serial_number,
+            "device_type": device.device_type,
+            "hardware_id": device.hardware_id,
+            "version": device.version,
+            "status_raw": device.status_raw,
+            "aux_voltage": device.aux_voltage,
+            "aux_current": device.aux_current,
+            "input_raw": device.input_raw,
+            "alert_raw": device.alert_raw,
+            "inhibit_raw": device.inhibit_raw,
+            "isolate_raw": device.isolate_raw,
             "sia_address": device.sia_address,
             "tamper_fault": device.tamper_fault,
             "tamper_isolated": device.tamper_isolated,
