@@ -33,6 +33,11 @@ DOOR_POLL_PHASE = 1.0 / 3.0
 MG_POLL_INTERVAL = 1.0
 MG_POLL_PHASE = 2.0 / 3.0
 
+# X-BUS status is aggregate and FlexC events provide immediate fault changes.
+# Poll periodically as a reconciliation path for missed events and state drift.
+XBUS_POLL_INTERVAL = 30.0
+XBUS_POLL_PHASE = 5.0
+
 # FlexC ATS
 ATS_IDS = range(1, 5)
 
