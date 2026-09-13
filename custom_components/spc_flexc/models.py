@@ -201,14 +201,34 @@ class MappingGateState:
 
 @dataclass
 class XBusDeviceState:
-    """Last known X-BUS device state derived from FlexC events."""
+    """Last known X-BUS device state."""
 
     device_id: int
     name: str | None = None
+    serial_number: str | None = None
+    device_type: int | None = None
+    hardware_id: int | None = None
+    input_count: int | None = None
+    output_count: int | None = None
+    version: str | None = None
+    rf_type: int | None = None
+    rf_version: str | None = None
+    reader_type: int | None = None
+    status_raw: str | None = None
+    position_1: int | None = None
+    position_2: int | None = None
+    psu_type: int | None = None
+    aux_voltage: float | None = None
+    aux_current: float | None = None
+    input_raw: str | None = None
+    alert_raw: str | None = None
+    inhibit_raw: str | None = None
+    isolate_raw: str | None = None
     sia_address: int | None = None
     tamper_fault: bool | None = None
     tamper_isolated: bool | None = None
     last_event: dict[str, Any] | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
 
 
