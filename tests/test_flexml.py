@@ -9,6 +9,7 @@ from custom_components.spc_flexc.flexc.flexml import (
     build_door_control_command,
     build_door_status_batch,
     build_panel_summary_command,
+    build_xbus_status_command,
     build_zone_control_command,
     build_zone_status_batch,
     parse_alert_status,
@@ -16,6 +17,7 @@ from custom_components.spc_flexc.flexc.flexml import (
     parse_area_status_discovery,
     parse_door_control,
     parse_door_status_discovery,
+    parse_xbus_status,
     parse_zone_control,
     parse_zone_status_discovery,
 )
@@ -167,3 +169,78 @@ def test_parse_area_status_raises_on_real_error() -> None:
     response = '<FLEXML_REPLY VER="1.0"><REPLY_GET_AREA_STATUS RESULT="54" CMD_RESULT="ERROR" /></FLEXML_REPLY>'
     with pytest.raises(FlexMLReplyError):
         parse_area_status(response)
+
+
+def test_xbus_status_command_uses_validated_read_only_command() -> None:
+    """Build the STATUS_XBUS command captured from a real panel."""
+    xml = build_xbus_status_command("HomeAssistant", "MyPassword")
+    assert '<CMD_STATUS_XBUS />' in xml
+    assert 'PANEL_USERNAME="HomeAssistant"' in xml
+    assert 'PANEL_PASSWORD="MyPassword"' in xml
+
+
+def test_parse_xbus_status_real_panel_reply() -> None:
+    """Preserve all raw ENETNODE attributes from the real panel capture."""
+    response = (
+        '<FLEXML_REPLY VER="1.0">'
+        '<REPLY_STATUS_XBUS RESULT="0" CMD_RESULT="OK">'
+        '<ENETNODE ID="1" SN="4CADF0DA" NAME="CLA 1" TYPE="1" HARDWARE_ID="1" '
+        'ICOUNT="0" OCOUNT="0" VERSION="2.09 13MAR13" RF_TYPE="0" RF_VERSION="0" '
+        'READER_TYPE="0" STATUS="00000004" POSITION_1="1" POSITION_2="0" '
+        'INHIBIT_ALLOWED_1="1" DEISOALTE_ALLOWED_1="1" INHIBIT_ALLOWED_2="1" '
+        'ISOALTE_ALLOWED_2="1" INHIBIT_ALLOWED_4="1" ISOALTE_ALLOWED_4="1" '
+        'INHIBIT_ALLOWED_11="1" ISOALTE_ALLOWED_11="1" PSU_TYPE="0" AUX_VOLT="13.7V" '
+        'AUX_CURR="0mA" INPUT="0002" ALERT="0000" INHIBIT="0000" ISOLATE="0002" />'
+        '</REPLY_STATUS_XBUS>'
+        '</FLEXML_REPLY>'
+    )
+    devices = parse_xbus_status(response)
+    assert devices == [
+        {
+            "ID": "1",
+            "SN": "4CADF0DA",
+            "NAME": "CLA 1",
+            "TYPE": "1",
+            "HARDWARE_ID": "1",
+            "ICOUNT": "0",
+            "OCOUNT": "0",
+            "VERSION": "2.09 13MAR13",
+            "RF_TYPE": "0",
+            "RF_VERSION": "0",
+            "READER_TYPE": "0",
+            "STATUS": "00000004",
+            "POSITION_1": "1",
+            "POSITION_2": "0",
+            "INHIBIT_ALLOWED_1": "1",
+            "DEISOALTE_ALLOWED_1": "1",
+            "INHIBIT_ALLOWED_2": "1",
+            "ISOALTE_ALLOWED_2": "1",
+            "INHIBIT_ALLOWED_4": "1",
+            "ISOALTE_ALLOWED_4": "1",
+            "INHIBIT_ALLOWED_11": "1",
+            "ISOALTE_ALLOWED_11": "1",
+            "PSU_TYPE": "0",
+            "AUX_VOLT": "13.7V",
+            "AUX_CURR": "0mA",
+            "INPUT": "0002",
+            "ALERT": "0000",
+            "INHIBIT": "0000",
+            "ISOLATE": "0002",
+        }
+    ]
+
+
+def test_parse_xbus_status_supports_multiple_nodes() -> None:
+    """STATUS_XBUS is aggregate and may return multiple ENETNODE objects."""
+    response = '<FLEXML_REPLY VER="1.0"><REPLY_STATUS_XBUS RESULT="0" CMD_RESULT="OK"><ENETNODE ID="1" NAME="Node 1"/><ENETNODE ID="2" NAME="Node 2"/></REPLY_STATUS_XBUS></FLEXML_REPLY>'
+    assert parse_xbus_status(response) == [
+        {"ID": "1", "NAME": "Node 1"},
+        {"ID": "2", "NAME": "Node 2"},
+    ]
+
+
+def test_parse_xbus_status_rejects_error_reply() -> None:
+    """Do not turn an X-BUS command failure into an empty inventory."""
+    response = '<FLEXML_REPLY VER="1.0"><REPLY_STATUS_XBUS RESULT="54" CMD_RESULT="ERROR" /></FLEXML_REPLY>'
+    with pytest.raises(FlexMLReplyError):
+        parse_xbus_status(response)
