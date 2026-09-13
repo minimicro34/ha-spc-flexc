@@ -30,6 +30,10 @@
       "xbus_tamper_fault": {"name": "Défaut d’autoprotection"},
       "xbus_tamper_isolated": {"name": "Autoprotection isolée"}
     },
+    "sensor": {
+      "xbus_aux_voltage": {"name": "Tension auxiliaire"},
+      "xbus_aux_current": {"name": "Courant auxiliaire"}
+    },
     "button": {
       "open_momentarily": {"name": "Mode libre temporaire"},
       "open_permanently": {"name": "Mode libre"},
