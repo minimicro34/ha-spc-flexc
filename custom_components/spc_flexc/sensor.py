@@ -321,6 +321,7 @@ class SpcXBusSensorBase(CoordinatorEntity[SpcFlexCCoordinator], SensorEntity):
 class SpcXBusAuxVoltageSensor(SpcXBusSensorBase):
     _attr_device_class = SensorDeviceClass.VOLTAGE
     _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_suggested_display_precision = 1
     _attr_translation_key = "xbus_aux_voltage"
 
     def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
