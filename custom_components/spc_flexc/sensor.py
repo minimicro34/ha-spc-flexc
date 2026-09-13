@@ -26,10 +26,26 @@ from .flexc.device import build_door_device_info, build_xbus_device_info
 from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
-    SensorEntityDescription(key="battery_voltage", name="Battery voltage", native_unit_of_measurement=UnitOfElectricPotential.VOLT),
-    SensorEntityDescription(key="aux_voltage", name="Aux voltage", native_unit_of_measurement=UnitOfElectricPotential.VOLT),
-    SensorEntityDescription(key="aux_current", name="Aux current", native_unit_of_measurement=UnitOfElectricCurrent.MILLIAMPERE),
-    SensorEntityDescription(key="ac_frequency", name="AC frequency", native_unit_of_measurement=UnitOfFrequency.HERTZ),
+    SensorEntityDescription(
+        key="battery_voltage",
+        name="Battery voltage",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+    ),
+    SensorEntityDescription(
+        key="aux_voltage",
+        name="Aux voltage",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+    ),
+    SensorEntityDescription(
+        key="aux_current",
+        name="Aux current",
+        native_unit_of_measurement=UnitOfElectricCurrent.MILLIAMPERE,
+    ),
+    SensorEntityDescription(
+        key="ac_frequency",
+        name="AC frequency",
+        native_unit_of_measurement=UnitOfFrequency.HERTZ,
+    ),
 )
 
 XBUS_DIAGNOSTIC_FIELDS = (
@@ -53,9 +69,15 @@ XBUS_DIAGNOSTIC_FIELDS = (
 )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
     coordinator: SpcFlexCCoordinator = entry.runtime_data
-    async_add_entities([SpcPanelSensor(coordinator, description) for description in DESCRIPTIONS])
+    async_add_entities(
+        [SpcPanelSensor(coordinator, description) for description in DESCRIPTIONS]
+    )
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
     known_doors: set[int] = set()
@@ -78,14 +100,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             if door_id in known_doors:
                 continue
             known_doors.add(door_id)
-            entities.extend((SpcDoorStatusSensor(coordinator, door_id), SpcDoorModeSensor(coordinator, door_id)))
+            entities.extend(
+                (
+                    SpcDoorStatusSensor(coordinator, door_id),
+                    SpcDoorModeSensor(coordinator, door_id),
+                )
+            )
 
         for device_id in coordinator.data.xbus_devices:
             if device_id in known_xbus:
                 continue
             known_xbus.add(device_id)
-            entities.extend((SpcXBusAuxVoltageSensor(coordinator, device_id), SpcXBusAuxCurrentSensor(coordinator, device_id), SpcXBusDiagnosticSensor(coordinator, device_id)))
-            entities.extend(SpcXBusMetadataSensor(coordinator, device_id, field) for field in XBUS_DIAGNOSTIC_FIELDS)
+            entities.extend(
+                (
+                    SpcXBusAuxVoltageSensor(coordinator, device_id),
+                    SpcXBusAuxCurrentSensor(coordinator, device_id),
+                    SpcXBusDiagnosticSensor(coordinator, device_id),
+                )
+            )
+            entities.extend(
+                SpcXBusMetadataSensor(coordinator, device_id, field)
+                for field in XBUS_DIAGNOSTIC_FIELDS
+            )
 
         if entities:
             async_add_entities(entities)
@@ -98,7 +134,9 @@ class SpcPanelSensor(CoordinatorEntity[SpcFlexCCoordinator], SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, description: SensorEntityDescription) -> None:
+    def __init__(
+        self, coordinator: SpcFlexCCoordinator, description: SensorEntityDescription
+    ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{entry_id(coordinator)}_{description.key}"
@@ -171,13 +209,17 @@ class SpcAtpLastTxSensor(CoordinatorEntity[SpcFlexCCoordinator], SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, ats_id: int, atp_id: int) -> None:
+    def __init__(
+        self, coordinator: SpcFlexCCoordinator, ats_id: int, atp_id: int
+    ) -> None:
         super().__init__(coordinator)
         self.ats_id = ats_id
         self.atp_id = atp_id
         atp = coordinator.data.ats[ats_id].atps[atp_id]
         self._attr_name = f"{atp.name or f'ATP {atp_id}'} last TX successful"
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_ats_{ats_id}_atp_{atp_id}_last_tx_ok"
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_ats_{ats_id}_atp_{atp_id}_last_tx_ok"
+        )
         self._attr_device_info = build_device_info(coordinator)
 
     def _atp(self) -> AtpState | None:
@@ -283,7 +325,9 @@ class SpcXBusAuxVoltageSensor(SpcXBusSensorBase):
 
     def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
         super().__init__(coordinator, device_id)
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_voltage"
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_voltage"
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -298,7 +342,9 @@ class SpcXBusAuxCurrentSensor(SpcXBusSensorBase):
 
     def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
         super().__init__(coordinator, device_id)
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_current"
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_current"
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -313,7 +359,9 @@ class SpcXBusDiagnosticSensor(SpcXBusSensorBase):
 
     def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
         super().__init__(coordinator, device_id)
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{device_id}_diagnostics"
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{device_id}_diagnostics"
+        )
 
     @property
     def native_value(self) -> str | None:
@@ -352,7 +400,9 @@ class SpcXBusDiagnosticSensor(SpcXBusSensorBase):
 class SpcXBusMetadataSensor(SpcXBusSensorBase):
     """Expose one X-BUS metadata field as a beta diagnostic entity."""
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int, field: str) -> None:
+    def __init__(
+        self, coordinator: SpcFlexCCoordinator, device_id: int, field: str
+    ) -> None:
         super().__init__(coordinator, device_id)
         self.field = field
         self._attr_translation_key = f"xbus_{field}"
