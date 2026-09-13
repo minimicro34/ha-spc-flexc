@@ -30,6 +30,10 @@
       "xbus_tamper_fault": {"name": "Tamper fault"},
       "xbus_tamper_isolated": {"name": "Tamper isolated"}
     },
+    "sensor": {
+      "xbus_aux_voltage": {"name": "Auxiliary voltage"},
+      "xbus_aux_current": {"name": "Auxiliary current"}
+    },
     "button": {
       "open_momentarily": {"name": "Open momentarily"},
       "open_permanently": {"name": "Open permanently"},
