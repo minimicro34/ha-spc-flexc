@@ -32,7 +32,8 @@
     },
     "sensor": {
       "xbus_aux_voltage": {"name": "Tension auxiliaire"},
-      "xbus_aux_current": {"name": "Courant auxiliaire"}
+      "xbus_aux_current": {"name": "Courant auxiliaire"},
+      "xbus_diagnostics": {"name": "Diagnostics X-BUS"}
     },
     "button": {
       "open_momentarily": {"name": "Mode libre temporaire"},
