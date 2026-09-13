@@ -138,6 +138,11 @@ def build_alert_status_command(username: str, password: str) -> str:
     return _build_command_envelope("<CMD_GET_ALERT_STATUS />", username, password)
 
 
+def build_xbus_status_command(username: str, password: str) -> str:
+    """Build the read-only CMD_STATUS_XBUS command validated on a real SPC."""
+    return _build_command_envelope("<CMD_STATUS_XBUS />", username, password)
+
+
 def _parse_reply_root(response: str) -> ET.Element:
     """Parse and validate a FLEXML_REPLY root element."""
     try:
@@ -298,3 +303,13 @@ def parse_alert_status(response: str) -> list[dict[str, str]]:
         raise FlexMLError("REPLY_GET_ALERT_STATUS not found")
     _validate_reply(reply, "REPLY_GET_ALERT_STATUS")
     return [dict(element.attrib) for element in reply if element.attrib]
+
+
+def parse_xbus_status(response: str) -> list[dict[str, str]]:
+    """Parse ENETNODE objects returned by the validated STATUS_XBUS command."""
+    root = _parse_reply_root(response)
+    reply = root.find("REPLY_STATUS_XBUS")
+    if reply is None:
+        raise FlexMLError("REPLY_STATUS_XBUS not found")
+    _validate_reply(reply, "REPLY_STATUS_XBUS")
+    return [dict(node.attrib) for node in reply.findall("ENETNODE")]
