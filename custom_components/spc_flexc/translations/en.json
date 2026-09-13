@@ -26,6 +26,10 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "xbus_tamper_fault": {"name": "Tamper fault"},
+      "xbus_tamper_isolated": {"name": "Tamper isolated"}
+    },
     "button": {
       "open_momentarily": {"name": "Open momentarily"},
       "open_permanently": {"name": "Open permanently"},
@@ -34,7 +38,7 @@
     },
     "switch": {
       "inhibition": {
-          "name": "Inhibition {zone_name}"
+        "name": "Inhibition {zone_name}"
       }
     }
   },
