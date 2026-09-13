@@ -22,7 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SpcFlexCCoordinator
-from .flexc.device import build_door_device_info
+from .flexc.device import build_door_device_info, build_xbus_device_info
 from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
@@ -63,6 +63,7 @@ async def async_setup_entry(
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
     known_doors: set[int] = set()
+    known_xbus: set[int] = set()
 
     def add_dynamic_entities() -> None:
         entities: list[SensorEntity] = []
@@ -103,6 +104,18 @@ async def async_setup_entry(
                 (
                     SpcDoorStatusSensor(coordinator, door_id),
                     SpcDoorModeSensor(coordinator, door_id),
+                )
+            )
+
+        for device_id in coordinator.data.xbus_devices:
+            if device_id in known_xbus:
+                continue
+
+            known_xbus.add(device_id)
+            entities.extend(
+                (
+                    SpcXBusAuxVoltageSensor(coordinator, device_id),
+                    SpcXBusAuxCurrentSensor(coordinator, device_id),
                 )
             )
 
@@ -343,3 +356,63 @@ class SpcDoorModeSensor(SpcDoorSensorBase):
         """Return the unmodified numeric MODE value from FlexC."""
         door = self._door()
         return None if door is None else door.mode
+
+
+class SpcXBusSensorBase(
+    CoordinatorEntity[SpcFlexCCoordinator],
+    SensorEntity,
+):
+    """Base class for X-BUS diagnostic measurements."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
+        super().__init__(coordinator)
+        self.device_id = device_id
+        self._attr_device_info = build_xbus_device_info(coordinator, device_id)
+
+    @property
+    def available(self) -> bool:
+        """Return whether the X-BUS device is known."""
+        return self.device_id in self.coordinator.data.xbus_devices
+
+
+class SpcXBusAuxVoltageSensor(SpcXBusSensorBase):
+    """Expose the X-BUS peripheral auxiliary voltage."""
+
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_translation_key = "xbus_aux_voltage"
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_voltage"
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the last reported X-BUS auxiliary voltage."""
+        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        return None if device is None else device.aux_voltage
+
+
+class SpcXBusAuxCurrentSensor(SpcXBusSensorBase):
+    """Expose the X-BUS peripheral auxiliary current."""
+
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
+    _attr_translation_key = "xbus_aux_current"
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_current"
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the last reported X-BUS auxiliary current."""
+        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        return None if device is None else device.aux_current
