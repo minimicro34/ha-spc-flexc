@@ -81,6 +81,28 @@ def build_door_device_info(
     return device_info
 
 
+def build_xbus_device_info(
+    coordinator: SpcFlexCCoordinator,
+    device_id: int,
+) -> DeviceInfo:
+    """Return a dedicated Home Assistant device for one X-BUS peripheral."""
+    panel = coordinator.data.panel
+    device = coordinator.data.xbus_devices[device_id]
+    panel_serial = panel.serial_number or coordinator.entry.entry_id
+
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, f"{panel_serial}_xbus_{device_id}")},
+        name=device.name or f"X-BUS {device_id}",
+        manufacturer="Vanderbilt",
+        model="SPC X-BUS",
+        serial_number=device.serial_number,
+        sw_version=device.version,
+    )
+
+    _set_parent_device(coordinator, device_info, (DOMAIN, str(panel_serial)))
+    return device_info
+
+
 def _set_parent_device(
     coordinator: SpcFlexCCoordinator,
     device_info: DeviceInfo,
