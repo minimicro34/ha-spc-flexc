@@ -18,6 +18,8 @@ from .const import (
     DEFAULT_PANEL_INTERVAL,
     DOMAIN,
     DOOR_DISCOVERY_MAX_ID,
+    XBUS_POLL_INTERVAL,
+    XBUS_POLL_PHASE,
     ZONE_DISCOVERY_MAX_ID,
     ZONE_POLL_BATCH_SIZE,
     ZONE_POLL_INTERVAL,
@@ -38,6 +40,7 @@ from .flexc.events import (
 )
 from .flexc.flexml import FlexMLError
 from .flexc.read_retry import async_retry_read_once
+from .flexc.xbus import async_get_xbus_status
 from .models import (
     AreaState,
     AtpState,
@@ -45,6 +48,7 @@ from .models import (
     DoorState,
     PanelState,
     SpcState,
+    XBusDeviceState,
     ZoneState,
 )
 
@@ -206,6 +210,47 @@ def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
     )
 
 
+def _xbus_device_state_from_status(
+    raw_device: dict[str, str],
+    previous: XBusDeviceState | None = None,
+) -> XBusDeviceState | None:
+    """Build an X-BUS device while preserving event-derived state."""
+    device_id = _int_value(raw_device.get("ID"))
+    if device_id is None:
+        _LOGGER.warning("Ignoring X-BUS ENETNODE without a valid ID: %s", raw_device)
+        return None
+
+    return XBusDeviceState(
+        device_id=device_id,
+        name=raw_device.get("NAME"),
+        serial_number=raw_device.get("SN"),
+        device_type=_int_value(raw_device.get("TYPE")),
+        hardware_id=_int_value(raw_device.get("HARDWARE_ID")),
+        input_count=_int_value(raw_device.get("ICOUNT")),
+        output_count=_int_value(raw_device.get("OCOUNT")),
+        version=raw_device.get("VERSION"),
+        rf_type=_int_value(raw_device.get("RF_TYPE")),
+        rf_version=raw_device.get("RF_VERSION"),
+        reader_type=_int_value(raw_device.get("READER_TYPE")),
+        status_raw=raw_device.get("STATUS"),
+        position_1=_int_value(raw_device.get("POSITION_1")),
+        position_2=_int_value(raw_device.get("POSITION_2")),
+        psu_type=_int_value(raw_device.get("PSU_TYPE")),
+        aux_voltage=_float_value(raw_device.get("AUX_VOLT"), "V"),
+        aux_current=_float_value(raw_device.get("AUX_CURR"), "mA"),
+        input_raw=raw_device.get("INPUT"),
+        alert_raw=raw_device.get("ALERT"),
+        inhibit_raw=raw_device.get("INHIBIT"),
+        isolate_raw=raw_device.get("ISOLATE"),
+        sia_address=previous.sia_address if previous is not None else None,
+        tamper_fault=previous.tamper_fault if previous is not None else None,
+        tamper_isolated=previous.tamper_isolated if previous is not None else None,
+        last_event=previous.last_event if previous is not None else None,
+        raw=dict(raw_device),
+        updated_at=datetime.now(UTC),
+    )
+
+
 class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         super().__init__(
@@ -226,10 +271,13 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._zone_discovery_complete = False
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
+        self._detected_xbus_ids: set[int] = set()
+        self._xbus_discovery_complete = False
         self._discovery_requested = False
         self._client_operation_lock = asyncio.Lock()
         self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
+        self._xbus_poll_task: asyncio.Task[None] | None = None
 
     async def _async_update_data(self) -> SpcState:
         try:
@@ -291,6 +339,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             and self._area_discovery_complete
             and self._zone_discovery_complete
             and self._door_discovery_complete
+            and self._xbus_discovery_complete
         )
 
     def async_start_background_discovery(self) -> None:
@@ -363,15 +412,36 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     detected_door_ids.add(door.door_id)
                 self._detected_door_ids.update(detected_door_ids)
                 self._door_discovery_complete = True
+                detected_xbus_ids: set[int] = set()
+                raw_xbus_devices = await async_retry_read_once(
+                    partial(async_get_xbus_status, self.client),
+                    description="discovering X-BUS devices",
+                )
+                for raw_device in raw_xbus_devices:
+                    raw_id = _int_value(raw_device.get("ID"))
+                    previous = (
+                        self.state.xbus_devices.get(raw_id)
+                        if raw_id is not None
+                        else None
+                    )
+                    device = _xbus_device_state_from_status(raw_device, previous)
+                    if device is None:
+                        continue
+                    self.state.xbus_devices[device.device_id] = device
+                    detected_xbus_ids.add(device.device_id)
+                self._detected_xbus_ids = detected_xbus_ids
+                self._xbus_discovery_complete = True
             _LOGGER.info(
-                "FlexC discovery completed: ATS=%s areas=%s zones=%s doors=%s",
+                "FlexC discovery completed: ATS=%s areas=%s zones=%s doors=%s X-BUS=%s",
                 sorted(self._detected_ats_ids),
                 sorted(self._detected_area_ids),
                 sorted(self._detected_zone_ids),
                 sorted(self._detected_door_ids),
+                sorted(self._detected_xbus_ids),
             )
             self.async_set_updated_data(self.state)
             self._schedule_zone_polling()
+            self._schedule_xbus_polling()
         except asyncio.CancelledError:
             raise
         except (FlexCError, FlexMLError) as err:
@@ -456,6 +526,83 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     _LOGGER.warning("SPC zone polling stopped unexpectedly; restarting")
                     self._schedule_zone_polling()
 
+    def _schedule_xbus_polling(self) -> None:
+        """Start periodic aggregate X-BUS reconciliation."""
+        if not self._xbus_discovery_complete:
+            return
+        if self._xbus_poll_task is not None and not self._xbus_poll_task.done():
+            return
+        self._xbus_poll_task = self.entry.async_create_background_task(
+            self.hass,
+            self._async_xbus_poll_loop(),
+            name=f"{DOMAIN} X-BUS polling",
+            eager_start=False,
+        )
+
+    async def _async_xbus_poll_loop(self) -> None:
+        """Periodically reconcile X-BUS inventory and raw status fields."""
+        _LOGGER.debug("SPC X-BUS polling started")
+        try:
+            while True:
+                await asyncio.sleep(
+                    poll_delay_for_phase(XBUS_POLL_PHASE, XBUS_POLL_INTERVAL)
+                )
+                if not self._xbus_discovery_complete:
+                    continue
+                try:
+                    async with self._client_operation_lock:
+                        await self.client.async_ensure_connected()
+                        raw_devices = await async_retry_read_once(
+                            partial(async_get_xbus_status, self.client),
+                            description="polling X-BUS devices",
+                        )
+
+                    changed = False
+                    seen_ids: set[int] = set()
+                    for raw_device in raw_devices:
+                        raw_id = _int_value(raw_device.get("ID"))
+                        previous = (
+                            self.state.xbus_devices.get(raw_id)
+                            if raw_id is not None
+                            else None
+                        )
+                        device = _xbus_device_state_from_status(raw_device, previous)
+                        if device is None:
+                            continue
+                        seen_ids.add(device.device_id)
+                        if previous is None or previous.raw != device.raw:
+                            changed = True
+                        self.state.xbus_devices[device.device_id] = device
+
+                    missing_ids = set(self.state.xbus_devices) - seen_ids
+                    if missing_ids:
+                        changed = True
+                        for device_id in missing_ids:
+                            del self.state.xbus_devices[device_id]
+
+                    if seen_ids != self._detected_xbus_ids:
+                        self._detected_xbus_ids = seen_ids
+                        changed = True
+
+                    if changed:
+                        self.async_set_updated_data(self.state)
+                except asyncio.CancelledError:
+                    raise
+                except (FlexCError, FlexMLError) as err:
+                    _LOGGER.debug("SPC X-BUS polling failed: %s", err)
+                except Exception:
+                    _LOGGER.exception(
+                        "Unexpected error while polling SPC X-BUS; polling will continue"
+                    )
+        finally:
+            _LOGGER.debug("SPC X-BUS polling stopped")
+            current_task = asyncio.current_task()
+            if self._xbus_poll_task is current_task:
+                self._xbus_poll_task = None
+                if self._discovery_requested:
+                    _LOGGER.warning("SPC X-BUS polling stopped unexpectedly; restarting")
+                    self._schedule_xbus_polling()
+
     async def async_shutdown(self) -> None:
         self._discovery_requested = False
         zone_task = self._zone_poll_task
@@ -464,6 +611,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             zone_task.cancel()
             with suppress(asyncio.CancelledError):
                 await zone_task
+        xbus_task = self._xbus_poll_task
+        self._xbus_poll_task = None
+        if xbus_task is not None and not xbus_task.done():
+            xbus_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await xbus_task
         discovery_task = self._discovery_task
         self._discovery_task = None
         if discovery_task is not None and not discovery_task.done():
