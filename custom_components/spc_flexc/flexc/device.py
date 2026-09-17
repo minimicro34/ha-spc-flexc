@@ -81,7 +81,9 @@ def build_door_device_info(
     return device_info
 
 
-def _xbus_model(device_type: int | None, input_count: int | None, output_count: int | None) -> str:
+def _xbus_model(
+    device_type: int | None, input_count: int | None, output_count: int | None
+) -> str:
     """Return only empirically validated X-BUS family/model labels."""
     if device_type == 1:
         return "SPC Keypad"
