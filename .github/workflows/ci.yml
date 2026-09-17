@@ -25,3 +25,6 @@ jobs:
 
       - name: Run quality checks
         run: make check
+
+      - name: Run coverage
+        run: make coverage
