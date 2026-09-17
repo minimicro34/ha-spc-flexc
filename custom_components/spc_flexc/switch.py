@@ -59,6 +59,56 @@ class SpcZoneInhibitionSwitch(
         await self.coordinator.async_deinhibit_zone(self.zone_id)
 
 
+class SpcZoneIsolationSwitch(
+    CoordinatorEntity[SpcFlexCMappingGateCoordinator], SwitchEntity
+):
+    """Represent the isolation state of one SPC zone."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "isolation"
+
+    def __init__(
+        self, coordinator: SpcFlexCMappingGateCoordinator, zone_id: int
+    ) -> None:
+        super().__init__(coordinator)
+        self.zone_id = zone_id
+        zone = coordinator.data.zones[zone_id]
+        zone_name = zone.name or f"Zone {zone_id}"
+        self._attr_translation_placeholders = {"zone_name": zone_name}
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_isolation"
+        if zone.area_id is not None and zone.area_id in coordinator.data.areas:
+            self._attr_device_info = build_area_device_info(coordinator, zone.area_id)
+        else:
+            self._attr_device_info = build_panel_device_info(coordinator)
+
+    @property
+    def is_on(self) -> bool | None:
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        return None if zone is None else zone.isolated
+
+    @property
+    def available(self) -> bool:
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        return zone is not None and zone.isolated is not None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, bool | int | None]:
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        if zone is None:
+            return {}
+        return {
+            "zone_id": zone.zone_id,
+            "isolate_allowed": zone.isolate_allowed,
+            "deisolate_allowed": zone.deisolate_allowed,
+        }
+
+    async def async_turn_on(self, **kwargs: object) -> None:
+        await self.coordinator.async_isolate_zone(self.zone_id)
+
+    async def async_turn_off(self, **kwargs: object) -> None:
+        await self.coordinator.async_deisolate_zone(self.zone_id)
+
+
 class SpcMappingGateSwitch(
     CoordinatorEntity[SpcFlexCMappingGateCoordinator], SwitchEntity
 ):
@@ -104,18 +154,23 @@ class SpcMappingGateSwitch(
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up SPC FlexC switches."""
     coordinator: SpcFlexCMappingGateCoordinator = entry.runtime_data
-    known_zones: set[int] = set()
+    known_inhibition_zones: set[int] = set()
+    known_isolation_zones: set[int] = set()
     known_mapping_gates: set[int] = set()
 
     def add_switches() -> None:
         entities: list[SwitchEntity] = []
         for zone_id, zone in coordinator.data.zones.items():
-            if zone_id in known_zones:
-                continue
-            if zone.inhibit_allowed is not True and zone.inhibited is not True:
-                continue
-            known_zones.add(zone_id)
-            entities.append(SpcZoneInhibitionSwitch(coordinator, zone_id))
+            if zone_id not in known_inhibition_zones and (
+                zone.inhibit_allowed is True or zone.inhibited is True
+            ):
+                known_inhibition_zones.add(zone_id)
+                entities.append(SpcZoneInhibitionSwitch(coordinator, zone_id))
+            if zone_id not in known_isolation_zones and (
+                zone.isolate_allowed is True or zone.isolated is True
+            ):
+                known_isolation_zones.add(zone_id)
+                entities.append(SpcZoneIsolationSwitch(coordinator, zone_id))
 
         for mg_id in coordinator.data.mapping_gates:
             if mg_id in known_mapping_gates:
