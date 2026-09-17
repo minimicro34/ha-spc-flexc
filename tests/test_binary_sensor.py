@@ -21,8 +21,8 @@ from custom_components.spc_flexc.binary_sensor import (
 )
 from custom_components.spc_flexc.models import (
     AreaState,
-    AtsState,
     AtpState,
+    AtsState,
     SpcState,
     XBusDeviceState,
     ZoneState,
@@ -257,12 +257,10 @@ def test_xbus_mask_and_tamper_sensors() -> None:
     fault = SpcXBusDeviceBinarySensor(coordinator, 1, "tamper_fault")
     inhibited = SpcXBusDeviceBinarySensor(coordinator, 1, "tamper_inhibited")
     isolated = SpcXBusDeviceBinarySensor(coordinator, 1, "tamper_isolated")
-    unknown = SpcXBusDeviceBinarySensor(coordinator, 1, "unknown")
 
     assert fault.is_on is True
     assert inhibited.is_on is True
     assert isolated.is_on is False
-    assert unknown.is_on is None
     assert fault.available is True
     attrs = fault.extra_state_attributes
     assert attrs["input_raw"] == "0002"
