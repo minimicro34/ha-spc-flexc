@@ -14,6 +14,8 @@ from custom_components.spc_flexc.const import (
     DEFAULT_PORT,
 )
 from custom_components.spc_flexc.flexc.connection import (
+    PROTOCOL_ID,
+    PROTOCOL_VERSION,
     FlexCClient,
     FlexCConnectionError,
     FlexCProtocolError,
@@ -203,8 +205,8 @@ async def test_read_frame_validates_protocol_and_version() -> None:
     client = _client()
 
     for header, expected in (
-        (b"\x00\x01" + b"\x00" * 14, "protocol ID"),
-        (b"\x02\x00" + b"\x00" * 14, "version"),
+        (bytes((0, PROTOCOL_VERSION)) + b"\x00" * 14, "protocol ID"),
+        (bytes((PROTOCOL_ID, 0)) + b"\x00" * 14, "version"),
     ):
         reader = MagicMock()
         reader.readexactly = AsyncMock(return_value=header)
@@ -216,7 +218,7 @@ async def test_read_frame_validates_protocol_and_version() -> None:
 async def test_read_frame_reads_complete_minimum_frame() -> None:
     """A zero-unit frame consists of its 16-byte header plus 48-byte body."""
     client = _client()
-    header = bytes((2, 1, 0, 0)) + b"\x00" * 12
+    header = bytes((PROTOCOL_ID, PROTOCOL_VERSION, 0, 0)) + b"\x00" * 12
     body = b"\xaa" * 48
     reader = MagicMock()
     reader.readexactly = AsyncMock(side_effect=[header, body])
