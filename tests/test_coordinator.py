@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.spc_flexc.coordinator import (
     ZONE_POLL_BATCH_SIZE,
@@ -22,6 +23,8 @@ from custom_components.spc_flexc.coordinator import (
     _zone_state_from_status,
     poll_delay_for_phase,
 )
+from custom_components.spc_flexc.flexc.connection import FlexCConnectionError
+from custom_components.spc_flexc.flexc.flexml import FlexMLError
 from custom_components.spc_flexc.models import SpcState, XBusDeviceState, ZoneState
 
 
@@ -31,6 +34,29 @@ class _AsyncLock:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         return None
+
+
+def _coordinator_stub() -> MagicMock:
+    coordinator = MagicMock()
+    coordinator.state = SpcState()
+    coordinator.hass.config.time_zone = "Europe/Paris"
+    coordinator._client_operation_lock = _AsyncLock()
+    coordinator._detected_ats_ids = set()
+    coordinator._detected_area_ids = set()
+    coordinator._detected_zone_ids = set()
+    coordinator._detected_door_ids = set()
+    coordinator._detected_xbus_ids = set()
+    coordinator._ats_discovery_complete = False
+    coordinator._area_discovery_complete = False
+    coordinator._zone_discovery_complete = False
+    coordinator._door_discovery_complete = False
+    coordinator._xbus_discovery_complete = False
+    coordinator._discovery_requested = False
+    coordinator._discovery_task = None
+    coordinator._zone_poll_task = None
+    coordinator._xbus_poll_task = None
+    coordinator.client.async_ensure_connected = AsyncMock()
+    return coordinator
 
 
 def test_poll_delay_for_phase_uses_fixed_monotonic_slots() -> None:
@@ -213,6 +239,118 @@ def test_unknown_flexc_event_does_not_notify() -> None:
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "9999"})
 
     coordinator.async_set_updated_data.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_data_refreshes_discovered_panel_objects() -> None:
+    """Regular refresh updates panel, ATS and areas already found by discovery."""
+    coordinator = _coordinator_stub()
+    coordinator._ats_discovery_complete = True
+    coordinator._detected_ats_ids = {2}
+    coordinator._area_discovery_complete = True
+    coordinator._detected_area_ids = {1}
+    coordinator.client.async_get_panel_summary = AsyncMock(
+        return_value={"INSTALLATION_NAME": "Home", "SPC_BATT_VOLT": "13.5V"}
+    )
+    coordinator.client.async_get_alert_status = AsyncMock(return_value=[])
+    coordinator.client.async_get_flexc_ats_status = AsyncMock(
+        return_value={"ats": {"ATS_ID": "2", "ATS_NAME": "FlexC"}, "atps": []}
+    )
+    coordinator.client.async_get_area_status = AsyncMock(
+        return_value=[{"AREA_ID": "1", "AREA_NAME": "Home", "MODE": "0"}]
+    )
+
+    state = await SpcFlexCCoordinator._async_update_data(coordinator)
+
+    assert state is coordinator.state
+    assert state.panel.installation_name == "Home"
+    assert state.ats[2].name == "FlexC"
+    assert state.areas[1].name == "Home"
+    assert state.faults.rf_jamming is False
+
+
+@pytest.mark.asyncio
+async def test_update_data_ignores_unavailable_detected_ats_and_reschedules() -> None:
+    """A previously detected unavailable ATS does not abort the panel refresh."""
+    coordinator = _coordinator_stub()
+    coordinator._ats_discovery_complete = True
+    coordinator._detected_ats_ids = {2}
+    coordinator._discovery_requested = True
+    coordinator._schedule_discovery = MagicMock()
+    coordinator.client.async_get_panel_summary = AsyncMock(return_value={})
+    coordinator.client.async_get_alert_status = AsyncMock(return_value=[])
+    coordinator.client.async_get_flexc_ats_status = AsyncMock(
+        side_effect=FlexMLError("unavailable")
+    )
+
+    with patch.object(
+        SpcFlexCCoordinator, "_discovery_complete", new_callable=MagicMock
+    ) as discovery_complete:
+        discovery_complete.__get__ = MagicMock(return_value=False)
+        await SpcFlexCCoordinator._async_update_data(coordinator)
+
+    coordinator._schedule_discovery.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_update_data_wraps_transport_failure() -> None:
+    """Transport failures surface to Home Assistant as UpdateFailed."""
+    coordinator = _coordinator_stub()
+    coordinator.client.async_ensure_connected = AsyncMock(
+        side_effect=FlexCConnectionError("offline")
+    )
+
+    with pytest.raises(UpdateFailed, match="FlexC update failed"):
+        await SpcFlexCCoordinator._async_update_data(coordinator)
+
+
+@pytest.mark.asyncio
+async def test_background_discovery_populates_all_object_families() -> None:
+    """Background discovery records ATS, areas, zones, doors and X-BUS inventory."""
+    coordinator = _coordinator_stub()
+    coordinator._discovery_task = asyncio.current_task()
+    coordinator.async_set_updated_data = MagicMock()
+    coordinator._schedule_zone_polling = MagicMock()
+    coordinator._schedule_xbus_polling = MagicMock()
+    coordinator.client.async_get_flexc_ats_status = AsyncMock(
+        side_effect=[
+            FlexMLError("not present"),
+            {"ats": {"ATS_ID": "2", "ATS_NAME": "FlexC"}, "atps": []},
+        ]
+    )
+    areas = AsyncMock(return_value=[{"AREA_ID": "1", "AREA_NAME": "Home"}])
+    zones = AsyncMock(return_value=[{"ZONE_ID": "4", "ZONE_NAME": "TV"}])
+    doors = AsyncMock(return_value=[{"DOOR_ID": "2", "NAME": "Garage"}])
+    xbus = AsyncMock(
+        return_value=[
+            {"ID": "1", "NAME": "CLA 1", "TYPE": "1"},
+            {"NAME": "invalid"},
+        ]
+    )
+
+    with (
+        patch("custom_components.spc_flexc.coordinator.ATS_IDS", (1, 2)),
+        patch("custom_components.spc_flexc.coordinator.async_discover_areas", areas),
+        patch("custom_components.spc_flexc.coordinator.async_discover_zones", zones),
+        patch("custom_components.spc_flexc.coordinator.async_discover_doors", doors),
+        patch("custom_components.spc_flexc.coordinator.async_get_xbus_status", xbus),
+    ):
+        await SpcFlexCCoordinator._async_discover_panel_objects(coordinator)
+
+    assert coordinator._detected_ats_ids == {2}
+    assert coordinator._detected_area_ids == {1}
+    assert coordinator._detected_zone_ids == {4}
+    assert coordinator._detected_door_ids == {2}
+    assert coordinator._detected_xbus_ids == {1}
+    assert coordinator._ats_discovery_complete is True
+    assert coordinator._area_discovery_complete is True
+    assert coordinator._zone_discovery_complete is True
+    assert coordinator._door_discovery_complete is True
+    assert coordinator._xbus_discovery_complete is True
+    assert coordinator._discovery_task is None
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+    coordinator._schedule_zone_polling.assert_called_once_with()
+    coordinator._schedule_xbus_polling.assert_called_once_with()
 
 
 @pytest.mark.asyncio
