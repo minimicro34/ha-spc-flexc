@@ -17,11 +17,18 @@ from custom_components.spc_flexc.const import (
 )
 from custom_components.spc_flexc.flexc.connection import (
     MSG_CONNECTION_ACK_LEGACY,
+    MSG_CONNECTION_REQUEST,
+    MSG_CONNECTION_REQUEST_LEGACY,
     MSG_DATA,
+    MSG_DATA_ACK,
+    MSG_ERROR,
+    MSG_EVENT,
+    MSG_POLL,
     PROTOCOL_ID,
     PROTOCOL_VERSION,
     RCT_CONNECTION_ID,
     FlexCClient,
+    FlexCCommandError,
     FlexCConnectionError,
     FlexCProtocolError,
     _be16,
@@ -375,3 +382,167 @@ async def test_send_wire_requires_active_connection_and_writes_frame() -> None:
 
     writer.write.assert_called_once_with(b"frame")
     writer.drain.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_handle_message_connection_and_poll_context() -> None:
+    """Connection requests and POLL establish a synchronized command context."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_connection_ack = MagicMock(return_value=b"legacy-ack")
+    client._build_clone_ack = MagicMock(return_value=b"clone-ack")
+
+    legacy = _message()
+    legacy["message_id"] = MSG_CONNECTION_REQUEST_LEGACY
+    await client._handle_message(legacy)
+    assert client.connected is True
+    client._send_wire.assert_awaited_with(b"legacy-ack")
+
+    request = _message()
+    request["message_id"] = MSG_CONNECTION_REQUEST
+    await client._handle_message(request)
+    client._send_wire.assert_awaited_with(b"clone-ack")
+
+    poll = _message()
+    poll["message_id"] = MSG_POLL
+    waiter = asyncio.get_running_loop().create_future()
+    client._poll_waiter = waiter
+    await client._handle_message(poll)
+
+    assert client._command_context == poll
+    assert client._rct_sequence == poll["rct_sequence"]
+    assert client._context_event.is_set()
+    assert waiter.result() == poll
+
+
+@pytest.mark.asyncio
+async def test_handle_message_poll_does_not_replace_active_command_context() -> None:
+    """A POLL during an in-flight command cannot replace its DATA context."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+    original = {"rct_sequence": 1}
+    client._command_context = original
+
+    poll = _message()
+    poll["message_id"] = MSG_POLL
+    poll["rct_sequence"] = 2
+    await client._handle_message(poll)
+
+    assert client._command_context is original
+    assert client._rct_sequence != 2
+    pending.cancel()
+
+
+@pytest.mark.asyncio
+async def test_handle_message_event_and_data() -> None:
+    """EVENT invokes its callback and DATA promotes the next command context."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    callback = MagicMock()
+    client.set_event_callback(callback)
+
+    event = _message()
+    event.update({"message_id": MSG_EVENT, "app_data": b"event"})
+    parsed_event = {"type": "test"}
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=parsed_event,
+    ):
+        await client._handle_message(event)
+    callback.assert_called_once_with(parsed_event)
+
+    data = _message()
+    data.update(
+        {
+            "message_id": MSG_DATA,
+            "new_application_message": True,
+            "application_length": 0,
+            "app_data": b"",
+        }
+    )
+    client._handle_incoming_data = MagicMock()
+    await client._handle_message(data)
+
+    assert client._command_context == data
+    assert client._rct_sequence == data["rct_sequence"]
+    client._handle_incoming_data.assert_called_once_with(data)
+
+    ack = _message()
+    ack["message_id"] = MSG_DATA_ACK
+    await client._handle_message(ack)
+
+
+@pytest.mark.asyncio
+async def test_handle_message_error_clears_context_and_fails_pending_reply() -> None:
+    """Explicit FlexC ERROR invalidates context and propagates to the command."""
+    client = _client()
+    client._command_context = _message()
+    client._context_event.set()
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+
+    error = _message()
+    error.update({"message_id": MSG_ERROR, "data_header": b"\x00\x00\x00\x00\x00\x00\x00\x36"})
+    await client._handle_message(error)
+
+    assert client._command_context is None
+    assert not client._context_event.is_set()
+    assert isinstance(pending.exception(), FlexCCommandError)
+
+
+def test_decode_application_extracts_reply_and_rejects_missing_reply() -> None:
+    """Application decoding ignores framing/noise and returns FLEXML_REPLY."""
+    reply = '<FLEXML_REPLY STATUS="OK" />'
+    application = b"noise\x00<FLEXML XML_LEN=\"1\" />\x00" + reply.encode() + b"\x00"
+    assert FlexCClient._decode_application(application) == reply
+
+    with pytest.raises(FlexCProtocolError, match="no FLEXML_REPLY"):
+        FlexCClient._decode_application(b"noise\x00\xff<bad\x00<FLEXML />\x00")
+
+
+def test_handle_incoming_data_reassembles_fragments() -> None:
+    """Fragmented DATA completes only after the advertised logical length."""
+    client = _client()
+    pending = asyncio.get_event_loop().create_future()
+    client._pending_reply = pending
+    reply = b'<FLEXML_REPLY STATUS="OK" />'
+
+    client._handle_incoming_data(
+        {
+            "new_application_message": True,
+            "application_length": len(reply),
+            "app_data": reply[:10],
+        }
+    )
+    assert not pending.done()
+
+    client._handle_incoming_data(
+        {
+            "new_application_message": False,
+            "application_length": 0,
+            "app_data": reply[10:],
+        }
+    )
+    assert pending.result() == reply.decode()
+
+
+def test_handle_incoming_data_propagates_malformed_reply() -> None:
+    """Malformed complete application data fails the outstanding command."""
+    client = _client()
+    pending = asyncio.get_event_loop().create_future()
+    client._pending_reply = pending
+    payload = b"not-a-flexml-reply"
+
+    client._handle_incoming_data(
+        {
+            "new_application_message": True,
+            "application_length": len(payload),
+            "app_data": payload,
+        }
+    )
+
+    assert isinstance(pending.exception(), FlexCProtocolError)
