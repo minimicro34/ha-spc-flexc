@@ -21,11 +21,13 @@ from .flexc.flexml import (
     parse_door_status,
 )
 from .flexc.read_retry import async_retry_read_once
-from .flexc.zone_control import async_set_zone_inhibited
+from .flexc.zone_control import async_set_zone_inhibited, async_set_zone_isolated
 from .models import DoorState
 
 _LOGGER = logging.getLogger(__name__)
 DOOR_ACTIONS = {5, 6, 7, 8}
+ZONE_CONTROL_VERIFY_ATTEMPTS = 3
+ZONE_CONTROL_VERIFY_DELAY = 0.25
 
 
 class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
@@ -147,8 +149,58 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         self._update_door_states(raw_doors)
         self.async_set_updated_data(self.state)
 
+    def _update_zone_from_control_status(
+        self, zone_id: int, raw_zone: dict[str, str]
+    ) -> None:
+        """Update one existing zone from a post-control status response."""
+        refreshed = self.state.zones[zone_id]
+        refreshed.name = raw_zone.get("ZONE_NAME")
+        refreshed.area_id = _int_or_none(raw_zone.get("AREA_ID"))
+        refreshed.area_name = raw_zone.get("AREA_NAME")
+        refreshed.zone_type = _int_or_none(raw_zone.get("TYPE"))
+        refreshed.input_state = _int_or_none(raw_zone.get("INPUT"))
+        refreshed.logic_input = _int_or_none(raw_zone.get("LOGIC_INPUT"))
+        refreshed.status = _int_or_none(raw_zone.get("STATUS"))
+        refreshed.proc_state = _int_or_none(raw_zone.get("PROC_STATE"))
+        refreshed.alarm_state = _int_or_none(raw_zone.get("ALARM_STATE"))
+        refreshed.inhibit_allowed = _bool_or_none(raw_zone.get("INHIBIT_ALLOWED"))
+        refreshed.isolate_allowed = _bool_or_none(raw_zone.get("ISOLATE_ALLOWED"))
+        refreshed.actuations_since_last_read = _int_or_none(
+            raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
+        )
+        refreshed.raw = dict(raw_zone)
+        refreshed.updated_at = datetime.now(UTC)
+
+    async def _async_refresh_zone_after_control(
+        self, zone_id: int, *, expected_attribute: str, expected_state: bool
+    ) -> None:
+        """Refresh until SPC explicitly confirms a requested zone state."""
+        for attempt in range(ZONE_CONTROL_VERIFY_ATTEMPTS):
+            if attempt:
+                await asyncio.sleep(ZONE_CONTROL_VERIFY_DELAY)
+            raw_zones = await async_retry_read_once(
+                lambda: self.client.async_get_zone_status([zone_id]),
+                description=f"refreshing zone {zone_id} after control",
+            )
+            if not raw_zones:
+                continue
+            raw_zone = raw_zones[0]
+            if int(raw_zone["ZONE_ID"]) != zone_id:
+                raise ValueError(
+                    f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}"
+                )
+            self._update_zone_from_control_status(zone_id, raw_zone)
+            if getattr(self.state.zones[zone_id], expected_attribute) is expected_state:
+                self.async_set_updated_data(self.state)
+                return
+
+        self.async_set_updated_data(self.state)
+        raise ValueError(
+            f"SPC zone {zone_id} did not confirm the requested {expected_attribute} state"
+        )
+
     async def async_set_zone_inhibited(self, zone_id: int, inhibited: bool) -> None:
-        """Set zone inhibition and refresh the zone state immediately."""
+        """Set zone inhibition after checking the explicit SPC permission."""
         zone = self.state.zones.get(zone_id)
         if zone is None:
             raise ValueError(f"Unknown SPC zone {zone_id}")
@@ -170,42 +222,36 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         async with self._client_operation_lock:
             await self.client.async_ensure_connected()
             await async_set_zone_inhibited(self.client, zone_id, inhibited)
-            raw_zones = await async_retry_read_once(
-                lambda: self.client.async_get_zone_status([zone_id]),
-                description=f"refreshing zone {zone_id} after inhibition control",
+            await self._async_refresh_zone_after_control(
+                zone_id, expected_attribute="inhibited", expected_state=inhibited
             )
 
-        if not raw_zones:
-            raise ValueError(f"SPC zone {zone_id} returned no status after control")
-        raw_zone = raw_zones[0]
-        if int(raw_zone["ZONE_ID"]) != zone_id:
-            raise ValueError(
-                f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}"
-            )
+    async def async_set_zone_isolated(self, zone_id: int, isolated: bool) -> None:
+        """Set zone isolation after checking the explicit SPC permission."""
+        zone = self.state.zones.get(zone_id)
+        if zone is None:
+            raise ValueError(f"Unknown SPC zone {zone_id}")
+        if isolated:
+            if zone.isolated is True:
+                return
+            if zone.isolate_allowed is not True:
+                raise ValueError(
+                    f"SPC zone {zone_id} does not currently allow isolation"
+                )
+        else:
+            if zone.isolated is False:
+                return
+            if zone.deisolate_allowed is not True:
+                raise ValueError(
+                    f"SPC zone {zone_id} does not currently allow de-isolation"
+                )
 
-        refreshed = self.state.zones[zone_id]
-        refreshed.name = raw_zone.get("ZONE_NAME")
-        refreshed.area_id = _int_or_none(raw_zone.get("AREA_ID"))
-        refreshed.area_name = raw_zone.get("AREA_NAME")
-        refreshed.zone_type = _int_or_none(raw_zone.get("TYPE"))
-        refreshed.input_state = _int_or_none(raw_zone.get("INPUT"))
-        refreshed.logic_input = _int_or_none(raw_zone.get("LOGIC_INPUT"))
-        refreshed.status = _int_or_none(raw_zone.get("STATUS"))
-        refreshed.proc_state = _int_or_none(raw_zone.get("PROC_STATE"))
-        refreshed.alarm_state = _int_or_none(raw_zone.get("ALARM_STATE"))
-        refreshed.inhibit_allowed = _bool_or_none(raw_zone.get("INHIBIT_ALLOWED"))
-        refreshed.isolate_allowed = _bool_or_none(raw_zone.get("ISOLATE_ALLOWED"))
-        refreshed.actuations_since_last_read = _int_or_none(
-            raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
-        )
-        refreshed.raw = dict(raw_zone)
-        refreshed.updated_at = datetime.now(UTC)
-
-        if refreshed.inhibited is not inhibited:
-            raise ValueError(
-                f"SPC zone {zone_id} did not confirm the requested inhibition state"
+        async with self._client_operation_lock:
+            await self.client.async_ensure_connected()
+            await async_set_zone_isolated(self.client, zone_id, isolated)
+            await self._async_refresh_zone_after_control(
+                zone_id, expected_attribute="isolated", expected_state=isolated
             )
-        self.async_set_updated_data(self.state)
 
     async def async_inhibit_zone(self, zone_id: int) -> None:
         """Inhibit one SPC zone using the validated FlexC command."""
@@ -214,6 +260,14 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
     async def async_deinhibit_zone(self, zone_id: int) -> None:
         """De-inhibit one SPC zone using the validated FlexC command."""
         await self.async_set_zone_inhibited(zone_id, False)
+
+    async def async_isolate_zone(self, zone_id: int) -> None:
+        """Isolate one SPC zone using the validated FlexC command."""
+        await self.async_set_zone_isolated(zone_id, True)
+
+    async def async_deisolate_zone(self, zone_id: int) -> None:
+        """De-isolate one SPC zone using the validated FlexC command."""
+        await self.async_set_zone_isolated(zone_id, False)
 
     async def async_shutdown(self) -> None:
         """Stop door polling and shut down the base coordinator."""
