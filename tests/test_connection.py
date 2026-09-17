@@ -1,6 +1,8 @@
 """Tests for the FlexC transport client."""
 
 import asyncio
+import hashlib
+import zlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,8 +16,11 @@ from custom_components.spc_flexc.const import (
     DEFAULT_PORT,
 )
 from custom_components.spc_flexc.flexc.connection import (
+    MSG_CONNECTION_ACK_LEGACY,
+    MSG_DATA,
     PROTOCOL_ID,
     PROTOCOL_VERSION,
+    RCT_CONNECTION_ID,
     FlexCClient,
     FlexCConnectionError,
     FlexCProtocolError,
@@ -40,6 +45,24 @@ def _config(key: str | bytes, *, port: int | None = 52000) -> dict[str, object]:
 
 def _client() -> FlexCClient:
     return FlexCClient(_config("11" * 32))
+
+
+def _message() -> dict[str, object]:
+    clear = bytearray(16)
+    clear[0] = PROTOCOL_ID
+    clear[1] = PROTOCOL_VERSION
+    clear[4:8] = _put32(0x10203040)
+    return {
+        "clear": bytes(clear),
+        "protocol_id": PROTOCOL_ID,
+        "version": PROTOCOL_VERSION,
+        "connection_id": 0x10203040,
+        "spt_sequence": 0x11223344,
+        "rct_sequence": 0x55667788,
+        "spt_account": 0x01020304,
+        "rct_identifier": 0xA1A2A3A4,
+        "data_header": b"\x00" * 8,
+    }
 
 
 def test_integer_wire_helpers() -> None:
@@ -233,3 +256,122 @@ def test_parse_frame_rejects_invalid_encrypted_length() -> None:
 
     with pytest.raises(FlexCProtocolError, match="Invalid encrypted"):
         client._parse_frame(b"\x00" * 63)
+
+
+def test_digest_and_encryption_round_trip() -> None:
+    """Encrypted frames decrypt with the validated digest intact."""
+    client = _client()
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
+    plain = bytearray(48)
+    plain[18] = 0x21
+
+    wire = client._encrypt_message(clear, plain)
+    parsed = client._parse_frame(wire)
+
+    assert parsed["message_id"] == 0x21
+    assert parsed["sha1_ok"] is True
+    logical = bytearray(clear + parsed["plain"])
+    logical[44:64] = b"\x00" * 20
+    assert parsed["recv_sha1"] == hashlib.sha1(logical).digest()
+
+
+def test_build_connection_ack_preserves_validated_fields() -> None:
+    """Legacy connection ACK contains the expected session identifiers."""
+    client = _client()
+    request = _message()
+
+    parsed = client._parse_frame(client._build_connection_ack(request))
+
+    assert parsed["message_id"] == MSG_CONNECTION_ACK_LEGACY
+    assert parsed["connection_id"] == RCT_CONNECTION_ID
+    assert parsed["spt_sequence"] == request["spt_sequence"]
+    assert parsed["rct_identifier"] == request["rct_identifier"]
+    assert parsed["sha1_ok"] is True
+
+
+def test_build_clone_ack_preserves_session_fields() -> None:
+    """Clone ACK keeps the incoming FlexC session and sequence values."""
+    client = _client()
+    request = _message()
+
+    parsed = client._parse_frame(client._build_clone_ack(request, 0x21))
+
+    assert parsed["message_id"] == 0x21
+    assert parsed["connection_id"] == request["connection_id"]
+    assert parsed["spt_sequence"] == request["spt_sequence"]
+    assert parsed["rct_sequence"] == request["rct_sequence"]
+    assert parsed["spt_account"] == request["spt_account"]
+    assert parsed["rct_identifier"] == request["rct_identifier"]
+    assert parsed["sha1_ok"] is True
+
+
+def test_build_application_buffer_metadata_and_alignment() -> None:
+    """Application buffer carries exact FLEXML length/CRC and block alignment."""
+    client = _client()
+    command = '<FLEXML><COMMAND TYPE="TEST" /></FLEXML>'
+    command_bytes = command.encode("ascii")
+
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.os.urandom",
+        side_effect=lambda length: b"\xaa" * length,
+    ):
+        application = client._build_application_buffer(command)
+
+    header, payload = application.split(b"\x00", 1)
+    assert len(application) % 16 == 0
+    assert f'XML_LEN="{len(command_bytes)}"'.encode() in header
+    assert f'XML_CLEN="{len(command_bytes)}"'.encode() in header
+    assert f'XML_CRC="{zlib.crc32(command_bytes) & 0xFFFFFFFF}"'.encode() in header
+    assert payload.startswith(command_bytes + b"\x00")
+
+
+def test_build_application_buffer_rejects_non_ascii_command() -> None:
+    """FLEXML wire commands are explicitly restricted to ASCII."""
+    client = _client()
+
+    with pytest.raises(FlexCProtocolError, match="ASCII"):
+        client._build_application_buffer("<FLEXML>é</FLEXML>")
+
+
+def test_build_outbound_data_contains_application() -> None:
+    """Outbound DATA advertises and carries the complete application buffer."""
+    client = _client()
+    request = _message()
+    application = b"A" * 32
+
+    parsed = client._parse_frame(
+        client._build_outbound_data(request, 0x12345679, application)
+    )
+
+    assert parsed["message_id"] == MSG_DATA
+    assert parsed["length_units"] == 2
+    assert parsed["application_length"] == len(application)
+    assert parsed["new_application_message"] is True
+    assert parsed["rct_sequence"] == 0x12345679
+    assert parsed["app_data"] == application
+    assert parsed["sha1_ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_send_wire_requires_active_connection_and_writes_frame() -> None:
+    """Wire writes fail without a session and drain an active writer."""
+    client = _client()
+
+    with pytest.raises(FlexCConnectionError, match="No active"):
+        await client._send_wire(b"frame")
+
+    closing_writer = MagicMock()
+    closing_writer.is_closing.return_value = True
+    client._writer = closing_writer
+    with pytest.raises(FlexCConnectionError, match="No active"):
+        await client._send_wire(b"frame")
+
+    writer = MagicMock()
+    writer.is_closing.return_value = False
+    writer.drain = AsyncMock()
+    client._writer = writer
+
+    await client._send_wire(b"frame")
+
+    writer.write.assert_called_once_with(b"frame")
+    writer.drain.assert_awaited_once_with()
