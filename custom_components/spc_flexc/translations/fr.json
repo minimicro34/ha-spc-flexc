@@ -25,30 +25,39 @@
       }
     }
   },
-  "exceptions": {
-    "area_not_ready_engineer": {
-      "message": "Impossible d’armer {area} : le mode Installateur est actif (raison SPC {reason})."
+  "entity": {
+    "binary_sensor": {
+      "xbus_tamper_fault": {"name": "Défaut d’autoprotection"},
+      "xbus_tamper_inhibited": {"name": "Autoprotection inhibée"},
+      "xbus_tamper_isolated": {"name": "Autoprotection isolée"}
     },
-    "area_not_ready_zone": {
-      "message": "Impossible d’armer {area} : la zone « {zone} » (ID {zone_id}) n’est pas prête (raison SPC {reason})."
+    "sensor": {
+      "xbus_aux_voltage": {"name": "Tension auxiliaire"},
+      "xbus_aux_current": {"name": "Courant auxiliaire"},
+      "xbus_diagnostics": {"name": "Diagnostics X-BUS"},
+      "xbus_device_id": {"name": "ID du périphérique X-BUS"},
+      "xbus_input_count": {"name": "Nombre d’entrées"},
+      "xbus_output_count": {"name": "Nombre de sorties"}
     },
-    "area_not_ready_faults": {
-      "message": "Impossible de changer le mode de {area} : le secteur n'est pas prêt (raison SPC {reason}). Défauts actifs : {faults}"
+    "button": {
+      "open_momentarily": {"name": "Mode libre temporaire"},
+      "open_permanently": {"name": "Mode libre"},
+      "set_normal": {"name": "Mode normal"},
+      "lock": {"name": "Mode accès interdit"}
     },
-    "area_not_ready": {
-      "message": "Impossible de changer le mode de {area} : le secteur n’est pas prêt (raison SPC {reason})."
-    },
-    "partset_a_not_supported": {
-      "message": "{area} ne prend pas en charge la mise en service partielle A."
-    },
-    "partset_b_not_supported": {
-      "message": "{area} ne prend pas en charge la mise en service partielle B."
-    },
-    "global_arm_incomplete": {
-      "message": "La mise en service totale SPC est incomplète. Secteurs déjà commandés : {areas}. Erreur : {error}"
-    },
-    "global_disarm_incomplete": {
-      "message": "La mise hors service totale SPC est incomplète. Erreurs : {errors}"
+    "switch": {
+      "inhibition": {"name": "Inhibition {zone_name}"},
+      "isolation": {"name": "Isolation {zone_name}"}
     }
+  },
+  "exceptions": {
+    "area_not_ready_engineer": {"message": "Impossible d’armer {area} : le mode Installateur est actif (raison SPC {reason})."},
+    "area_not_ready_zone": {"message": "Impossible d’armer {area} : la zone « {zone} » (ID {zone_id}) n’est pas prête (raison SPC {reason})."},
+    "area_not_ready_faults": {"message": "Impossible de changer le mode de {area} : le secteur n'est pas prêt (raison SPC {reason}). Défauts actifs : {faults}"},
+    "area_not_ready": {"message": "Impossible de changer le mode de {area} : le secteur n’est pas prêt (raison SPC {reason})."},
+    "partset_a_not_supported": {"message": "{area} ne prend pas en charge la mise en service partielle A."},
+    "partset_b_not_supported": {"message": "{area} ne prend pas en charge la mise en service partielle B."},
+    "global_arm_incomplete": {"message": "La mise en service totale SPC est incomplète. Secteurs déjà commandés : {areas}. Erreur : {error}"},
+    "global_disarm_incomplete": {"message": "La mise hors service totale SPC est incomplète. Erreurs : {errors}"}
   }
 }

@@ -24,31 +24,52 @@
         }
       }
     }
-  }, 
-  "exceptions": {
-    "area_not_ready_engineer": {
-      "message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."
+  },
+  "entity": {
+    "binary_sensor": {
+      "xbus_tamper_fault": {"name": "Tamper fault"},
+      "xbus_tamper_isolated": {"name": "Tamper isolated"}
     },
-    "area_not_ready_zone": {
-      "message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."
+    "sensor": {
+      "xbus_aux_voltage": {"name": "Auxiliary voltage"},
+      "xbus_aux_current": {"name": "Auxiliary current"},
+      "xbus_diagnostics": {"name": "X-BUS diagnostics"},
+      "xbus_device_id": {"name": "X-BUS device ID"},
+      "xbus_device_type": {"name": "Device type"},
+      "xbus_hardware_id": {"name": "Hardware ID"},
+      "xbus_input_count": {"name": "Input count"},
+      "xbus_output_count": {"name": "Output count"},
+      "xbus_rf_type": {"name": "RF type"},
+      "xbus_rf_version": {"name": "RF version"},
+      "xbus_reader_type": {"name": "Reader type"},
+      "xbus_position_1": {"name": "Position 1"},
+      "xbus_position_2": {"name": "Position 2"},
+      "xbus_psu_type": {"name": "Power supply type"},
+      "xbus_sia_address": {"name": "SIA address"},
+      "xbus_status_raw": {"name": "Raw status"},
+      "xbus_input_raw": {"name": "Raw input"},
+      "xbus_alert_raw": {"name": "Raw alert"},
+      "xbus_inhibit_raw": {"name": "Raw inhibit"},
+      "xbus_isolate_raw": {"name": "Raw isolate"}
     },
-    "area_not_ready_faults": {
-      "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"
+    "button": {
+      "open_momentarily": {"name": "Momentary free mode"},
+      "open_permanently": {"name": "Free mode"},
+      "set_normal": {"name": "Normal mode"},
+      "lock": {"name": "Access forbidden mode"}
     },
-    "area_not_ready": {
-      "message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason})."
-    },
-    "partset_a_not_supported": {
-      "message": "{area} does not support Part Set A."
-    },
-    "partset_b_not_supported": {
-      "message": "{area} does not support Part Set B."
-    },
-    "global_arm_incomplete": {
-      "message": "SPC global arming was incomplete. Areas already commanded: {areas}. Error: {error}"
-    },
-    "global_disarm_incomplete": {
-      "message": "SPC global disarming was incomplete. Errors: {errors}"
+    "switch": {
+      "inhibition": {"name": "Inhibition {zone_name}"}
     }
+  },
+  "exceptions": {
+    "area_not_ready_engineer": {"message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."},
+    "area_not_ready_zone": {"message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."},
+    "area_not_ready_faults": {"message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"},
+    "area_not_ready": {"message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason})."},
+    "partset_a_not_supported": {"message": "{area} does not support Part Set A."},
+    "partset_b_not_supported": {"message": "{area} does not support Part Set B."},
+    "global_arm_incomplete": {"message": "SPC global arming was incomplete. Areas already commanded: {areas}. Error: {error}"},
+    "global_disarm_incomplete": {"message": "SPC global disarming was incomplete. Errors: {errors}"}
   }
 }

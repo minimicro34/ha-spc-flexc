@@ -1,3 +1,5 @@
+"""State models for the SPC FlexC integration."""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -9,24 +11,18 @@ class AreaState:
 
     area_id: int
     name: str | None = None
-
     mode: int | None = None
     partset_a_enabled: bool | None = None
     partset_b_enabled: bool | None = None
-
     last_set_time: datetime | None = None
     last_set_user_id: int | None = None
     last_set_user_name: str | None = None
-
     last_unset_time: datetime | None = None
     last_unset_user_id: int | None = None
     last_unset_user_name: str | None = None
-
     last_alarm: datetime | None = None
-
     internal_bells: bool | None = None
     external_bells: bool | None = None
-
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
 
@@ -38,11 +34,9 @@ class AtpState:
     atp_id: int
     name: str | None = None
     uid: int | None = None
-
     status: int | None = None
     state: int | None = None
     connect_state: int | None = None
-
     last_tx_ok_timestamp: datetime | None = None
 
     @property
@@ -50,13 +44,10 @@ class AtpState:
         """Return the validated ATP fault state."""
         if self.status is None:
             return None
-
         if self.status == 1:
             return False
-
         if self.status == 2:
             return True
-
         return None
 
     @property
@@ -64,13 +55,10 @@ class AtpState:
         """Return whether this ATP is an active/connected path."""
         if self.connect_state is None:
             return None
-
         if self.connect_state in (15, 16):
             return True
-
         if self.connect_state == 0:
             return False
-
         return None
 
 
@@ -80,15 +68,11 @@ class AtsState:
 
     ats_id: int
     name: str | None = None
-
     status: int | None = None
     state: int | None = None
-
     registration_id: str | None = None
     event_log_count: int | None = None
-
     atps: dict[int, AtpState] = field(default_factory=dict)
-
     updated_at: datetime | None = None
 
 
@@ -100,21 +84,17 @@ class PanelState:
     aux_voltage: float | None = None
     aux_current: float | None = None
     ac_frequency: float | None = None
-
     rf_type: int | None = None
     rf_version: str | None = None
-
     internal_bells: bool | None = None
     external_bells: bool | None = None
     engineer_mode: bool | None = None
-
     installation_name: str | None = None
     spc_type: str | None = None
     spc_variant: str | None = None
     serial_number: str | None = None
     firmware_version: str | None = None
     hardware_version: str | None = None
-
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
 
@@ -126,17 +106,13 @@ class FaultState:
     mains_fault: bool | None = None
     battery_fault: bool | None = None
     panel_tamper: bool | None = None
-
     modem_1_fault: bool | None = None
     modem_1_line_fault: bool | None = None
     modem_2_fault: bool | None = None
     modem_2_line_fault: bool | None = None
-
     rf_jamming: bool | None = None
-
     xbus_mains_fault: bool | None = None
     xbus_battery_fault: bool | None = None
-
     last_event: dict[str, Any] | None = None
 
 
@@ -149,7 +125,6 @@ class ZoneState:
     area_id: int | None = None
     area_name: str | None = None
     zone_type: int | None = None
-
     input_state: int | None = None
     logic_input: int | None = None
     status: int | None = None
@@ -157,27 +132,128 @@ class ZoneState:
     alarm_state: int | None = None
     event_tamper: bool | None = None
     last_event: dict[str, Any] | None = None
-
     inhibit_allowed: bool | None = None
     isolate_allowed: bool | None = None
     actuations_since_last_read: int | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime | None = None
 
+    @property
+    def inhibited(self) -> bool | None:
+        """Return the explicit FlexC inhibition state when it can be inferred."""
+        value = self.raw.get("INHIBITED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if "INHIBIT_ALLOWED" in self.raw:
+            return False
+        return None
+
+    @property
+    def deinhibit_allowed(self) -> bool | None:
+        """Return whether FlexC currently permits de-inhibiting this zone."""
+        value = self.raw.get("DEINHIBIT_ALLOWED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if self.inhibited is False:
+            return False
+        return None
+
+    @property
+    def isolated(self) -> bool | None:
+        """Return the explicit FlexC isolation state when it can be inferred."""
+        value = self.raw.get("ISOLATED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if "ISOLATE_ALLOWED" in self.raw:
+            return False
+        return None
+
+    @property
+    def deisolate_allowed(self) -> bool | None:
+        """Return whether FlexC currently permits de-isolating this zone."""
+        value = self.raw.get("DEISOLATE_ALLOWED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if self.isolated is False:
+            return False
+        return None
+
+
+@dataclass
+class DoorState:
+    """Last known SPC access-control door state."""
+
+    door_id: int
+    name: str | None = None
+    status: int | None = None
+    mode: int | None = None
+    dps_input: int | None = None
+    drs_input: int | None = None
+    reader1_format: int | None = None
+    reader2_format: int | None = None
+    zone_id: int | None = None
+    zone_name: str | None = None
+    area_id: int | None = None
+    area_name: str | None = None
+    area_side_1: int | None = None
+    area_side_1_name: str | None = None
+    entry_exit: bool | None = None
+    normal_allowed: bool | None = None
+    lock_allowed: bool | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+    updated_at: datetime | None = None
+
+
+@dataclass
+class MappingGateState:
+    """Last known SPC Mapping Gate state."""
+
+    mg_id: int
+    name: str | None = None
+    state: bool | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
 
 
 @dataclass
 class XBusDeviceState:
-    """Last known X-BUS device state derived from FlexC events."""
+    """Last known X-BUS device state."""
 
     device_id: int
     name: str | None = None
+    serial_number: str | None = None
+    device_type: int | None = None
+    hardware_id: int | None = None
+    input_count: int | None = None
+    output_count: int | None = None
+    version: str | None = None
+    rf_type: int | None = None
+    rf_version: str | None = None
+    reader_type: int | None = None
+    status_raw: str | None = None
+    position_1: int | None = None
+    position_2: int | None = None
+    psu_type: int | None = None
+    aux_voltage: float | None = None
+    aux_current: float | None = None
+    input_raw: str | None = None
+    alert_raw: str | None = None
+    inhibit_raw: str | None = None
+    isolate_raw: str | None = None
     sia_address: int | None = None
-
     tamper_fault: bool | None = None
+    tamper_inhibited: bool | None = None
     tamper_isolated: bool | None = None
-
     last_event: dict[str, Any] | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
 
 
@@ -187,8 +263,9 @@ class SpcState:
 
     panel: PanelState = field(default_factory=PanelState)
     faults: FaultState = field(default_factory=FaultState)
-
     areas: dict[int, AreaState] = field(default_factory=dict)
     zones: dict[int, ZoneState] = field(default_factory=dict)
+    doors: dict[int, DoorState] = field(default_factory=dict)
+    mapping_gates: dict[int, MappingGateState] = field(default_factory=dict)
     ats: dict[int, AtsState] = field(default_factory=dict)
     xbus_devices: dict[int, XBusDeviceState] = field(default_factory=dict)

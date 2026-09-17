@@ -1,5 +1,5 @@
 PYTHON ?= python3.14
-.PHONY: help compile format format-check lint typecheck test check clean
+.PHONY: help compile format format-check lint typecheck test coverage check clean
 
 help:
 	@echo "Available targets:"
@@ -9,6 +9,7 @@ help:
 	@echo "  lint          Run Ruff lint"
 	@echo "  typecheck     Run mypy"
 	@echo "  test          Run pytest"
+	@echo "  coverage      Run pytest with coverage (minimum 80%)"
 	@echo "  check         Run the complete CI locally"
 	@echo "  clean         Remove Python cache files"
 
@@ -25,10 +26,13 @@ lint:
 	$(PYTHON) -m ruff check .
 
 typecheck:
-	$(PYTHON) -m mypy custom_components/spc_flexc
+	$(PYTHON) -m mypy --check-untyped-defs custom_components/spc_flexc
 
 test:
 	$(PYTHON) -m pytest -q
+
+coverage:
+	$(PYTHON) -m pytest -q --cov=custom_components.spc_flexc --cov-report=term-missing --cov-fail-under=80
 
 check: compile format-check lint typecheck test
 

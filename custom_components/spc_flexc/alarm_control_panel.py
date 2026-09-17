@@ -1,3 +1,5 @@
+"""Alarm control panel entities and area mode commands for SPC FlexC."""
+
 import xml.etree.ElementTree as ET
 from typing import Any
 from xml.sax.saxutils import quoteattr
@@ -101,6 +103,25 @@ def _area_name(
     if area is not None and area.name:
         return area.name
     return f"Area {area_id}"
+
+
+def _partset_name(
+    coordinator: SpcFlexCCoordinator,
+    area: Any,
+    part: str,
+) -> str | None:
+    """Return an SPC-configured partial-set name when available."""
+    key = "PARTA_NAME" if part == "a" else "PARTB_NAME"
+
+    value = area.raw.get(key)
+    if value is None:
+        value = coordinator.data.panel.raw.get(key)
+
+    if value is None:
+        return None
+
+    name = str(value).strip()
+    return name or None
 
 
 def _active_blocking_faults(
@@ -394,6 +415,8 @@ class SpcAreaAlarmControlPanel(
             ),
             "partset_a_enabled": area.partset_a_enabled,
             "partset_b_enabled": area.partset_b_enabled,
+            "partset_a_name": _partset_name(self.coordinator, area, "a"),
+            "partset_b_name": _partset_name(self.coordinator, area, "b"),
             "last_set_time": area.last_set_time,
             "last_set_user_id": area.last_set_user_id,
             "last_set_user_name": area.last_set_user_name,
@@ -464,6 +487,8 @@ class SpcPanelAlarmControlPanel(
                     "mode_name": (
                         MODE_LABELS.get(area.mode) if area.mode is not None else None
                     ),
+                    "partset_a_name": _partset_name(self.coordinator, area, "a"),
+                    "partset_b_name": _partset_name(self.coordinator, area, "b"),
                 }
                 for area_id, area in sorted(self.coordinator.data.areas.items())
             }

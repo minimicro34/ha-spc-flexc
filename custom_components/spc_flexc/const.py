@@ -2,17 +2,19 @@
 
 from homeassistant.const import Platform
 
+# Integration
 DOMAIN = "spc_flexc"
 
 PLATFORMS = (
     Platform.ALARM_CONTROL_PANEL,
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.SENSOR,
+    Platform.SWITCH,
 )
 
+# Configuration
 DEFAULT_PORT = 52000
-DEFAULT_ZONE_INTERVAL = 1.0
-DEFAULT_AREA_INTERVAL = 1.0
 DEFAULT_PANEL_INTERVAL = 60.0
 
 CONF_PORT = "port"
@@ -20,10 +22,41 @@ CONF_KEY = "encryption_key"
 CONF_COMMAND_USERNAME = "command_username"
 CONF_COMMAND_PASSWORD = "command_password"
 
-ATS_IDS = range(1, 5)
-AREA_IDS = range(1, 9)
-ZONE_IDS = range(1, 9)
+# Live polling
+ZONE_POLL_INTERVAL = 1.0
+ZONE_POLL_PHASE = 0.0
+ZONE_POLL_BATCH_SIZE = 16
 
+DOOR_POLL_INTERVAL = 1.0
+DOOR_POLL_PHASE = 1.0 / 3.0
+
+MG_POLL_INTERVAL = 1.0
+MG_POLL_PHASE = 2.0 / 3.0
+
+# X-BUS status is aggregate and FlexC events provide immediate fault changes.
+# Poll periodically as a reconciliation path for missed events and state drift.
+XBUS_POLL_INTERVAL = 30.0
+XBUS_POLL_PHASE = 5.0
+
+# Validated on a real X-BUS keypad with an active tamper fault.
+# Bit 0x0002 identifies the physical tamper input and its inhibit/isolate state.
+XBUS_TAMPER_INPUT_MASK = 0x0002
+XBUS_TAMPER_INHIBIT_MASK = 0x0002
+XBUS_TAMPER_ISOLATE_MASK = 0x0002
+
+# FlexC ATS
+ATS_IDS = range(1, 5)
+
+# Discovery is protocol-driven: valid-but-unused IDs may return RESULT=0 with
+# an empty reply, while the first out-of-range IDs return RESULT=102. The
+# generous safety caps below prevent an endless scan if a panel never reports
+# that boundary.
+DISCOVERY_BATCH_SIZE = 8
+AREA_DISCOVERY_MAX_ID = 64
+ZONE_DISCOVERY_MAX_ID = 512
+DOOR_DISCOVERY_MAX_ID = 128
+
+# SPC zone types
 SPC_ZONE_TYPES: dict[int, str] = {
     0: "alarm",
     1: "entry_exit",

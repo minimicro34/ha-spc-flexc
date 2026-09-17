@@ -15,27 +15,19 @@
 </p>
 
 <p align="center">
-  🔐 Alarm control • 🏠 Areas • 🚪 Zones • 📡 FlexC • 🩺 Diagnostics
+  🔐 Alarm control • 🏠 Areas • 🚪 Zones • 🔌 Outputs • 🧩 X-BUS • 📡 FlexC • 🩺 Diagnostics
 </p>
 
 ---
 
-SPC FlexC is a custom Home Assistant integration for compatible
-**Siemens / Vanderbilt / Comelit SPC alarm panels**.
+SPC FlexC is a custom Home Assistant integration for compatible **Siemens / Vanderbilt / Comelit SPC alarm panels**.
 
-It implements a native FlexC receiver directly inside Home Assistant.
-
-The SPC panel connects directly to Home Assistant using its FlexC communication
-path, allowing Home Assistant to retrieve panel information, monitor areas and
-zones, receive events and control the alarm system without requiring an
-additional SPC gateway.
+It implements a native FlexC receiver directly inside Home Assistant. The SPC panel connects directly to Home Assistant through its FlexC communication path, allowing Home Assistant to retrieve panel information, monitor areas and zones, discover X-BUS hardware, receive events and control supported alarm and output functions without an additional SPC gateway.
 
 > [!IMPORTANT]
-> SPC FlexC can arm and disarm your alarm system.
+> SPC FlexC can change the state of your alarm system.
 >
-> State-changing commands are deliberately never automatically retried.
-> Before arming, the integration asks the SPC panel whether the requested mode
-> change is currently allowed.
+> State-changing commands are deliberately never automatically retried after an uncertain communication failure. The integration also checks SPC-reported capabilities before sending supported alarm, inhibition and isolation commands.
 
 ---
 
@@ -52,10 +44,10 @@ additional SPC gateway.
 - [Available entities](#available-entities)
 - [SPC FlexC Card](#spc-flexc-card)
 - [Alarm control](#alarm-control)
-- [Global alarm control](#global-alarm-control)
-- [Arming safety and error reporting](#arming-safety-and-error-reporting)
+- [Zone inhibition and isolation](#zone-inhibition-and-isolation)
+- [Mapping Gates / outputs](#mapping-gates--outputs)
+- [X-BUS](#x-bus)
 - [Diagnostics](#diagnostics)
-- [SPC command attribution](#spc-command-attribution)
 - [Security recommendations](#security-recommendations)
 - [Known limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
@@ -73,11 +65,12 @@ additional SPC gateway.
 
 - 📡 Native FlexC receiver implemented directly in Home Assistant
 - 🔐 AES-256 encrypted FlexC communication
-- 🔄 FlexC connection management
+- 🔄 FlexC connection lifecycle management
 - 💓 FlexC polling and acknowledgements
 - 📥 FLEXML command/reply handling
 - ⚡ Processing of unsolicited FlexC events
-- 📶 FlexC ATS communication monitoring
+- 📶 FlexC ATS / ATP communication monitoring
+- 🔁 Bounded recovery/retry handling for read-only status requests
 
 ### Alarm
 
@@ -87,49 +80,52 @@ additional SPC gateway.
 - 🔒 Individual area Full Set / Arm Away
 - 🏡 Part Set A / Arm Home when supported
 - 🌙 Part Set B / Arm Night when supported
-- 🛡️ Global Full Set
-- 🔓 Global Unset
-- ✅ Precheck before mode-changing operations
+- 🛡️ Global Full Set and Global Unset
+- ✅ SPC capability prechecks before mode-changing operations
 - 🚫 Automatic arming refusal when an area is not ready
-- 🚪 Identification of the zone preventing arming
+- 🚪 Identification of the zone preventing arming when reported by SPC
 - 🛠️ Engineer / Installer mode detection
-- 🌐 English and French error messages
+- ⚡ Live state updates from supported FlexC events
+
+### Zones
+
+- Live zone state monitoring
+- Zone inhibition and de-inhibition controls when explicitly allowed by SPC
+- Zone isolation and de-isolation controls when explicitly allowed by SPC
+- Dynamic creation of supported Home Assistant control entities
+
+### X-BUS
+
+- Dynamic discovery of X-BUS peripherals reported by SPC
+- Validated identification of tested SPC keypad, comfort keypad, SPCE650, SPCE450 and SPCA210 hardware
+- Auxiliary voltage/current information where reported
+- Tamper, tamper-inhibited and tamper-isolated diagnostics
+- Device-specific metadata retained in Home Assistant diagnostics
+
+### Outputs
+
+- Mapping Gate discovery
+- Mapping Gate state monitoring
+- Home Assistant switch entities for discovered Mapping Gates
+- Resulting output state verification after commands
 
 ### Home Assistant
 
-- 🏠 Native `alarm_control_panel` entities
-- 🚪 SPC zone entities
-- 🩺 Diagnostic entities
-- 🔄 UI configuration and reconfiguration flows
-- 🔧 Connection settings can be changed without removing the integration
-- ⚡ Live updates from FlexC events
-- 📦 HACS compatible
-- 🌐 English and French translations
-
-### Safety
-
-- 🛡️ State-changing FlexC commands are never automatically retried
-- 🔍 Individual arming operations are prechecked with the SPC panel
-- 🔍 Every area is prechecked before global arming starts
-- 🚫 Global arming is cancelled before the first Set command if an area is
-  already known to be unable to arm
-- 📥 Resulting states are refreshed from the SPC panel after commands
+- Native `alarm_control_panel` entities
+- Zone, switch, sensor and binary sensor entities
+- Dynamic entity discovery
+- Home Assistant device grouping
+- UI configuration and reconfiguration flows
+- HACS-compatible repository structure
+- English and French translations
 
 ---
 
 ## Supported systems
 
-SPC FlexC is designed for SPC intrusion panels providing the FlexC protocol,
-including systems sold under the:
+SPC FlexC is designed for SPC intrusion panels providing the FlexC protocol, including systems sold under the Siemens SPC, Vanderbilt SPC and Comelit SPC product families.
 
-- Siemens SPC
-- Vanderbilt SPC
-- Comelit SPC
-
-product families.
-
-Actual feature availability depends on the panel model, firmware, installed
-modules and SPC configuration.
+Actual feature availability depends on the panel model, firmware, installed modules, Command Profile permissions and SPC configuration.
 
 ---
 
@@ -145,11 +141,14 @@ modules and SPC configuration.
 | Zones | ✅ |
 | Full Set / Unset | ✅ |
 | Global Full Set / Unset | ✅ |
-| Part Set A | ✅ When enabled by the area |
-| Part Set B | ✅ When enabled by the area |
+| Part Set A / B | ✅ When enabled by the area |
+| Zone inhibition | ✅ When allowed by SPC |
+| Zone isolation | ✅ When allowed by SPC |
+| Mapping Gates / outputs | ✅ |
+| X-BUS discovery | ✅ |
 | FlexC events | ✅ |
 | Panel diagnostics | ✅ |
-| FlexC ATS diagnostics | ✅ |
+| FlexC ATS / ATP diagnostics | ✅ |
 
 ---
 
@@ -165,18 +164,7 @@ You need:
 - a dedicated SPC Command Profile;
 - a command username and password.
 
-Home Assistant must be reachable by the SPC panel on the configured FlexC TCP
-port.
-
-The port used by your SPC ATP and Home Assistant must be identical.
-
-A typical port is:
-
-```text
-52000
-```
-
-You may use another available TCP port.
+Home Assistant must be reachable by the SPC panel on the configured FlexC TCP port. The port configured in the SPC ATP and Home Assistant must be identical. A typical port is `52000`, but another available TCP port may be used.
 
 ---
 
@@ -184,44 +172,16 @@ You may use another available TCP port.
 
 ### HACS
 
-1. Open **HACS**.
-2. Go to **Integrations**.
-3. Open the **⋮** menu.
-4. Select **Custom repositories**.
-5. Add:
-
-```text
-https://github.com/minimicro34/ha-spc-flexc
-```
-
-Select the category:
-
-```text
-Integration
-```
-
-6. Install **SPC FlexC**.
-7. Restart Home Assistant.
-
-Then go to:
-
-**Settings → Devices & services → Add integration → SPC FlexC**
+1. Open **HACS → Integrations**.
+2. Open the **⋮** menu and select **Custom repositories**.
+3. Add `https://github.com/minimicro34/ha-spc-flexc` as an **Integration** repository.
+4. Install **SPC FlexC**.
+5. Restart Home Assistant.
+6. Open **Settings → Devices & services → Add integration → SPC FlexC**.
 
 ### Manual installation
 
-Copy:
-
-```text
-custom_components/spc_flexc
-```
-
-to:
-
-```text
-/config/custom_components/spc_flexc
-```
-
-Restart Home Assistant.
+Copy `custom_components/spc_flexc` to `/config/custom_components/spc_flexc` and restart Home Assistant.
 
 ---
 
@@ -229,272 +189,111 @@ Restart Home Assistant.
 
 ### FlexC communication path
 
-Configure an SPC ATS / ATP using FlexC.
-
-The SPC panel initiates the TCP connection to Home Assistant.
-
-Home Assistant therefore acts as the FlexC receiver.
+Configure an SPC ATS / ATP using FlexC. The SPC panel initiates the TCP connection to Home Assistant, which acts as the FlexC receiver.
 
 Configure the ATP destination with:
 
-- the IP address of Home Assistant;
+- the Home Assistant IP address;
 - the TCP port configured in SPC FlexC;
 - FlexC encryption enabled;
-- the AES-256 encryption key used by Home Assistant.
+- the same AES-256 encryption key configured in Home Assistant.
 
-Make sure that:
-
-- the Home Assistant IP address is reachable from the SPC panel;
-- the configured TCP port is not blocked by a firewall;
-- no other receiver is listening for the same SPC FlexC destination;
-- the ATS / ATP is enabled.
-
-### AES-256 encryption
-
-Configure the FlexC ATP to use AES-256 encryption.
-
-The same encryption key must be configured in Home Assistant.
-
-Keep this key private.
+Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.
 
 ### Command Profile
 
-Create a dedicated SPC Command Profile.
-
-For example:
-
-```text
-Name: Home Assistant
-```
-
-Use:
+Create a dedicated SPC Command Profile. The configuration validated for this integration uses:
 
 ```text
 Authentication mode: Command User Only
 ```
 
-or, on a French SPC interface:
+On a French SPC interface:
 
 ```text
 Mode Authentification : Utilisateur Commandes seulement
 ```
 
-Create dedicated command credentials, for example:
+Use dedicated command credentials and enable only the FLEXML permissions required by your installation.
 
-```text
-Command username: homeassistant
-Command password: <strong unique password>
-```
-
-Enter these same credentials in the SPC FlexC Home Assistant integration.
+Read permissions are required for the panel and hardware status used by the integration. Alarm control requires area change-mode permissions. Zone inhibition/isolation and Mapping Gate controls additionally require the corresponding commands to be permitted by the Command Profile.
 
 > [!IMPORTANT]
-> **Command User Only / Utilisateur Commandes seulement** is the authentication
-> mode validated for SPC FlexC v1.0.
->
-> `SPC User Only / Utilisateur SPC seulement` is not part of the validated
-> v1.0 configuration.
-
-### Command permissions
-
-The Command Profile must allow the FLEXML commands required by the integration.
-
-This includes commands required to retrieve:
-
-- panel summary;
-- alert status;
-- area status;
-- zone status;
-- FlexC / ATS status where available.
-
-Alarm control additionally requires permission for:
-
-- area change-mode status;
-- area mode changes.
-
-Only enable the permissions required by your installation.
-
-A dedicated Command Profile is recommended instead of reusing an installer or
-personal SPC account.
+> `SPC User Only / Utilisateur SPC seulement` has not been validated as the authentication mode for this integration.
 
 ---
 
 ## Home Assistant configuration
 
-After installing and restarting Home Assistant:
+After installation, add **SPC FlexC** from **Settings → Devices & services**.
 
-1. Open **Settings**.
-2. Open **Devices & services**.
-3. Select **Add integration**.
-4. Search for **SPC FlexC**.
+The configuration flow asks for:
 
-The integration asks for the following settings.
+- SPC address;
+- FlexC TCP port;
+- AES-256 key;
+- Command Profile username;
+- Command Profile password.
 
-### SPC address
-
-The IP address of the SPC panel.
-
-Example:
-
-```text
-192.168.1.200
-```
-
-### FlexC port
-
-The TCP port on which Home Assistant listens for the SPC FlexC connection.
-
-Example:
-
-```text
-52000
-```
-
-### AES-256 key
-
-The FlexC encryption key configured in the SPC ATP.
-
-The same key must be configured on both sides.
-
-### Command username
-
-The username configured in the SPC Command Profile.
-
-Example:
-
-```text
-homeassistant
-```
-
-### Command password
-
-The password configured for the SPC Command Profile.
-
-After setup, the SPC panel should establish its FlexC connection to Home
-Assistant.
+After setup, the SPC panel should establish its FlexC connection to Home Assistant.
 
 ---
 
 ## Reconfiguration
 
-Starting with v1.0.1, SPC FlexC connection settings can be changed directly
-from the Home Assistant UI without removing and recreating the integration.
+Connection settings can be changed without removing and recreating the integration.
 
-Open:
+Open **Settings → Devices & services → SPC FlexC → Reconfigure** to change the SPC address, FlexC TCP port, AES-256 key or Command Profile credentials.
 
-**Settings → Devices & services → SPC FlexC → Reconfigure**
-
-The following settings can be changed:
-
-- SPC address;
-- FlexC TCP port;
-- AES-256 encryption key;
-- Command Profile username;
-- Command Profile password.
-
-The current values are automatically pre-filled in the reconfiguration form.
-
-After validation, the existing config entry is updated and the integration is
-reloaded with the new connection settings.
-
-### Changing the SPC address
-
-The SPC panel IP address is not used as the permanent identity of the config
-entry.
-
-After a successful panel refresh, SPC FlexC uses the panel serial number as the
-stable config entry unique identifier.
-
-This allows the SPC address to be changed through the reconfiguration flow
-without changing the logical identity of the panel in Home Assistant.
-
-Existing config entries that previously used the SPC IP address as their
-unique identifier are updated to the panel serial number after a successful
-panel refresh.
+After a successful panel refresh, the SPC panel serial number is used as the stable config-entry unique identifier. This allows the panel IP address to change without changing the logical identity of the SPC installation in Home Assistant.
 
 ---
 
 ## Available entities
 
-The exact entities depend on the SPC panel, its configuration and the installed
-hardware.
+The exact entities depend on the SPC panel, its configuration, capabilities and installed hardware.
 
 ### Alarm control panels
 
-An alarm control panel entity is created for every discovered SPC area.
-
-Examples may include:
-
-```text
-alarm_control_panel.logis
-alarm_control_panel.garage
-```
-
-The actual entity IDs are generated by Home Assistant from the discovered area
-names.
-
-A global SPC alarm control panel is also created to control all discovered
-areas together.
+An `alarm_control_panel` entity is created for every discovered SPC area, together with a global SPC alarm control panel representing the complete installation.
 
 ### Zones
 
-SPC zones discovered by the integration are exposed in Home Assistant.
+Discovered zones are represented in Home Assistant and are also used to resolve SPC arming refusal reasons. When SPC explicitly reports the relevant capabilities, dedicated switches are dynamically created for zone inhibition and isolation.
 
-Zone information is also used internally to provide meaningful arming errors.
+### Mapping Gates
 
-For example, if SPC reports that zone ID `2` prevents an area from being armed,
-the integration can resolve that ID to the corresponding zone name.
+Discovered Mapping Gates are represented as Home Assistant switches. Their friendly names are taken from SPC when available.
+
+### X-BUS devices
+
+X-BUS peripherals are dynamically grouped as Home Assistant devices. Tested device families can be identified as SPC keypads, comfort keypads, SPCE650 I/O expanders, SPCE450 output expanders and SPCA210 door controllers. Unknown hardware remains generic rather than being assigned guessed semantics.
 
 ### Diagnostics
 
-Diagnostic entities are associated with the appropriate SPC devices and expose
-information reported by the panel and FlexC communication path.
+Diagnostic entities are associated with the appropriate SPC devices and can include panel power/battery/tamper faults, modem/RF information, FlexC ATS/ATP state and X-BUS operational information.
 
-Panel-level diagnostic binary sensors include:
-
-- 230 V mains fault;
-- panel battery fault;
-- panel enclosure tamper;
-- modem fault and line fault where reported;
-- RF jamming where reported;
-- X-BUS mains fault;
-- X-BUS battery fault.
-
-Some diagnostic states are updated immediately from unsolicited FlexC events
-without waiting for the next coordinator refresh.
-
-X-BUS devices discovered from FlexC events may also expose device-specific
-tamper and tamper-isolation diagnostics.
-
-The exact diagnostic entities available depend on the SPC panel, firmware,
-installed hardware and events reported by the installation.
+Availability is hardware- and firmware-dependent.
 
 ---
 
 ## SPC FlexC Card
 
-A dedicated Lovelace dashboard card for SPC FlexC is planned as a separate
-project:
-
-**SPC FlexC Card**
+The companion **SPC FlexC Card** provides a dedicated Lovelace interface for the integration and is maintained as a separate project:
 
 https://github.com/minimicro34/ha-spc-flexc-card
 
-The card is distributed separately so that the SPC FlexC backend integration
-and the Home Assistant dashboard frontend can evolve independently.
+The backend integration and dashboard card are intentionally distributed separately so they can evolve independently.
 
-When available, the card will be installable through HACS as a custom
-repository of type:
+For **screenshots, installation, dashboard configuration, responsive layout and the current visual feature set**, see the README of the SPC FlexC Card repository. Screenshots are intentionally not duplicated here.
 
-```text
-Dashboard
-```
+The card can be installed through HACS as a custom repository of type **Dashboard**.
 
 ---
 
 ## Alarm control
 
-SPC FlexC maps the validated SPC area modes to Home Assistant as follows:
+SPC FlexC maps the validated SPC area modes as follows:
 
 | SPC mode | SPC meaning | Home Assistant |
 | ---: | --- | --- |
@@ -503,326 +302,113 @@ SPC FlexC maps the validated SPC area modes to Home Assistant as follows:
 | `2` | Part Set B | Armed Night |
 | `3` | Full Set | Armed Away |
 
-### Disarm
+Part Set controls are only exposed when the corresponding capability is reported by SPC.
 
-Home Assistant:
+### Global alarm control
 
-```text
-Disarm
-```
+Before Global Full Set, every discovered area is prechecked. If any precheck fails, the operation is aborted before the first Full Set command is sent. Only after all prechecks succeed are individual area commands sent.
 
-SPC:
+Global Full Set is therefore coordinated but not atomic. A communication failure or panel state change after prechecks can still produce a partially completed operation. State-changing commands are not automatically retried.
 
-```text
-MODE=0
-```
+### Arming errors
 
-### Arm Away
+Validated SPC reasons in the form `1000 + zone_id` identify a zone preventing arming. The integration resolves the zone ID against discovered zones and reports it in the Home Assistant error when possible.
 
-Home Assistant:
+SPC reason `10006` is handled as Engineer / Installer mode preventing the requested arming operation. SPC reason `2007` is handled as an active system fault and known active diagnostic faults are included when available.
 
-```text
-Arm Away
-```
-
-SPC:
-
-```text
-MODE=3
-```
-
-This performs a Full Set of the selected SPC area.
-
-### Arm Home
-
-When Part Set A is enabled for the area:
-
-```text
-Arm Home
-```
-
-maps to:
-
-```text
-MODE=1
-```
-
-### Arm Night
-
-When Part Set B is enabled for the area:
-
-```text
-Arm Night
-```
-
-maps to:
-
-```text
-MODE=2
-```
-
-Part Set controls are only exposed when the SPC area reports that the
-corresponding Part Set mode is enabled.
+Unknown reason codes are preserved and are not assigned guessed meanings.
 
 ---
 
-## Global alarm control
+## Zone inhibition and isolation
 
-SPC FlexC also creates a global alarm control panel representing the complete
-SPC installation.
+SPC FlexC exposes zone inhibition and isolation controls only when the SPC panel explicitly reports the corresponding capability.
 
-It provides:
+Real-panel testing validated:
 
-- **Arm Away** — Full Set all discovered areas;
-- **Disarm** — Unset all discovered areas.
+| Action | Meaning |
+| ---: | --- |
+| `0` | Inhibit |
+| `1` | De-inhibit |
+| `2` | Isolate |
+| `3` | De-isolate |
 
-### Global Full Set
+`ISOLATED=1` is used as the canonical reported zone isolation state. `ISOLATE_ALLOWED=1` and `DEISOLATE_ALLOWED=1` are used as the corresponding capability fields.
 
-Global Full Set is deliberately implemented in two phases.
-
-First, the integration asks SPC whether **every discovered area** can change to
-Full Set.
-
-Conceptually:
-
-```text
-Area 1 precheck
-Area 2 precheck
-...
-```
-
-If any area fails its precheck, the global operation is aborted before the
-first Full Set command is sent.
-
-Only after all prechecks succeed does the integration send the individual area
-mode-change commands.
-
-This prevents a known not-ready area from causing an avoidable partial arming
-operation.
-
-### Global Unset
-
-Global Unset sends an Unset request to the applicable areas.
-
-If an individual operation fails, the integration reports the incomplete
-global operation.
-
-State-changing commands are not automatically retried.
-
-### Global state
-
-The global alarm entity reflects the combined state of the SPC areas.
-
-When all areas are Unset, the global entity is disarmed.
-
-When all relevant areas are Full Set, the global entity is armed away.
-
-If areas have different modes, the global entity can report a mixed/unknown
-state while the individual area entities continue to expose their exact
-states.
+The integration does not infer permission from unrelated status values. If the expected capability is not explicitly reported, the state-changing command is not sent.
 
 ---
 
-## Arming safety and error reporting
+## Mapping Gates / outputs
 
-Before changing an area to an armed mode, SPC FlexC performs a read-only
-change-mode capability request.
+SPC Mapping Gates discovered through FLEXML are exposed as Home Assistant switches.
 
-This allows the SPC panel itself to decide whether the requested operation is
-currently permitted.
+The integration:
 
-### Zone preventing arming
+1. discovers the available Mapping Gates;
+2. tracks their reported state;
+3. sends the requested state change;
+4. refreshes Mapping Gate status;
+5. confirms the resulting state reported by SPC.
 
-Validated SPC reason codes in the form:
+A command is rejected when the Mapping Gate is unknown or the requested state cannot be confirmed.
 
-```text
-1000 + zone_id
-```
+---
 
-identify a zone preventing the requested arming operation.
+## X-BUS
 
-For example:
+SPC FlexC dynamically discovers X-BUS peripherals reported by the panel.
 
-```text
-reason 1002
-```
+Validated mappings currently include:
 
-means:
+- SPC keypad;
+- SPC comfort keypad;
+- SPCE650 I/O expander;
+- SPCE450 output expander;
+- SPCA210 door controller.
 
-```text
-zone_id = 2
-```
+Operational entities can include auxiliary voltage/current and tamper-related states. Lower-level hardware identifiers and raw protocol values remain available in diagnostics where useful.
 
-SPC FlexC looks up the zone in the zones already discovered by the coordinator.
+Unknown or unvalidated values are deliberately not given speculative meanings.
 
-Home Assistant can therefore display an error such as:
-
-```text
-Cannot arm Logis: zone Salon (ID 2) is not ready (SPC reason 1002).
-```
-
-With Home Assistant configured in French, the translated message is displayed.
-
-If the zone exists but has no usable name, SPC FlexC uses a fallback such as:
-
-```text
-Zone 2
-```
-
-### Engineer / Installer mode
-
-The validated SPC reason:
-
-```text
-10006
-```
-
-is handled separately.
-
-It indicates that Engineer / Installer mode prevents the requested arming
-operation.
-
-Home Assistant displays a dedicated error instead of attempting the Set
-command.
-
-### Active system faults
-
-The validated SPC reason `2007` indicates that the requested area mode change
-is blocked by an active system fault.
-
-When this reason is returned, SPC FlexC includes known active diagnostic faults
-in the Home Assistant error message when available.
-
-For example, this may identify an active:
-
-- 230 V mains fault;
-- panel battery fault;
-- panel enclosure tamper;
-- X-BUS power fault;
-- X-BUS battery fault;
-- modem fault;
-- RF jamming condition.
-
-The SPC panel remains authoritative: the integration reports the blocking
-condition but does not bypass it or force the arming operation.
-
-### Unknown SPC reasons
-
-Unknown reason codes are not guessed.
-
-SPC FlexC preserves the original SPC reason and displays a generic translated
-error.
-
-This makes unexpected panel responses visible without assigning an incorrect
-meaning to undocumented codes.
+X-BUS control is not exposed unless the corresponding write semantics have been validated.
 
 ---
 
 ## Diagnostics
 
-SPC FlexC retrieves diagnostic information directly from the SPC panel and the
-FlexC communication path.
+Depending on the panel, firmware and installed hardware, SPC FlexC can expose information related to:
 
-Depending on the panel, firmware and installed hardware, this can include
-information related to:
+- panel identity and firmware;
+- panel operating state and summary;
+- 230 V mains, battery and enclosure tamper faults;
+- modem and RF information where reported;
+- area information and last Set/Unset data;
+- FlexC ATS / ATP communication state;
+- X-BUS peripheral identity and status;
+- X-BUS auxiliary power values;
+- X-BUS tamper, tamper-inhibited and tamper-isolated states;
+- raw protocol metadata retained for troubleshooting.
 
-- panel identity;
-- firmware information;
-- panel operating state;
-- panel summary;
-- power-related status reported by SPC;
-- voltage/current-related values reported by SPC;
-- alert state;
-- FlexC ATS status;
-- communication path status.
-
-Not every SPC installation exposes the same diagnostic information.
-
-Optional hardware and firmware differences can therefore cause some values or
-entities to be unavailable.
-
-The integration is designed to tolerate missing optional diagnostic fields.
-
-### Area information
-
-Area entities can expose SPC-specific information such as:
-
-- area ID;
-- current SPC mode;
-- mode name;
-- Part Set A availability;
-- Part Set B availability;
-- last Set time;
-- last Set user ID;
-- last Set user name;
-- last Unset time;
-- last Unset user ID;
-- last Unset user name;
-- last alarm information;
-- internal bell state;
-- external bell state.
+Some states are updated immediately from unsolicited FlexC events. Missing optional fields are tolerated because not every SPC installation exposes the same diagnostics.
 
 ---
 
 ## SPC command attribution
 
-When FLEXML commands are authenticated using:
+When FLEXML commands use **Command User Only** authentication, SPC can attribute Set/Unset operations to its internal Command Profile user. The SPC event log may still identify the ATS / ATP and Command Profile as the technical origin.
 
-```text
-Command User Only
-```
-
-SPC can attribute Set/Unset operations to its internal Command Profile user.
-
-For example, SPC may report a user similar to:
-
-```text
-User 9995
-Command Profile User
-```
-
-even when the FlexC Command Profile itself is named:
-
-```text
-Home Assistant
-```
-
-The SPC event log can still identify the technical origin of the command
-through the ATS / ATP and Command Profile.
-
-This behaviour is generated by the SPC panel and is not a Home Assistant user
-mapping.
-
-It can also affect the user name shown in native SPC SMS notifications for
-remote Set/Unset operations.
+This behaviour is generated by the SPC panel and is not a Home Assistant user mapping.
 
 ---
 
 ## Security recommendations
 
-SPC FlexC controls a security system.
+SPC FlexC controls security equipment. Use a dedicated FlexC AES-256 key, a dedicated Command Profile, unique command credentials and only the permissions required by the integration. Restrict network access to the FlexC listener and keep another method of controlling the alarm available.
 
-Use a dedicated configuration for Home Assistant.
+Never publish FlexC encryption keys, Command Profile passwords, SPC user PINs or installer codes in issues, logs, diagnostics or screenshots.
 
-Recommended:
-
-- use a dedicated FlexC AES-256 encryption key;
-- use a dedicated SPC Command Profile;
-- use a unique command username;
-- use a strong unique command password;
-- enable only the FLEXML commands required by the integration;
-- restrict network access to the FlexC listener;
-- keep Home Assistant and the SPC panel on trusted networks;
-- keep Home Assistant backups;
-- keep another method of controlling the alarm available.
-
-Do not:
-
-- expose the FlexC listener directly to the Internet;
-- publish your AES-256 key;
-- publish the Command Profile password;
-- publish SPC user PINs or installer codes;
-- reuse sensitive credentials unnecessarily.
+Do not expose the FlexC listener directly to the Internet.
 
 ---
 
@@ -830,56 +416,19 @@ Do not:
 
 ### Global Full Set is not atomic
 
-The validated FlexC interface changes the mode of individual areas.
-
-Global Full Set therefore works by:
-
-1. prechecking every area;
-2. aborting before arming if any precheck fails;
-3. sending individual Full Set commands after all prechecks succeed.
-
-There is still a theoretical window where an area may successfully arm and a
-later command may fail because:
-
-- the FlexC connection is interrupted;
-- the panel state changes after the precheck;
-- another condition prevents a later operation.
-
-For safety, SPC FlexC does **not** automatically retry state-changing commands.
-
-Always inspect the resulting area states if Home Assistant reports an
-incomplete global operation.
-
-### Command Profile attribution
-
-SPC may record FlexC Set/Unset operations using its internal Command Profile
-user rather than the friendly Command Profile name in user-related event
-fields and native SMS notifications.
-
-### SPC User Only authentication
-
-The validated v1.0 configuration uses:
-
-```text
-Command User Only
-```
-
-`SPC User Only / Utilisateur SPC seulement` is not supported as part of the
-validated v1.0 configuration.
-
-### Part Set availability
-
-Part Set A and Part Set B depend on the configuration of each SPC area.
-
-Home Assistant only exposes these controls when the corresponding capability
-is reported by SPC.
+Global Full Set coordinates individual area operations. All areas are prechecked first, but a later communication failure or panel state change can still result in an incomplete operation. State-changing commands are never automatically retried after an uncertain result.
 
 ### Hardware-dependent diagnostics
 
-Some SPC diagnostic information depends on optional hardware, firmware and
-communication modules.
+Entity and diagnostic availability depends on panel model, firmware, installed modules and configuration.
 
-Not every panel will expose every possible diagnostic value.
+### X-BUS topology
+
+X-BUS discovery reflects the peripherals returned by the SPC FlexC/FLEXML interface. If a panel does not return a peripheral in the available status data, Home Assistant cannot represent it from that response.
+
+### Unvalidated protocol fields
+
+Unknown values are retained for diagnostics rather than assigned guessed semantics. Additional hardware and write operations are added only when their behaviour is sufficiently validated.
 
 ---
 
@@ -887,158 +436,78 @@ Not every panel will expose every possible diagnostic value.
 
 ### SPC does not connect
 
-Check:
-
-- Home Assistant IP address configured in the SPC ATP;
-- FlexC TCP port;
-- firewall rules;
-- ATS / ATP enabled state;
-- AES-256 configuration;
-- network connectivity from SPC to Home Assistant.
-
-Remember that the SPC panel initiates the connection to Home Assistant.
-
-### Connection settings need to be changed
-
-Open:
-
-**Settings → Devices & services → SPC FlexC → Reconfigure**
-
-You can change the SPC address, FlexC TCP port, AES-256 key and Command Profile
-credentials without removing and recreating the integration.
+Check the Home Assistant destination configured in the SPC ATP, FlexC TCP port, firewall rules, ATS / ATP enabled state, AES-256 configuration and network connectivity. Remember that the SPC panel initiates the connection to Home Assistant.
 
 ### FlexC connects but FLEXML commands fail
 
-Check:
+Check the Command Profile authentication mode, command username/password and command permissions.
 
-- Command Profile authentication mode is **Command User Only**;
-- command username;
-- command password;
-- Command Profile command permissions.
+### Arming fails
 
-### `GET_PANEL_SUMMARY` fails
+Use the Home Assistant error message and individual area/zone states. If a blocking zone or SPC reason is reported, correct the panel condition before retrying.
 
-Verify that the Command Profile is configured using the validated
-authentication mode:
+### Dynamic hardware is missing
 
-```text
-Command User Only
-```
-
-and that the required read commands are enabled in its command filter.
-
-### Arming fails with a zone error
-
-Home Assistant should identify the zone preventing arming.
-
-Restore or close the reported zone and retry the operation.
-
-Example:
-
-```text
-Cannot arm Logis: zone Salon (ID 2) is not ready (SPC reason 1002).
-```
-
-### Arming fails with reason 10006
-
-Exit SPC Engineer / Installer mode before attempting to arm the system.
-
-### Global arming fails
-
-If the failure occurs during the precheck phase, no Full Set command should
-have been sent.
-
-Check the Home Assistant error message to identify the area or zone preventing
-the operation.
-
-If an error occurs after commands have started, inspect the individual area
-entities to determine their actual SPC states.
+Check Home Assistant diagnostics and the raw SPC/FLEXML data first. Hardware-dependent entities can only be created for objects actually returned by SPC.
 
 ---
 
 ## Development
 
-Development instructions and contribution guidelines are available in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Development instructions are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Common commands:
+The main validation commands are:
 
 ```bash
-make compile
 make format
-make format-check
-make lint
-make typecheck
-make test
 make check
-make clean
+make coverage
 ```
 
-Before committing changes, run:
+`make format` applies Ruff formatting.
+
+`make check` runs compilation, formatting verification, linting, type checking and the test suite. It **does not** run the coverage gate.
+
+`make coverage` runs the tests with pytest-cov and enforces the repository minimum coverage threshold.
+
+Before a pull request or release, run both:
 
 ```bash
 make check
-```
-
-The complete validation suite should pass.
-
-It is also useful to check the Git diff for whitespace errors:
-
-```bash
+make coverage
 git diff --check
 ```
+
+The current coverage gate is 80%. The v1.1.0 release validation reached 90.03% total coverage.
 
 ---
 
 ## Contributing
 
-Contributions are welcome.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
+Useful contributions include bug fixes, additional SPC hardware validation, diagnostics, FlexC/FLEXML support, event decoding, tests, translations and documentation.
 
-Contributions can include:
-
-- bug fixes;
-- support for additional SPC hardware;
-- additional diagnostics;
-- additional FlexC/FLEXML support;
-- event decoding improvements;
-- tests;
-- translations;
-- documentation.
-
-For significant FlexC protocol or alarm-control changes, please open a GitHub
-Issue before starting a large implementation.
+For protocol semantics, prefer real-panel evidence or reliable documentation. Do not assign meanings to unknown fields solely from names or observed numeric coincidences.
 
 > [!WARNING]
-> Never publish FlexC encryption keys, Command Profile passwords, SPC user
-> PINs, installer codes or other alarm credentials in Issues, Pull Requests,
-> logs or screenshots.
+> Never publish FlexC encryption keys, Command Profile passwords, SPC user PINs, installer codes or other alarm credentials.
 
 ---
 
 ## Disclaimer
 
-SPC FlexC is an independent open-source project.
+SPC FlexC is an independent open-source project. It is not affiliated with, endorsed by, or supported by Siemens, Vanderbilt, Comelit or Home Assistant.
 
-It is not affiliated with, endorsed by, or supported by Siemens, Vanderbilt,
-Comelit or Home Assistant.
+Alarm systems are security equipment. Always validate the behaviour of your specific panel and installation before relying on remote alarm control.
 
-Alarm systems are security equipment.
-
-Always validate the behaviour of your specific panel and installation before
-relying on remote alarm control.
-
-The authors and contributors cannot be held responsible for alarm activations,
-failed arming operations, missed events or other consequences resulting from
-the use of this integration.
+The authors and contributors cannot be held responsible for alarm activations, failed arming operations, missed events or other consequences resulting from use of this integration.
 
 ---
 
 ## Support
 
-If you find SPC FlexC useful and would like to support its development, you can
-buy me a coffee.
+If you find SPC FlexC useful and would like to support its development, you can buy me a coffee.
 
 <p align="center">
   <a href="https://buymeacoffee.com/minimicro34">
@@ -1050,32 +519,7 @@ buy me a coffee.
   </a>
 </p>
 
-Your support helps me dedicate more time to improving the integration, adding new
-features, testing additional SPC functionality and fixing issues.
-
-Bug reports, feature suggestions, contributions and GitHub stars are also
-greatly appreciated.
-
-Please use GitHub Issues for bug reports and feature requests.
-
-When reporting an issue, please include whenever possible:
-
-- SPC panel model;
-- SPC firmware version;
-- SPC FlexC integration version;
-- Home Assistant version;
-- a clear description of the problem;
-- relevant Home Assistant logs;
-- Home Assistant diagnostics.
-
-For alarm-control problems, also include:
-
-- the affected area;
-- the requested mode;
-- the current mode;
-- the SPC reason code, if available.
-
-Never include passwords, PINs or encryption keys.
+Bug reports, feature suggestions, contributions and GitHub stars are also appreciated. Please use GitHub Issues for bug reports and feature requests and include the panel model, firmware, integration version, Home Assistant version, relevant logs and diagnostics when possible — without credentials or encryption keys.
 
 ---
 
