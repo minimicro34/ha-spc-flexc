@@ -178,12 +178,11 @@ async def test_setup_entry_adds_switches_dynamically_without_duplicates() -> Non
     listeners[0]()
     assert async_add_entities.call_count == 1
 
-    # A later discovery update adds only newly eligible entities.
+    # A later discovery update adds only newly eligible entities. Zone state is
+    # protocol-derived from raw fields rather than constructor-only booleans.
     coordinator.data.zones[2] = ZoneState(
         zone_id=2,
         name="Door",
-        inhibited=True,
-        isolated=True,
         raw={"INHIBITED": "1", "ISOLATED": "1"},
     )
     coordinator.data.mapping_gates[3] = MappingGateState(
