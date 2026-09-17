@@ -4,6 +4,66 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-09-17
+
+### Added
+
+- Added dynamic discovery and Home Assistant representation of SPC X-BUS peripherals.
+- Added validated X-BUS family mapping for SPC keypads, comfort keypads, SPCE650 I/O expanders, SPCE450 output expanders and SPCA210 door controllers.
+- Added X-BUS auxiliary voltage/current and tamper diagnostics where reported by SPC.
+- Added SPC zone inhibition and isolation controls with dedicated Home Assistant switches.
+- Added Mapping Gate discovery, state monitoring and Home Assistant output switches.
+- Added door status support and additional SPC device metadata.
+- Added dynamic entity discovery when zones, X-BUS devices or Mapping Gates appear after initial setup.
+- Added read retry handling for read-only FLEXML status requests.
+- Added additional FlexC, ATS/ATP, panel and hardware diagnostics.
+
+### Changed
+
+- Reworked coordinator state discovery and refresh handling for areas, zones, doors, X-BUS devices and Mapping Gates.
+- Improved FLEXML parsing and FlexC connection/message handling.
+- Zone inhibition and isolation commands verify SPC capability fields before changing state and refresh the resulting SPC state after the command.
+- Mapping Gate commands refresh and confirm the reported output state after a change.
+- X-BUS entity presentation now exposes useful operational information while retaining lower-level fields in diagnostics.
+- Expanded English and French translations for the new entities and controls.
+
+### Safety
+
+- State-changing FlexC commands remain deliberately non-retriable after an uncertain communication failure.
+- Zone inhibition is only sent when SPC explicitly reports the corresponding inhibit/de-inhibit capability.
+- Zone isolation is only sent when SPC explicitly reports the corresponding isolate/de-isolate capability.
+- Mapping Gate state changes require a known discovered output and verify the resulting reported state.
+- Read-only requests may use bounded retry/recovery handling without changing panel state.
+
+### Validated
+
+Real SPC hardware testing validated:
+
+- zone `ACTION=0` — inhibit;
+- zone `ACTION=1` — de-inhibit;
+- zone `ACTION=2` — isolate;
+- zone `ACTION=3` — de-isolate;
+- `ISOLATED=1` as the canonical zone isolation state;
+- `ISOLATE_ALLOWED=1` and `DEISOLATE_ALLOWED=1` as isolation capability fields;
+- X-BUS TYPE1 keypad physical tamper, tamper inhibition and tamper isolation states;
+- X-BUS peripheral identification for tested SPC keypad, comfort keypad, SPCE650, SPCE450 and SPCA210 hardware;
+- Mapping Gate discovery, state monitoring and output control.
+
+Some X-BUS fields remain hardware-dependent. Unknown or unvalidated protocol values are kept as diagnostics rather than assigned guessed semantics.
+
+### Development
+
+- Expanded automated coverage across integration setup/unload, FlexC connection and message handling, FLEXML parsing, coordinator updates, discovery, diagnostics, sensors, binary sensors, switches, Mapping Gates, X-BUS and zone controls.
+- CI now runs coverage separately from the standard `make check` quality suite.
+- Coverage threshold is enforced at 80% by `make coverage`.
+- Release validation reached 90.03% total coverage.
+- Updated contributor guidance to distinguish formatting, standard quality checks and coverage validation.
+
+**Full Changelog**:
+https://github.com/minimicro34/ha-spc-flexc/compare/v1.0.3...v1.1.0
+
+---
+
 ## [1.0.3] - 2026-08-19
 
 ### Added
