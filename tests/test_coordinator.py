@@ -1,14 +1,25 @@
 """Tests for the SPC FlexC data update coordinator."""
 
 import asyncio
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, call, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from custom_components.spc_flexc.coordinator import (
     ZONE_POLL_BATCH_SIZE,
     SpcFlexCCoordinator,
+    _area_state_from_status,
+    _ats_state_from_status,
+    _bool_value,
+    _door_state_from_status,
+    _float_value,
+    _int_value,
+    _panel_state_from_summary,
+    _spc_datetime,
     _xbus_device_state_from_status,
+    _zone_state_from_status,
     poll_delay_for_phase,
 )
 from custom_components.spc_flexc.models import SpcState, XBusDeviceState, ZoneState
@@ -37,15 +48,146 @@ def test_poll_delay_for_phase_uses_fixed_monotonic_slots() -> None:
         assert poll_delay_for_phase(0.0, 1.0) == pytest.approx(0.09)
 
 
+def test_coordinator_value_helpers_reject_invalid_values() -> None:
+    """Protocol conversion helpers preserve unknown and malformed values."""
+    assert _float_value(None) is None
+    assert _float_value(" 13.7V ", "V") == pytest.approx(13.7)
+    assert _float_value("bad") is None
+    assert _int_value(None) is None
+    assert _int_value(" 42 ") == 42
+    assert _int_value("bad") is None
+    assert _bool_value(None) is None
+    assert _bool_value("0") is False
+    assert _bool_value("1") is True
+    assert _bool_value("2") is None
+
+    timezone = ZoneInfo("Europe/Paris")
+    assert _spc_datetime(None, timezone) is None
+    parsed = _spc_datetime("12345617092026", timezone)
+    assert parsed == datetime(2026, 9, 17, 12, 34, 56, tzinfo=timezone)
+    assert _spc_datetime("invalid", timezone) is None
+
+
+def test_protocol_status_mappers() -> None:
+    """Panel, ATS, area, zone and door replies map documented fields."""
+    timezone = ZoneInfo("Europe/Paris")
+
+    panel = _panel_state_from_summary(
+        {
+            "SPC_BATT_VOLT": "13.5V",
+            "SPC_AUX_VOLT": "13.7V",
+            "SPC_AUX_CURR": "120mA",
+            "SPC_AC_FREQ": "50Hz",
+            "SPC_RF_TYPE": "2",
+            "SPC_RF_VERSION": "1.0",
+            "INTERNAL_BELLS": "1",
+            "EXTERNAL_BELLS": "0",
+            "ENG_MODE": "1",
+            "INSTALLATION_NAME": "Home",
+            "SPC_TYPE": "SPC4300",
+            "SPC_VARIANT": "A",
+            "SPC_SERIAL_NO": "1234",
+            "SPC_FW_VERSION": "3.16.1",
+            "SPC_HW_VERSION": "1",
+        }
+    )
+    assert panel.battery_voltage == pytest.approx(13.5)
+    assert panel.aux_current == pytest.approx(120.0)
+    assert panel.ac_frequency == pytest.approx(50.0)
+    assert panel.internal_bells is True
+    assert panel.external_bells is False
+    assert panel.installation_name == "Home"
+
+    ats = _ats_state_from_status(
+        {
+            "ats": {
+                "ATS_ID": "2",
+                "ATS_NAME": "FlexC",
+                "REGISTRATION_ID": "redacted",
+                "ATS_STATUS": "1",
+                "ATS_STATE": "2",
+                "EVENT_LOG_COUNT": "3",
+            },
+            "atps": [
+                {
+                    "ATP_ID": "1",
+                    "ATP_NAME": "Primary",
+                    "ATP_UID": "7",
+                    "ATP_STATUS": "1",
+                    "ATP_STATE": "2",
+                    "ATP_CONNECT_STATE": "3",
+                    "LAST_TX_OK_TIMESTAMP": "12345617092026",
+                }
+            ],
+        },
+        timezone,
+    )
+    assert ats.ats_id == 2
+    assert ats.status == 1
+    assert ats.atps[1].connect_state == 3
+    assert ats.atps[1].last_tx_ok_timestamp is not None
+
+    area = _area_state_from_status(
+        {
+            "AREA_ID": "1",
+            "AREA_NAME": "Home",
+            "MODE": "0",
+            "PARTSETA_ENABLE": "1",
+            "PARTSETB_ENABLE": "0",
+            "LAST_SET_TIME": "12345617092026",
+            "LAST_SET_USER_ID": "5",
+            "LAST_SET_USER_NAME": "nicolas",
+            "LAST_UNSET_TIME": "11345617092026",
+            "LAST_UNSET_USER_ID": "5",
+            "LAST_UNSET_USER_NAME": "nicolas",
+            "LAST_ALARM": "10345617092026",
+            "INTERNAL_BELLS": "1",
+            "EXTERNAL_BELLS": "0",
+        },
+        timezone,
+    )
+    assert area.area_id == 1
+    assert area.partset_a_enabled is True
+    assert area.partset_b_enabled is False
+    assert area.last_set_user_id == 5
+
+    zone = _zone_state_from_status(
+        {
+            "ZONE_ID": "4",
+            "ZONE_NAME": "TV",
+            "AREA_ID": "1",
+            "AREA_NAME": "Home",
+            "TYPE": "0",
+            "INPUT": "1",
+            "LOGIC_INPUT": "1",
+            "STATUS": "2",
+            "PROC_STATE": "0",
+            "ALARM_STATE": "0",
+            "INHIBIT_ALLOWED": "1",
+            "ISOLATE_ALLOWED": "0",
+            "ACTUATIONS_SINCE_LAST_READ": "3",
+        }
+    )
+    assert zone.zone_id == 4
+    assert zone.input_state == 1
+    assert zone.inhibit_allowed is True
+    assert zone.isolate_allowed is False
+    assert zone.actuations_since_last_read == 3
+
+    door = _door_state_from_status(
+        {"DOOR_ID": "2", "NAME": "Garage", "MODE": "7"}
+    )
+    assert door.door_id == 2
+    assert door.name == "Garage"
+    assert door.mode == 7
+
+
 def test_handle_flexc_event() -> None:
     """Test applying a FlexC EVENT to coordinator state."""
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
     coordinator.state = SpcState()
 
-    SpcFlexCCoordinator._handle_flexc_event(
-        coordinator,
-        {"EV_ID": "5336"},
-    )
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "5336"})
 
     assert coordinator.state.faults.rf_jamming is True
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
@@ -57,10 +199,7 @@ def test_handle_flexc_restore_event() -> None:
     coordinator.state = SpcState()
     coordinator.state.faults.xbus_mains_fault = True
 
-    SpcFlexCCoordinator._handle_flexc_event(
-        coordinator,
-        {"EV_ID": "5325"},
-    )
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "5325"})
 
     assert coordinator.state.faults.xbus_mains_fault is False
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
@@ -71,10 +210,7 @@ def test_unknown_flexc_event_does_not_notify() -> None:
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
     coordinator.state = SpcState()
 
-    SpcFlexCCoordinator._handle_flexc_event(
-        coordinator,
-        {"EV_ID": "9999"},
-    )
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "9999"})
 
     coordinator.async_set_updated_data.assert_not_called()
 
@@ -90,10 +226,7 @@ async def test_zone_polling_continues_after_malformed_reply() -> None:
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
     coordinator.client.async_get_zone_status = AsyncMock(
-        side_effect=[
-            [{"INPUT": "0"}],
-            [{"ZONE_ID": "1", "INPUT": "1"}],
-        ]
+        side_effect=[[{"INPUT": "0"}], [{"ZONE_ID": "1", "INPUT": "1"}]]
     )
     coordinator.async_set_updated_data = MagicMock()
     coordinator._zone_poll_task = asyncio.current_task()
@@ -117,10 +250,7 @@ async def test_zone_actuation_change_notifies_entities() -> None:
     coordinator = MagicMock()
     coordinator.state = SpcState()
     coordinator.state.zones[1] = ZoneState(
-        zone_id=1,
-        zone_type=0,
-        logic_input=0,
-        actuations_since_last_read=0,
+        zone_id=1, zone_type=0, logic_input=0, actuations_since_last_read=0
     )
     coordinator._zone_discovery_complete = True
     coordinator._detected_zone_ids = {1}
@@ -257,6 +387,12 @@ def test_xbus_status_mapping_preserves_raw_and_event_state() -> None:
     assert device.raw == raw
 
 
+def test_xbus_status_mapping_rejects_missing_id() -> None:
+    """Malformed ENETNODE replies without a numeric ID are ignored."""
+    assert _xbus_device_state_from_status({"NAME": "broken"}) is None
+    assert _xbus_device_state_from_status({"ID": "bad"}) is None
+
+
 @pytest.mark.asyncio
 async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None:
     """Periodic STATUS_XBUS refreshes inventory without overwriting event state."""
@@ -292,10 +428,7 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
 
     with (
         patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
-        patch(
-            "custom_components.spc_flexc.coordinator.async_get_xbus_status",
-            read_xbus,
-        ),
+        patch("custom_components.spc_flexc.coordinator.async_get_xbus_status", read_xbus),
         pytest.raises(asyncio.CancelledError),
     ):
         await SpcFlexCCoordinator._async_xbus_poll_loop(coordinator)
