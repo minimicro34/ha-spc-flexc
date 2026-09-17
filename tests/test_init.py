@@ -69,7 +69,9 @@ async def test_unload_entry_shutdown_only_after_success(unload_ok: bool) -> None
 
     assert await async_unload_entry(hass, entry) is unload_ok
 
-    hass.config_entries.async_unload_platforms.assert_awaited_once_with(entry, PLATFORMS)
+    hass.config_entries.async_unload_platforms.assert_awaited_once_with(
+        entry, PLATFORMS
+    )
     if unload_ok:
         entry.runtime_data.async_shutdown.assert_awaited_once_with()
     else:

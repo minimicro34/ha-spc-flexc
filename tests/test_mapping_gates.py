@@ -158,8 +158,9 @@ async def test_read_mapping_gates_uses_client_credentials() -> None:
 
     assert result == [{"MG_ID": "1", "STATE": "1"}]
     coordinator.client.async_ensure_connected.assert_awaited_once_with()
-    assert '<CMD_GET_MG_STATUS MG_ID="0" />' in (
-        coordinator.client.async_send_flexml.await_args.args[0]
+    assert (
+        '<CMD_GET_MG_STATUS MG_ID="0" />'
+        in (coordinator.client.async_send_flexml.await_args.args[0])
     )
 
 
@@ -274,7 +275,9 @@ async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
     coordinator.state = SpcState()
 
     with pytest.raises(ValueError, match="Unknown SPC Mapping Gate 1"):
-        await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(coordinator, 1, True)
+        await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(
+            coordinator, 1, True
+        )
 
     coordinator.state.mapping_gates[1] = MappingGateState(mg_id=1, state=False)
     coordinator._client_operation_lock = _AsyncLock()
@@ -300,7 +303,9 @@ async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
     )
 
     with pytest.raises(ValueError, match="did not confirm"):
-        await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(coordinator, 1, True)
+        await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(
+            coordinator, 1, True
+        )
 
 
 @pytest.mark.asyncio

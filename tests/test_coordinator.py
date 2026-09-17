@@ -200,9 +200,7 @@ def test_protocol_status_mappers() -> None:
     assert zone.isolate_allowed is False
     assert zone.actuations_since_last_read == 3
 
-    door = _door_state_from_status(
-        {"DOOR_ID": "2", "NAME": "Garage", "MODE": "7"}
-    )
+    door = _door_state_from_status({"DOOR_ID": "2", "NAME": "Garage", "MODE": "7"})
     assert door.door_id == 2
     assert door.name == "Garage"
     assert door.mode == 7
@@ -563,7 +561,9 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
 
     with (
         patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
-        patch("custom_components.spc_flexc.coordinator.async_get_xbus_status", read_xbus),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_get_xbus_status", read_xbus
+        ),
         pytest.raises(asyncio.CancelledError),
     ):
         await SpcFlexCCoordinator._async_xbus_poll_loop(coordinator)

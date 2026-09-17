@@ -153,9 +153,10 @@ async def test_ensure_connected_times_out() -> None:
     client = _client()
     client._server = MagicMock()
 
-    with patch(
-        "custom_components.spc_flexc.flexc.connection.CONNECT_TIMEOUT", 0
-    ), pytest.raises(FlexCConnectionError, match="did not connect"):
+    with (
+        patch("custom_components.spc_flexc.flexc.connection.CONNECT_TIMEOUT", 0),
+        pytest.raises(FlexCConnectionError, match="did not connect"),
+    ):
         await client.async_ensure_connected()
 
 
@@ -486,7 +487,9 @@ async def test_handle_message_error_clears_context_and_fails_pending_reply() -> 
     client._pending_reply = pending
 
     error = _message()
-    error.update({"message_id": MSG_ERROR, "data_header": b"\x00\x00\x00\x00\x00\x00\x00\x36"})
+    error.update(
+        {"message_id": MSG_ERROR, "data_header": b"\x00\x00\x00\x00\x00\x00\x00\x36"}
+    )
     await client._handle_message(error)
 
     assert client._command_context is None
@@ -497,7 +500,7 @@ async def test_handle_message_error_clears_context_and_fails_pending_reply() -> 
 def test_decode_application_extracts_reply_and_rejects_missing_reply() -> None:
     """Application decoding ignores framing/noise and returns FLEXML_REPLY."""
     reply = '<FLEXML_REPLY STATUS="OK" />'
-    application = b"noise\x00<FLEXML XML_LEN=\"1\" />\x00" + reply.encode() + b"\x00"
+    application = b'noise\x00<FLEXML XML_LEN="1" />\x00' + reply.encode() + b"\x00"
     assert FlexCClient._decode_application(application) == reply
 
     with pytest.raises(FlexCProtocolError, match="no FLEXML_REPLY"):
