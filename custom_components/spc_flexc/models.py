@@ -162,6 +162,30 @@ class ZoneState:
             return False
         return None
 
+    @property
+    def isolated(self) -> bool | None:
+        """Return the explicit FlexC isolation state when it can be inferred."""
+        value = self.raw.get("ISOLATED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if "ISOLATE_ALLOWED" in self.raw:
+            return False
+        return None
+
+    @property
+    def deisolate_allowed(self) -> bool | None:
+        """Return whether FlexC currently permits de-isolating this zone."""
+        value = self.raw.get("DEISOLATE_ALLOWED")
+        if value == "1":
+            return True
+        if value == "0":
+            return False
+        if self.isolated is False:
+            return False
+        return None
+
 
 @dataclass
 class DoorState:
@@ -226,6 +250,7 @@ class XBusDeviceState:
     isolate_raw: str | None = None
     sia_address: int | None = None
     tamper_fault: bool | None = None
+    tamper_inhibited: bool | None = None
     tamper_isolated: bool | None = None
     last_event: dict[str, Any] | None = None
     raw: dict[str, Any] = field(default_factory=dict)
