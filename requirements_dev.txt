@@ -1,5 +1,6 @@
 ruff
 pytest
+pytest-cov
 pytest-homeassistant-custom-component
 pytest<9
 mypy
