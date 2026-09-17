@@ -5,7 +5,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.spc_flexc.models import AtsState, AtpState, DoorState, SpcState, XBusDeviceState
+from custom_components.spc_flexc.models import (
+    AtpState,
+    AtsState,
+    DoorState,
+    SpcState,
+    XBusDeviceState,
+)
 from custom_components.spc_flexc.sensor import (
     DESCRIPTIONS,
     SpcAtpLastTxSensor,
@@ -66,7 +72,12 @@ def test_ats_and_atp_sensors() -> None:
         ats_id=2,
         name="FlexC",
         atps={
-            1: AtpState(atp_id=1, name="Ethernet", connect_state=16, last_tx_ok_timestamp=stamp),
+            1: AtpState(
+                atp_id=1,
+                name="Ethernet",
+                connect_state=16,
+                last_tx_ok_timestamp=stamp,
+            ),
             2: AtpState(atp_id=2, name="Backup", connect_state=0),
         },
     )
@@ -90,10 +101,23 @@ def test_ats_and_atp_sensors() -> None:
 def test_door_sensors() -> None:
     coordinator = _coordinator()
     coordinator.data.doors[4] = DoorState(
-        door_id=4, name="Garage", status=2, mode=3, zone_id=9, zone_name="Porte",
-        area_id=1, area_name="Logis", area_side_1=1, area_side_1_name="Logis",
-        dps_input=1, drs_input=0, reader1_format=2, reader2_format=3,
-        entry_exit=True, normal_allowed=True, lock_allowed=False,
+        door_id=4,
+        name="Garage",
+        status=2,
+        mode=3,
+        zone_id=9,
+        zone_name="Porte",
+        area_id=1,
+        area_name="Logis",
+        area_side_1=1,
+        area_side_1_name="Logis",
+        dps_input=1,
+        drs_input=0,
+        reader1_format=2,
+        reader2_format=3,
+        entry_exit=True,
+        normal_allowed=True,
+        lock_allowed=False,
     )
     status = SpcDoorStatusSensor(coordinator, 4)
     mode = SpcDoorModeSensor(coordinator, 4)
@@ -114,10 +138,21 @@ def test_door_sensors() -> None:
 def test_xbus_sensors_and_diagnostics() -> None:
     coordinator = _coordinator()
     coordinator.data.xbus_devices[7] = XBusDeviceState(
-        device_id=7, name="SPCE650", serial_number="XB7", device_type=2,
-        hardware_id=1, input_count=8, output_count=2, version="1.0",
-        aux_voltage=13.4, aux_current=85.0, status_raw="0004", input_raw="0002",
-        alert_raw="0002", inhibit_raw="0000", isolate_raw="0000",
+        device_id=7,
+        name="SPCE650",
+        serial_number="XB7",
+        device_type=2,
+        hardware_id=1,
+        input_count=8,
+        output_count=2,
+        version="1.0",
+        aux_voltage=13.4,
+        aux_current=85.0,
+        status_raw="0004",
+        input_raw="0002",
+        alert_raw="0002",
+        inhibit_raw="0000",
+        isolate_raw="0000",
     )
     voltage = SpcXBusAuxVoltageSensor(coordinator, 7)
     current = SpcXBusAuxCurrentSensor(coordinator, 7)
@@ -149,9 +184,13 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     entry = MagicMock()
     entry.runtime_data = coordinator
     listeners: list[object] = []
-    coordinator.async_add_listener.side_effect = lambda callback: listeners.append(callback) or MagicMock()
+    coordinator.async_add_listener.side_effect = (
+        lambda callback: listeners.append(callback) or MagicMock()
+    )
     batches: list[list[object]] = []
-    await async_setup_entry(MagicMock(), entry, lambda entities: batches.append(list(entities)))
+    await async_setup_entry(
+        MagicMock(), entry, lambda entities: batches.append(list(entities))
+    )
     assert len(batches[0]) == 4
     assert len(batches[1]) == 10
     assert len(listeners) == 1
