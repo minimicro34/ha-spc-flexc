@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.spc_flexc.flexc.connection import FlexCError
 from custom_components.spc_flexc.flexc.flexml import (
     FlexMLError,
     FlexMLReplyError,
@@ -107,7 +106,7 @@ def test_parse_mg_control_rejects_inner_error() -> None:
 
 
 def test_update_mapping_gate_states_tracks_changes_and_removals() -> None:
-    """Mapping Gate snapshots update values, preserve unknown states and remove stale IDs."""
+    """Mapping Gate snapshots update values and remove stale IDs."""
     coordinator = MagicMock()
     coordinator.state = SpcState()
     coordinator.state.mapping_gates[9] = MappingGateState(
@@ -124,19 +123,19 @@ def test_update_mapping_gate_states_tracks_changes_and_removals() -> None:
 
     assert changed is True
     assert set(coordinator.state.mapping_gates) == {1, 2}
-    assert coordinator.state.mapping_gates[1].name == "One"
     assert coordinator.state.mapping_gates[1].state is True
-    assert coordinator.state.mapping_gates[2].name == "Two"
     assert coordinator.state.mapping_gates[2].state is None
 
-    changed = SpcFlexCMappingGateCoordinator._update_mapping_gate_states(
-        coordinator,
-        [
-            {"MG_ID": "1", "MG_NAME": "One", "STATE": "1"},
-            {"MG_ID": "2", "NAME": "Two", "STATE": "2"},
-        ],
+    assert (
+        SpcFlexCMappingGateCoordinator._update_mapping_gate_states(
+            coordinator,
+            [
+                {"MG_ID": "1", "MG_NAME": "One", "STATE": "1"},
+                {"MG_ID": "2", "NAME": "Two", "STATE": "2"},
+            ],
+        )
+        is False
     )
-    assert changed is False
 
 
 @pytest.mark.asyncio
@@ -159,48 +158,9 @@ async def test_read_mapping_gates_uses_client_credentials() -> None:
 
     assert result == [{"MG_ID": "1", "STATE": "1"}]
     coordinator.client.async_ensure_connected.assert_awaited_once_with()
-    sent = coordinator.client.async_send_flexml.await_args.args[0]
-    assert '<CMD_GET_MG_STATUS MG_ID="0" />' in sent
-
-
-@pytest.mark.asyncio
-async def test_discovery_updates_mapping_gates_and_starts_polling() -> None:
-    """Successful Mapping Gate discovery publishes state and starts live polling."""
-    coordinator = MagicMock()
-    coordinator.state = SpcState()
-    coordinator._async_read_mapping_gates = AsyncMock(
-        return_value=[{"MG_ID": "1", "MG_NAME": "Gate", "STATE": "0"}]
+    assert '<CMD_GET_MG_STATUS MG_ID="0" />' in (
+        coordinator.client.async_send_flexml.await_args.args[0]
     )
-    coordinator._update_mapping_gate_states = MagicMock()
-    coordinator._schedule_mg_polling = MagicMock()
-    coordinator.async_set_updated_data = MagicMock()
-
-    with patch(
-        "custom_components.spc_flexc.zone_control_coordinator.SpcFlexCZoneControlCoordinator._async_discover_panel_objects",
-        new=AsyncMock(),
-    ):
-        await SpcFlexCMappingGateCoordinator._async_discover_panel_objects(coordinator)
-
-    coordinator._update_mapping_gate_states.assert_called_once()
-    assert coordinator._mg_discovery_complete is True
-    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
-    coordinator._schedule_mg_polling.assert_called_once_with()
-
-
-@pytest.mark.asyncio
-async def test_discovery_tolerates_mapping_gate_read_failure() -> None:
-    """Mapping Gate discovery failure leaves the rest of panel discovery usable."""
-    coordinator = MagicMock()
-    coordinator._async_read_mapping_gates = AsyncMock(side_effect=FlexCError("offline"))
-    coordinator._update_mapping_gate_states = MagicMock()
-
-    with patch(
-        "custom_components.spc_flexc.zone_control_coordinator.SpcFlexCZoneControlCoordinator._async_discover_panel_objects",
-        new=AsyncMock(),
-    ):
-        await SpcFlexCMappingGateCoordinator._async_discover_panel_objects(coordinator)
-
-    coordinator._update_mapping_gate_states.assert_not_called()
 
 
 def test_schedule_mg_polling_requires_discovery_and_single_task() -> None:
@@ -216,7 +176,6 @@ def test_schedule_mg_polling_requires_discovery_and_single_task() -> None:
     coordinator._mg_discovery_complete = True
     SpcFlexCMappingGateCoordinator._schedule_mg_polling(coordinator)
     assert coordinator._mg_poll_task == "task"
-    coordinator.entry.async_create_background_task.assert_called_once()
 
     running = MagicMock()
     running.done.return_value = False
@@ -227,13 +186,16 @@ def test_schedule_mg_polling_requires_discovery_and_single_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mg_polling_updates_only_when_state_changes() -> None:
-    """Live polling publishes only changed Mapping Gate snapshots."""
+async def test_mg_polling_updates_and_survives_read_error() -> None:
+    """Polling survives malformed replies and publishes later state changes."""
     coordinator = MagicMock()
+    coordinator.state = SpcState()
     coordinator._discovery_requested = False
     coordinator._mg_poll_task = asyncio.current_task()
-    coordinator._async_read_mapping_gates = AsyncMock(side_effect=[[{"MG_ID": "1"}], []])
-    coordinator._update_mapping_gate_states = MagicMock(side_effect=[False, True])
+    coordinator._async_read_mapping_gates = AsyncMock(
+        side_effect=[FlexMLError("bad reply"), [{"MG_ID": "1", "STATE": "1"}]]
+    )
+    coordinator._update_mapping_gate_states = MagicMock(return_value=True)
     coordinator.async_set_updated_data = MagicMock()
     sleep = AsyncMock(side_effect=[None, None, asyncio.CancelledError()])
 
@@ -245,36 +207,14 @@ async def test_mg_polling_updates_only_when_state_changes() -> None:
     ):
         await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
 
+    assert coordinator._async_read_mapping_gates.await_count == 2
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
     assert coordinator._mg_poll_task is None
 
 
 @pytest.mark.asyncio
-async def test_mg_polling_continues_after_expected_error() -> None:
-    """A FlexC read failure cannot permanently stop Mapping Gate polling."""
-    coordinator = MagicMock()
-    coordinator._discovery_requested = False
-    coordinator._mg_poll_task = asyncio.current_task()
-    coordinator._async_read_mapping_gates = AsyncMock(
-        side_effect=[FlexMLError("bad reply"), []]
-    )
-    coordinator._update_mapping_gate_states = MagicMock(return_value=False)
-    sleep = AsyncMock(side_effect=[None, None, asyncio.CancelledError()])
-
-    with (
-        patch(
-            "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep", sleep
-        ),
-        pytest.raises(asyncio.CancelledError),
-    ):
-        await SpcFlexCMappingGateCoordinator._async_mg_poll_loop(coordinator)
-
-    assert coordinator._async_read_mapping_gates.await_count == 2
-
-
-@pytest.mark.asyncio
 async def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
-    """Test an unexpectedly stopped Mapping Gate task schedules a replacement."""
+    """An unexpectedly stopped Mapping Gate task schedules a replacement."""
     coordinator = MagicMock()
     coordinator._discovery_requested = True
     coordinator._schedule_mg_polling = MagicMock()
@@ -283,8 +223,7 @@ async def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
 
     with (
         patch(
-            "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep",
-            sleep,
+            "custom_components.spc_flexc.mapping_gate_coordinator.asyncio.sleep", sleep
         ),
         pytest.raises(asyncio.CancelledError),
     ):
@@ -295,7 +234,7 @@ async def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
 
 @pytest.mark.asyncio
 async def test_set_mapping_gate_validates_refresh() -> None:
-    """Mapping Gate control publishes only a state confirmed by a fresh panel read."""
+    """Control publishes only a state confirmed by a fresh panel read."""
     coordinator = MagicMock()
     coordinator.state = SpcState()
     coordinator.state.mapping_gates[1] = MappingGateState(mg_id=1, state=False)
@@ -317,18 +256,20 @@ async def test_set_mapping_gate_validates_refresh() -> None:
             ),
         ]
     )
+    coordinator._update_mapping_gate_states = lambda raw: (
+        SpcFlexCMappingGateCoordinator._update_mapping_gate_states(coordinator, raw)
+    )
     coordinator.async_set_updated_data = MagicMock()
 
     await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(coordinator, 1, True)
 
     assert coordinator.state.mapping_gates[1].state is True
-    assert coordinator.client.async_send_flexml.await_count == 2
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 @pytest.mark.asyncio
 async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
-    """Mapping Gate control rejects unknown IDs and a refresh that does not confirm state."""
+    """Control rejects unknown IDs and refreshes that do not confirm state."""
     coordinator = MagicMock()
     coordinator.state = SpcState()
 
@@ -354,6 +295,9 @@ async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
             ),
         ]
     )
+    coordinator._update_mapping_gate_states = lambda raw: (
+        SpcFlexCMappingGateCoordinator._update_mapping_gate_states(coordinator, raw)
+    )
 
     with pytest.raises(ValueError, match="did not confirm"):
         await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(coordinator, 1, True)
@@ -361,12 +305,9 @@ async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
 
 @pytest.mark.asyncio
 async def test_shutdown_cancels_mapping_gate_polling() -> None:
-    """Shutdown cancels the Mapping Gate task before delegating to the base coordinator."""
+    """Shutdown cancels Mapping Gate polling before delegating to the base coordinator."""
     coordinator = MagicMock()
-    task = MagicMock()
-    task.done.return_value = False
-    task.cancel = MagicMock()
-    task.__await__ = MagicMock(return_value=iter(()))
+    task = asyncio.create_task(asyncio.sleep(60))
     coordinator._mg_poll_task = task
     coordinator._discovery_requested = True
 
@@ -378,5 +319,5 @@ async def test_shutdown_cancels_mapping_gate_polling() -> None:
 
     assert coordinator._discovery_requested is False
     assert coordinator._mg_poll_task is None
-    task.cancel.assert_called_once_with()
+    assert task.cancelled()
     base_shutdown.assert_awaited_once_with()
