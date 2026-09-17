@@ -14,6 +14,7 @@ from custom_components.spc_flexc.switch import (
     SpcMappingGateSwitch,
     SpcZoneInhibitionSwitch,
     SpcZoneIsolationSwitch,
+    async_setup_entry,
 )
 
 
@@ -135,3 +136,67 @@ async def test_mapping_gate_switch_state_attributes_and_control() -> None:
     assert switch.is_on is None
     assert switch.available is False
     assert switch.extra_state_attributes == {}
+
+
+@pytest.mark.asyncio
+async def test_setup_entry_adds_switches_dynamically_without_duplicates() -> None:
+    """Eligible zones and outputs appear as discovery data arrives, only once."""
+    coordinator = _coordinator()
+    coordinator.data.zones[1] = ZoneState(
+        zone_id=1,
+        name="PIR",
+        area_id=1,
+        inhibit_allowed=True,
+        isolate_allowed=True,
+        raw={"INHIBIT_ALLOWED": "1", "ISOLATE_ALLOWED": "1"},
+    )
+    coordinator.data.mapping_gates[2] = MappingGateState(
+        mg_id=2, name="Portail", state=False
+    )
+    listeners: list[object] = []
+
+    def add_listener(callback):
+        listeners.append(callback)
+        return MagicMock()
+
+    coordinator.async_add_listener.side_effect = add_listener
+    entry = MagicMock()
+    entry.runtime_data = coordinator
+    async_add_entities = MagicMock()
+
+    await async_setup_entry(MagicMock(), entry, async_add_entities)
+
+    first_entities = async_add_entities.call_args.args[0]
+    assert [type(entity) for entity in first_entities] == [
+        SpcZoneInhibitionSwitch,
+        SpcZoneIsolationSwitch,
+        SpcMappingGateSwitch,
+    ]
+    assert len(listeners) == 1
+
+    # Re-running the listener with unchanged coordinator data must not duplicate entities.
+    listeners[0]()
+    assert async_add_entities.call_count == 1
+
+    # A later discovery update adds only newly eligible entities.
+    coordinator.data.zones[2] = ZoneState(
+        zone_id=2,
+        name="Door",
+        inhibited=True,
+        isolated=True,
+        raw={"INHIBITED": "1", "ISOLATED": "1"},
+    )
+    coordinator.data.mapping_gates[3] = MappingGateState(
+        mg_id=3, name="Light", state=True
+    )
+    listeners[0]()
+
+    second_entities = async_add_entities.call_args.args[0]
+    assert [type(entity) for entity in second_entities] == [
+        SpcZoneInhibitionSwitch,
+        SpcZoneIsolationSwitch,
+        SpcMappingGateSwitch,
+    ]
+    assert [entity.zone_id for entity in second_entities[:2]] == [2, 2]
+    assert second_entities[2].mg_id == 3
+    assert async_add_entities.call_count == 2
