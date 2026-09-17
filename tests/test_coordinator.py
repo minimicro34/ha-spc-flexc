@@ -276,6 +276,7 @@ async def test_update_data_ignores_unavailable_detected_ats_and_reschedules() ->
     coordinator._ats_discovery_complete = True
     coordinator._detected_ats_ids = {2}
     coordinator._discovery_requested = True
+    coordinator._discovery_complete = False
     coordinator._schedule_discovery = MagicMock()
     coordinator.client.async_get_panel_summary = AsyncMock(return_value={})
     coordinator.client.async_get_alert_status = AsyncMock(return_value=[])
@@ -283,11 +284,7 @@ async def test_update_data_ignores_unavailable_detected_ats_and_reschedules() ->
         side_effect=FlexMLError("unavailable")
     )
 
-    with patch.object(
-        SpcFlexCCoordinator, "_discovery_complete", new_callable=MagicMock
-    ) as discovery_complete:
-        discovery_complete.__get__ = MagicMock(return_value=False)
-        await SpcFlexCCoordinator._async_update_data(coordinator)
+    await SpcFlexCCoordinator._async_update_data(coordinator)
 
     coordinator._schedule_discovery.assert_called_once_with()
 
