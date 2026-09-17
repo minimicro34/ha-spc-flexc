@@ -81,6 +81,23 @@ def build_door_device_info(
     return device_info
 
 
+def _xbus_model(device_type: int | None, input_count: int | None, output_count: int | None) -> str:
+    """Return only empirically validated X-BUS family/model labels."""
+    if device_type == 1:
+        return "SPC Keypad"
+    if device_type == 7:
+        return "SPC Comfort Keypad"
+    if device_type == 6 and input_count == 4 and output_count == 2:
+        return "SPCA210 2-door expander"
+    if device_type == 2:
+        if input_count == 8 and output_count == 2:
+            return "SPCE650 I/O expander (8 inputs / 2 outputs)"
+        if input_count == 0 and output_count == 8:
+            return "SPCE450 output expander (8 outputs)"
+        return "SPC I/O expander"
+    return "SPC X-BUS"
+
+
 def build_xbus_device_info(
     coordinator: SpcFlexCCoordinator,
     device_id: int,
@@ -94,7 +111,7 @@ def build_xbus_device_info(
         identifiers={(DOMAIN, f"{panel_serial}_xbus_{device_id}")},
         name=device.name or f"X-BUS {device_id}",
         manufacturer="Vanderbilt",
-        model="SPC X-BUS",
+        model=_xbus_model(device.device_type, device.input_count, device.output_count),
         serial_number=device.serial_number,
         sw_version=device.version,
     )
