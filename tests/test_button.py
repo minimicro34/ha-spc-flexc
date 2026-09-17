@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.spc_flexc.button import DOOR_BUTTONS, SpcDoorActionButton, async_setup_entry
+from custom_components.spc_flexc.button import (
+    DOOR_BUTTONS,
+    SpcDoorActionButton,
+    async_setup_entry,
+)
 from custom_components.spc_flexc.models import DoorState, SpcState
 
 
@@ -40,10 +44,14 @@ async def test_setup_adds_four_buttons_once_and_discovers_new_door() -> None:
     entry.runtime_data = coordinator
     listener: list[object] = []
     entry.async_on_unload = MagicMock()
-    coordinator.async_add_listener.side_effect = lambda callback: listener.append(callback) or MagicMock()
+    coordinator.async_add_listener.side_effect = lambda callback: (
+        listener.append(callback) or MagicMock()
+    )
     batches: list[list[SpcDoorActionButton]] = []
 
-    await async_setup_entry(MagicMock(), entry, lambda entities: batches.append(list(entities)))
+    await async_setup_entry(
+        MagicMock(), entry, lambda entities: batches.append(list(entities))
+    )
 
     assert len(batches) == 1
     assert len(batches[0]) == 4

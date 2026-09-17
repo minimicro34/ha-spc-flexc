@@ -184,8 +184,8 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     entry = MagicMock()
     entry.runtime_data = coordinator
     listeners: list[object] = []
-    coordinator.async_add_listener.side_effect = (
-        lambda callback: listeners.append(callback) or MagicMock()
+    coordinator.async_add_listener.side_effect = lambda callback: (
+        listeners.append(callback) or MagicMock()
     )
     batches: list[list[object]] = []
     await async_setup_entry(

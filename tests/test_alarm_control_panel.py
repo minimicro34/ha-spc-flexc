@@ -28,7 +28,12 @@ from custom_components.spc_flexc.alarm_control_panel import (
     _reply_is_ok,
     async_setup_entry,
 )
-from custom_components.spc_flexc.models import AreaState, FaultState, SpcState, ZoneState
+from custom_components.spc_flexc.models import (
+    AreaState,
+    FaultState,
+    SpcState,
+    ZoneState,
+)
 
 
 def _coordinator(*areas: AreaState) -> MagicMock:
@@ -140,7 +145,10 @@ def test_not_ready_reasons() -> None:
 @pytest.mark.asyncio
 async def test_precheck_and_single_mode_command() -> None:
     coordinator = _coordinator(AreaState(area_id=1, name="Logis"))
-    coordinator.client.async_send_flexml.side_effect = [_precheck_reply(1), _mode_reply()]
+    coordinator.client.async_send_flexml.side_effect = [
+        _precheck_reply(1),
+        _mode_reply(),
+    ]
 
     await _async_precheck_area_mode(coordinator, 1, MODE_SET, "user", "password")
     await _async_send_area_mode_once(coordinator, 1, MODE_SET, "user", "password")
@@ -152,7 +160,9 @@ async def test_precheck_and_single_mode_command() -> None:
     with pytest.raises(HomeAssistantError):
         await _async_send_area_mode_once(coordinator, 1, MODE_SET, "user", "password")
 
-    coordinator.client.async_send_flexml = AsyncMock(return_value=_precheck_reply(1, "2007"))
+    coordinator.client.async_send_flexml = AsyncMock(
+        return_value=_precheck_reply(1, "2007")
+    )
     with pytest.raises(ServiceValidationError):
         await _async_precheck_area_mode(coordinator, 1, MODE_SET, "user", "password")
 
@@ -195,7 +205,9 @@ def test_area_entity_states_features_and_attributes() -> None:
 
 @pytest.mark.asyncio
 async def test_area_commands_and_validation() -> None:
-    area = AreaState(area_id=1, name="Logis", partset_a_enabled=True, partset_b_enabled=True)
+    area = AreaState(
+        area_id=1, name="Logis", partset_a_enabled=True, partset_b_enabled=True
+    )
     coordinator = _coordinator(area)
     entity = SpcAreaAlarmControlPanel(coordinator, 1)
 
@@ -298,9 +310,10 @@ async def test_panel_partial_failures_are_reported() -> None:
             "custom_components.spc_flexc.alarm_control_panel._async_send_area_mode_once",
             new=AsyncMock(side_effect=[None, HomeAssistantError("refused")]),
         ),
+        pytest.raises(ServiceValidationError) as exc,
     ):
-        with pytest.raises(ServiceValidationError) as exc:
-            await entity.async_alarm_arm_away()
+        await entity.async_alarm_arm_away()
+
     assert exc.value.translation_key == "global_arm_incomplete"
     assert exc.value.translation_placeholders["areas"] == "Logis"
 
@@ -313,9 +326,9 @@ async def test_panel_partial_failures_are_reported() -> None:
             "custom_components.spc_flexc.alarm_control_panel._async_send_area_mode_once",
             new=AsyncMock(),
         ),
+        pytest.raises(ServiceValidationError) as exc,
     ):
-        with pytest.raises(ServiceValidationError) as exc:
-            await entity.async_alarm_disarm()
+        await entity.async_alarm_disarm()
     assert exc.value.translation_key == "global_disarm_incomplete"
     assert "Logis: blocked" in exc.value.translation_placeholders["errors"]
 

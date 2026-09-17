@@ -9,7 +9,12 @@ from custom_components.spc_flexc.flexc.device import (
     build_panel_device_info,
     build_xbus_device_info,
 )
-from custom_components.spc_flexc.models import AreaState, DoorState, SpcState, XBusDeviceState
+from custom_components.spc_flexc.models import (
+    AreaState,
+    DoorState,
+    SpcState,
+    XBusDeviceState,
+)
 
 
 def _coordinator() -> MagicMock:
@@ -38,8 +43,13 @@ def test_panel_area_door_and_xbus_device_info() -> None:
     coordinator.data.areas[1] = AreaState(area_id=1, name="Logis")
     coordinator.data.doors[2] = DoorState(door_id=2, name="Garage", area_id=1)
     coordinator.data.xbus_devices[3] = XBusDeviceState(
-        device_id=3, name="Extension", device_type=2, input_count=8, output_count=2,
-        serial_number="XB3", version="1.2",
+        device_id=3,
+        name="Extension",
+        device_type=2,
+        input_count=8,
+        output_count=2,
+        serial_number="XB3",
+        version="1.2",
     )
 
     with patch(

@@ -30,7 +30,9 @@ async def test_inhibit_zone_refreshes_explicit_inhibition_state() -> None:
         "custom_components.spc_flexc.zone_control_coordinator.async_set_zone_inhibited",
         new=AsyncMock(),
     ):
-        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(coordinator, 1, True)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(
+            coordinator, 1, True
+        )
 
     assert coordinator.state.zones[1].inhibited is True
     assert coordinator.state.zones[1].deinhibit_allowed is True
@@ -53,7 +55,9 @@ async def test_isolate_zone_refreshes_explicit_isolation_state() -> None:
         "custom_components.spc_flexc.zone_control_coordinator.async_set_zone_isolated",
         new=AsyncMock(),
     ):
-        await SpcFlexCZoneControlCoordinator.async_set_zone_isolated(coordinator, 1, True)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_isolated(
+            coordinator, 1, True
+        )
 
     assert coordinator.state.zones[1].isolated is True
     assert coordinator.state.zones[1].deisolate_allowed is True
@@ -93,17 +97,25 @@ async def test_zone_control_unknown_zone_and_deactivation_permissions() -> None:
     coordinator = _coordinator_with_zone(ZoneState(zone_id=1))
     coordinator.state.zones.clear()
     with pytest.raises(ValueError, match="Unknown SPC zone"):
-        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(coordinator, 1, True)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(
+            coordinator, 1, True
+        )
     with pytest.raises(ValueError, match="Unknown SPC zone"):
-        await SpcFlexCZoneControlCoordinator.async_set_zone_isolated(coordinator, 1, True)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_isolated(
+            coordinator, 1, True
+        )
 
     coordinator = _coordinator_with_zone(
         ZoneState(zone_id=1, raw={"INHIBITED": "1", "ISOLATED": "1"})
     )
     with pytest.raises(ValueError, match="de-inhibition"):
-        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(coordinator, 1, False)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_inhibited(
+            coordinator, 1, False
+        )
     with pytest.raises(ValueError, match="de-isolation"):
-        await SpcFlexCZoneControlCoordinator.async_set_zone_isolated(coordinator, 1, False)
+        await SpcFlexCZoneControlCoordinator.async_set_zone_isolated(
+            coordinator, 1, False
+        )
 
 
 @pytest.mark.asyncio
@@ -127,7 +139,10 @@ async def test_refresh_zone_retries_and_validates_returned_id() -> None:
     coordinator.client.async_get_zone_status = AsyncMock(
         side_effect=[[], [_zone_status(INHIBITED="1")]]
     )
-    with patch("custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep", new=AsyncMock()):
+    with patch(
+        "custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep",
+        new=AsyncMock(),
+    ):
         await SpcFlexCZoneControlCoordinator._async_refresh_zone_after_control(
             coordinator, 1, expected_attribute="inhibited", expected_state=True
         )
@@ -148,7 +163,10 @@ async def test_refresh_zone_fails_without_confirmation() -> None:
     coordinator = _coordinator_with_zone(ZoneState(zone_id=1))
     coordinator.client.async_get_zone_status = AsyncMock(return_value=[_zone_status()])
     with (
-        patch("custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep", new=AsyncMock()),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep",
+            new=AsyncMock(),
+        ),
         pytest.raises(ValueError, match="did not confirm"),
     ):
         await SpcFlexCZoneControlCoordinator._async_refresh_zone_after_control(
@@ -223,10 +241,17 @@ def test_update_door_states_detects_changes() -> None:
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
     coordinator.state = SpcState()
     raw = {"DOOR_ID": "1", "DOOR_NAME": "Garage", "STATUS": "0"}
-    assert SpcFlexCZoneControlCoordinator._update_door_states(coordinator, [raw]) is True
-    assert SpcFlexCZoneControlCoordinator._update_door_states(coordinator, [raw]) is False
+    assert (
+        SpcFlexCZoneControlCoordinator._update_door_states(coordinator, [raw]) is True
+    )
+    assert (
+        SpcFlexCZoneControlCoordinator._update_door_states(coordinator, [raw]) is False
+    )
     changed = {**raw, "STATUS": "1"}
-    assert SpcFlexCZoneControlCoordinator._update_door_states(coordinator, [changed]) is True
+    assert (
+        SpcFlexCZoneControlCoordinator._update_door_states(coordinator, [changed])
+        is True
+    )
 
 
 @pytest.mark.asyncio
@@ -240,7 +265,9 @@ async def test_control_door_validation_and_refresh() -> None:
     coordinator.client.async_send_flexml = AsyncMock(side_effect=["control", "status"])
     coordinator._client_operation_lock = AsyncMockContextManager()
     coordinator.async_set_updated_data = MagicMock()
-    coordinator._update_door_states = lambda raw: SpcFlexCZoneControlCoordinator._update_door_states(coordinator, raw)
+    coordinator._update_door_states = lambda raw: (
+        SpcFlexCZoneControlCoordinator._update_door_states(coordinator, raw)
+    )
 
     with pytest.raises(ValueError, match="Unknown SPC door"):
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 2, 5)
@@ -248,10 +275,21 @@ async def test_control_door_validation_and_refresh() -> None:
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 1)
 
     with (
-        patch("custom_components.spc_flexc.zone_control_coordinator.build_door_control_command", return_value="cmd"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.parse_door_control"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch", return_value="status-cmd"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.parse_door_status", return_value=[{"DOOR_ID": "1", "STATUS": "1"}]),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_control_command",
+            return_value="cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_control"
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch",
+            return_value="status-cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_status",
+            return_value=[{"DOOR_ID": "1", "STATUS": "1"}],
+        ),
     ):
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 5)
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
@@ -269,20 +307,42 @@ async def test_control_door_rejects_bad_refresh() -> None:
     coordinator._client_operation_lock = AsyncMockContextManager()
 
     with (
-        patch("custom_components.spc_flexc.zone_control_coordinator.build_door_control_command", return_value="cmd"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.parse_door_control"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch", return_value="status-cmd"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.parse_door_status", return_value=[]),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_control_command",
+            return_value="cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_control"
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch",
+            return_value="status-cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_status",
+            return_value=[],
+        ),
         pytest.raises(ValueError, match="returned no status"),
     ):
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 5)
 
     coordinator.client.async_send_flexml = AsyncMock(side_effect=["control", "status"])
     with (
-        patch("custom_components.spc_flexc.zone_control_coordinator.build_door_control_command", return_value="cmd"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.parse_door_control"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch", return_value="status-cmd"),
-        patch("custom_components.spc_flexc.zone_control_coordinator.parse_door_status", return_value=[{"DOOR_ID": "2"}]),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_control_command",
+            return_value="cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_control"
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch",
+            return_value="status-cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_status",
+            return_value=[{"DOOR_ID": "2"}],
+        ),
         pytest.raises(ValueError, match="returned door 2"),
     ):
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 5)

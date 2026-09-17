@@ -286,12 +286,14 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
     entry = MagicMock()
     entry.runtime_data = coordinator
     callbacks: list[object] = []
-    coordinator.async_add_listener.side_effect = (
-        lambda callback: callbacks.append(callback) or MagicMock()
+    coordinator.async_add_listener.side_effect = lambda callback: (
+        callbacks.append(callback) or MagicMock()
     )
     batches: list[list[object]] = []
 
-    await async_setup_entry(MagicMock(), entry, lambda entities: batches.append(list(entities)))
+    await async_setup_entry(
+        MagicMock(), entry, lambda entities: batches.append(list(entities))
+    )
 
     assert len(batches[0]) == len(PANEL) + len(FAULTS) + 1
     assert [len(batch) for batch in batches[1:]] == [1, 1, 3]

@@ -5,7 +5,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.spc_flexc.diagnostics import async_get_config_entry_diagnostics
-from custom_components.spc_flexc.models import AreaState, DoorState, SpcState, XBusDeviceState, ZoneState
+from custom_components.spc_flexc.models import (
+    AreaState,
+    DoorState,
+    SpcState,
+    XBusDeviceState,
+    ZoneState,
+)
 
 
 @pytest.mark.asyncio

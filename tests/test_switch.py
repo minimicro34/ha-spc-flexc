@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.spc_flexc.models import AreaState, MappingGateState, SpcState, ZoneState
+from custom_components.spc_flexc.models import (
+    AreaState,
+    MappingGateState,
+    SpcState,
+    ZoneState,
+)
 from custom_components.spc_flexc.switch import (
     SpcMappingGateSwitch,
     SpcZoneInhibitionSwitch,
