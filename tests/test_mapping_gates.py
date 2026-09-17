@@ -306,7 +306,7 @@ async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
 @pytest.mark.asyncio
 async def test_shutdown_cancels_mapping_gate_polling() -> None:
     """Shutdown cancels Mapping Gate polling before delegating to the base coordinator."""
-    coordinator = MagicMock()
+    coordinator = object.__new__(SpcFlexCMappingGateCoordinator)
     task = asyncio.create_task(asyncio.sleep(60))
     coordinator._mg_poll_task = task
     coordinator._discovery_requested = True
@@ -315,7 +315,7 @@ async def test_shutdown_cancels_mapping_gate_polling() -> None:
         "custom_components.spc_flexc.zone_control_coordinator.SpcFlexCZoneControlCoordinator.async_shutdown",
         new=AsyncMock(),
     ) as base_shutdown:
-        await SpcFlexCMappingGateCoordinator.async_shutdown(coordinator)
+        await coordinator.async_shutdown()
 
     assert coordinator._discovery_requested is False
     assert coordinator._mg_poll_task is None
