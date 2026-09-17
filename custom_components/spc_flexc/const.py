@@ -38,9 +38,10 @@ MG_POLL_PHASE = 2.0 / 3.0
 XBUS_POLL_INTERVAL = 30.0
 XBUS_POLL_PHASE = 5.0
 
-# Validated on a real X-BUS keypad with an active and isolated tamper fault.
-# INPUT=0002 and ISOLATE=0002 identify the tamper input and its isolation.
+# Validated on a real X-BUS keypad with an active tamper fault.
+# Bit 0x0002 identifies the physical tamper input and its inhibit/isolate state.
 XBUS_TAMPER_INPUT_MASK = 0x0002
+XBUS_TAMPER_INHIBIT_MASK = 0x0002
 XBUS_TAMPER_ISOLATE_MASK = 0x0002
 
 # FlexC ATS
