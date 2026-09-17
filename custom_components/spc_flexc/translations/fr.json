@@ -28,6 +28,7 @@
   "entity": {
     "binary_sensor": {
       "xbus_tamper_fault": {"name": "Défaut d’autoprotection"},
+      "xbus_tamper_inhibited": {"name": "Autoprotection inhibée"},
       "xbus_tamper_isolated": {"name": "Autoprotection isolée"}
     },
     "sensor": {
@@ -35,22 +36,8 @@
       "xbus_aux_current": {"name": "Courant auxiliaire"},
       "xbus_diagnostics": {"name": "Diagnostics X-BUS"},
       "xbus_device_id": {"name": "ID du périphérique X-BUS"},
-      "xbus_device_type": {"name": "Type de périphérique"},
-      "xbus_hardware_id": {"name": "ID matériel"},
       "xbus_input_count": {"name": "Nombre d’entrées"},
-      "xbus_output_count": {"name": "Nombre de sorties"},
-      "xbus_rf_type": {"name": "Type RF"},
-      "xbus_rf_version": {"name": "Version RF"},
-      "xbus_reader_type": {"name": "Type de lecteur"},
-      "xbus_position_1": {"name": "Position 1"},
-      "xbus_position_2": {"name": "Position 2"},
-      "xbus_psu_type": {"name": "Type d’alimentation"},
-      "xbus_sia_address": {"name": "Adresse SIA"},
-      "xbus_status_raw": {"name": "État brut"},
-      "xbus_input_raw": {"name": "Entrée brute"},
-      "xbus_alert_raw": {"name": "Alerte brute"},
-      "xbus_inhibit_raw": {"name": "Inhibition brute"},
-      "xbus_isolate_raw": {"name": "Isolation brute"}
+      "xbus_output_count": {"name": "Nombre de sorties"}
     },
     "button": {
       "open_momentarily": {"name": "Mode libre temporaire"},
@@ -59,7 +46,8 @@
       "lock": {"name": "Mode accès interdit"}
     },
     "switch": {
-      "inhibition": {"name": "Inhibition {zone_name}"}
+      "inhibition": {"name": "Inhibition {zone_name}"},
+      "isolation": {"name": "Isolation {zone_name}"}
     }
   },
   "exceptions": {
