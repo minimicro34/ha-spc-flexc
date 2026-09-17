@@ -28,6 +28,7 @@
   "entity": {
     "binary_sensor": {
       "xbus_tamper_fault": {"name": "Tamper fault"},
+      "xbus_tamper_inhibited": {"name": "Tamper inhibited"},
       "xbus_tamper_isolated": {"name": "Tamper isolated"}
     },
     "sensor": {
@@ -35,22 +36,8 @@
       "xbus_aux_current": {"name": "Auxiliary current"},
       "xbus_diagnostics": {"name": "X-BUS diagnostics"},
       "xbus_device_id": {"name": "X-BUS device ID"},
-      "xbus_device_type": {"name": "Device type"},
-      "xbus_hardware_id": {"name": "Hardware ID"},
       "xbus_input_count": {"name": "Input count"},
-      "xbus_output_count": {"name": "Output count"},
-      "xbus_rf_type": {"name": "RF type"},
-      "xbus_rf_version": {"name": "RF version"},
-      "xbus_reader_type": {"name": "Reader type"},
-      "xbus_position_1": {"name": "Position 1"},
-      "xbus_position_2": {"name": "Position 2"},
-      "xbus_psu_type": {"name": "Power supply type"},
-      "xbus_sia_address": {"name": "SIA address"},
-      "xbus_status_raw": {"name": "Raw status"},
-      "xbus_input_raw": {"name": "Raw input"},
-      "xbus_alert_raw": {"name": "Raw alert"},
-      "xbus_inhibit_raw": {"name": "Raw inhibit"},
-      "xbus_isolate_raw": {"name": "Raw isolate"}
+      "xbus_output_count": {"name": "Output count"}
     },
     "button": {
       "open_momentarily": {"name": "Momentary free mode"},
@@ -59,7 +46,8 @@
       "lock": {"name": "Access forbidden mode"}
     },
     "switch": {
-      "inhibition": {"name": "Inhibition {zone_name}"}
+      "inhibition": {"name": "Inhibition {zone_name}"},
+      "isolation": {"name": "Isolation {zone_name}"}
     }
   },
   "exceptions": {
