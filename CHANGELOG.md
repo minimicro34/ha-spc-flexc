@@ -9,8 +9,6 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Fixed
 
 - Fixed X-BUS tamper fault, inhibition and isolation state reconciliation for X-BUS devices reported by `CMD_STATUS_XBUS`.
-- X-BUS keypad tamper inhibition now updates immediately from validated FlexC events `5314` / `5315`.
-- X-BUS keypad tamper isolation continues to update immediately from validated FlexC events `5316` / `5317`, with periodic X-BUS status polling now correctly reconciling the same state.
 - Renamed the X-BUS diagnostic entities to clearly separate `Tamper fault`, `Inhibition` and `Isolation`.
 
 ### Validated
