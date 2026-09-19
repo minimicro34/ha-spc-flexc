@@ -28,8 +28,8 @@
   "entity": {
     "binary_sensor": {
       "xbus_tamper_fault": {"name": "Tamper fault"},
-      "xbus_tamper_inhibited": {"name": "Tamper inhibited"},
-      "xbus_tamper_isolated": {"name": "Tamper isolated"}
+      "xbus_tamper_inhibited": {"name": "Inhibition"},
+      "xbus_tamper_isolated": {"name": "Isolation"}
     },
     "sensor": {
       "xbus_aux_voltage": {"name": "Auxiliary voltage"},
