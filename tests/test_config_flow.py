@@ -1,7 +1,8 @@
 """Tests for the SPC FlexC config flow."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
