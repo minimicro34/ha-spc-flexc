@@ -4,6 +4,34 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] - 2026-09-19
+
+### Fixed
+
+- Fixed X-BUS tamper fault, inhibition and isolation state reconciliation for X-BUS devices reported by `CMD_STATUS_XBUS`.
+- Renamed the X-BUS diagnostic entities to clearly separate `Tamper fault`, `Inhibition` and `Isolation`.
+
+### Validated
+
+Real SPC4300 hardware testing with a TYPE1 keypad validated:
+
+- `INPUT=0002` / `0000` as the X-BUS keypad physical tamper fault state;
+- `INHIBIT=0002` / `0000` as the X-BUS keypad tamper inhibition state;
+- `ISOLATE=0002` / `0000` as the X-BUS keypad tamper isolation state;
+- event `5314` / `5315` as immediate tamper inhibition / de-inhibition;
+- event `5316` / `5317` as immediate tamper isolation / de-isolation;
+- event-driven state changes are immediate, while periodic X-BUS polling reconciles the state if needed.
+
+### Development
+
+- Added regression coverage for X-BUS tamper status masks and event-driven inhibition/isolation state changes.
+- Release validation passes 181 tests with 90.08% total coverage.
+
+**Full Changelog**:
+https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.0...v1.1.1
+
+---
+
 ## [1.1.0] - 2026-09-17
 
 ### Added

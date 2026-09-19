@@ -28,8 +28,8 @@
   "entity": {
     "binary_sensor": {
       "xbus_tamper_fault": {"name": "Défaut d’autoprotection"},
-      "xbus_tamper_inhibited": {"name": "Autoprotection inhibée"},
-      "xbus_tamper_isolated": {"name": "Autoprotection isolée"}
+      "xbus_tamper_inhibited": {"name": "Inhibition"},
+      "xbus_tamper_isolated": {"name": "Isolation"}
     },
     "sensor": {
       "xbus_aux_voltage": {"name": "Tension auxiliaire"},

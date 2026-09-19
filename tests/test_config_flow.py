@@ -1,5 +1,7 @@
 """Tests for the SPC FlexC config flow."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
@@ -34,7 +36,7 @@ NEW_DATA = {
 
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_user_flow(hass: HomeAssistant) -> None:
-    """Test the initial user config flow."""
+    """Test the initial user config flow without opening a real FlexC socket."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_USER},
@@ -43,10 +45,15 @@ async def test_user_flow(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        OLD_DATA,
-    )
+    with patch(
+        "custom_components.spc_flexc.async_setup_entry",
+        new=AsyncMock(return_value=True),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            OLD_DATA,
+        )
+        await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "SPC 192.168.1.200"

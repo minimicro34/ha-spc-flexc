@@ -177,12 +177,14 @@ def apply_xbus_event(
     # Validated X-BUS keypad tamper events:
     #
     # 5312 = physical tamper fault
+    # 5314 = tamper inhibition enabled
+    # 5315 = tamper inhibition disabled
     # 5316 = fault isolated by a user
     # 5317 = isolation restored / removed
     #
     # IMPORTANT:
     # 5317 does NOT mean the physical tamper fault is cleared.
-    if event_id not in {5312, 5316, 5317}:
+    if event_id not in {5312, 5314, 5315, 5316, 5317}:
         return False
 
     device = devices.get(device_id)
@@ -236,6 +238,16 @@ def apply_xbus_event(
     if event_id == 5312:
         if device.tamper_fault is not True:
             device.tamper_fault = True
+            changed = True
+
+    elif event_id == 5314:
+        if device.tamper_inhibited is not True:
+            device.tamper_inhibited = True
+            changed = True
+
+    elif event_id == 5315:
+        if device.tamper_inhibited is not False:
+            device.tamper_inhibited = False
             changed = True
 
     elif event_id == 5316:

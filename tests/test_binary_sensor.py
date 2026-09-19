@@ -19,6 +19,7 @@ from custom_components.spc_flexc.binary_sensor import (
     async_setup_entry,
     zone_device_class,
 )
+from custom_components.spc_flexc.coordinator import _xbus_device_state_from_status
 from custom_components.spc_flexc.models import (
     AreaState,
     AtpState,
@@ -233,6 +234,35 @@ async def test_zone_removal_cancels_activity_timer() -> None:
     handle.cancel.assert_called_once_with()
     assert sensor._activity_pulse_handle is None
     parent_remove.assert_awaited_once_with()
+
+
+def test_xbus_status_reconciles_tamper_states() -> None:
+    device = _xbus_device_state_from_status(
+        {
+            "ID": "1",
+            "INPUT": "0002",
+            "INHIBIT": "0002",
+            "ISOLATE": "0002",
+        }
+    )
+    assert device is not None
+    assert device.tamper_fault is True
+    assert device.tamper_inhibited is True
+    assert device.tamper_isolated is True
+
+    device = _xbus_device_state_from_status(
+        {
+            "ID": "1",
+            "INPUT": "0000",
+            "INHIBIT": "0000",
+            "ISOLATE": "0000",
+        },
+        previous=device,
+    )
+    assert device is not None
+    assert device.tamper_fault is False
+    assert device.tamper_inhibited is False
+    assert device.tamper_isolated is False
 
 
 def test_xbus_mask_and_tamper_sensors() -> None:

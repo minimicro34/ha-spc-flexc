@@ -20,6 +20,9 @@ from .const import (
     DOOR_DISCOVERY_MAX_ID,
     XBUS_POLL_INTERVAL,
     XBUS_POLL_PHASE,
+    XBUS_TAMPER_INHIBIT_MASK,
+    XBUS_TAMPER_INPUT_MASK,
+    XBUS_TAMPER_ISOLATE_MASK,
     ZONE_DISCOVERY_MAX_ID,
     ZONE_POLL_BATCH_SIZE,
     ZONE_POLL_INTERVAL,
@@ -210,11 +213,21 @@ def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
     )
 
 
+def _xbus_mask_state(raw_value: str | None, mask: int) -> bool | None:
+    """Return a validated X-BUS bit state from a hexadecimal status field."""
+    if raw_value is None:
+        return None
+    try:
+        return bool(int(raw_value, 16) & mask)
+    except ValueError:
+        return None
+
+
 def _xbus_device_state_from_status(
     raw_device: dict[str, str],
     previous: XBusDeviceState | None = None,
 ) -> XBusDeviceState | None:
-    """Build an X-BUS device while preserving event-derived state."""
+    """Build an X-BUS device and reconcile tamper state from status."""
     device_id = _int_value(raw_device.get("ID"))
     if device_id is None:
         _LOGGER.warning("Ignoring X-BUS ENETNODE without a valid ID: %s", raw_device)
@@ -243,8 +256,13 @@ def _xbus_device_state_from_status(
         inhibit_raw=raw_device.get("INHIBIT"),
         isolate_raw=raw_device.get("ISOLATE"),
         sia_address=previous.sia_address if previous is not None else None,
-        tamper_fault=previous.tamper_fault if previous is not None else None,
-        tamper_isolated=previous.tamper_isolated if previous is not None else None,
+        tamper_fault=_xbus_mask_state(raw_device.get("INPUT"), XBUS_TAMPER_INPUT_MASK),
+        tamper_inhibited=_xbus_mask_state(
+            raw_device.get("INHIBIT"), XBUS_TAMPER_INHIBIT_MASK
+        ),
+        tamper_isolated=_xbus_mask_state(
+            raw_device.get("ISOLATE"), XBUS_TAMPER_ISOLATE_MASK
+        ),
         last_event=previous.last_event if previous is not None else None,
         raw=dict(raw_device),
         updated_at=datetime.now(UTC),
