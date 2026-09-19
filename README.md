@@ -99,7 +99,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - Dynamic discovery of X-BUS peripherals reported by SPC
 - Validated identification of tested SPC keypad, comfort keypad, SPCE650, SPCE450 and SPCA210 hardware
 - Auxiliary voltage/current information where reported
-- Tamper, tamper-inhibited and tamper-isolated diagnostics
+- Independent X-BUS tamper fault, inhibition and isolation diagnostics with real-time event updates and status reconciliation
 - Device-specific metadata retained in Home Assistant diagnostics
 
 ### Outputs
@@ -367,7 +367,7 @@ Validated mappings currently include:
 - SPCE450 output expander;
 - SPCA210 door controller.
 
-Operational entities can include auxiliary voltage/current and tamper-related states. Lower-level hardware identifiers and raw protocol values remain available in diagnostics where useful.
+Operational entities can include auxiliary voltage/current and independent tamper fault, inhibition and isolation states. Validated keypad tamper inhibition/isolation events update Home Assistant immediately, while periodic X-BUS status polling reconciles the reported state if an event is missed. Lower-level hardware identifiers and raw protocol values remain available in diagnostics where useful.
 
 Unknown or unvalidated values are deliberately not given speculative meanings.
 
@@ -387,7 +387,7 @@ Depending on the panel, firmware and installed hardware, SPC FlexC can expose in
 - FlexC ATS / ATP communication state;
 - X-BUS peripheral identity and status;
 - X-BUS auxiliary power values;
-- X-BUS tamper, tamper-inhibited and tamper-isolated states;
+- X-BUS tamper fault, inhibition and isolation states;
 - raw protocol metadata retained for troubleshooting.
 
 Some states are updated immediately from unsolicited FlexC events. Missing optional fields are tolerated because not every SPC installation exposes the same diagnostics.
@@ -478,7 +478,7 @@ make coverage
 git diff --check
 ```
 
-The current coverage gate is 80%. The v1.1.0 release validation reached 90.03% total coverage.
+The current coverage gate is 80%. The v1.1.1 release validation reached 90.08% total coverage.
 
 ---
 
