@@ -240,16 +240,22 @@ def test_xbus_tamper_inhibition_cycle() -> None:
     """Test X-BUS tamper inhibition events."""
     devices = {1: XBusDeviceState(device_id=1, name="CLA 1")}
 
-    assert apply_xbus_event(
-        devices,
-        {"EV_ID": "5314", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"},
-    ) is True
+    assert (
+        apply_xbus_event(
+            devices,
+            {"EV_ID": "5314", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"},
+        )
+        is True
+    )
     assert devices[1].tamper_inhibited is True
 
-    assert apply_xbus_event(
-        devices,
-        {"EV_ID": "5315", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"},
-    ) is True
+    assert (
+        apply_xbus_event(
+            devices,
+            {"EV_ID": "5315", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"},
+        )
+        is True
+    )
     assert devices[1].tamper_inhibited is False
 
 
