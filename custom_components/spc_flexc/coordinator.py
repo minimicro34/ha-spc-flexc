@@ -256,9 +256,7 @@ def _xbus_device_state_from_status(
         inhibit_raw=raw_device.get("INHIBIT"),
         isolate_raw=raw_device.get("ISOLATE"),
         sia_address=previous.sia_address if previous is not None else None,
-        tamper_fault=_xbus_mask_state(
-            raw_device.get("INPUT"), XBUS_TAMPER_INPUT_MASK
-        ),
+        tamper_fault=_xbus_mask_state(raw_device.get("INPUT"), XBUS_TAMPER_INPUT_MASK),
         tamper_inhibited=_xbus_mask_state(
             raw_device.get("INHIBIT"), XBUS_TAMPER_INHIBIT_MASK
         ),
