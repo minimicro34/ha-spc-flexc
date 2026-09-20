@@ -160,7 +160,7 @@ def apply_panel_event(
 
 
 def apply_xbus_event(
-    devices: dict[int, XBusDeviceState],
+    devices: dict[str, XBusDeviceState],
     event: Mapping[str, Any],
 ) -> bool:
     """Apply an X-BUS device EVENT to persistent device state."""
@@ -187,30 +187,39 @@ def apply_xbus_event(
     if event_id not in {5312, 5314, 5315, 5316, 5317}:
         return False
 
-    device = devices.get(device_id)
+    # ENETNODE.ID / KEYPAD_ID is branch-local and may be duplicated on
+    # multi-branch panels.  Inventory is keyed by the hardware serial number,
+    # so resolve events against the discovered devices instead of treating the
+    # keypad ID as globally unique.
+    candidates = [device for device in devices.values() if device.device_id == device_id]
 
-    if device is None:
-        raw_sia_address = event.get("SIA_ADDRESS")
+    raw_name = event.get("KEYPAD_NAME")
+    if len(candidates) > 1 and raw_name is not None:
+        named = [device for device in candidates if device.name == str(raw_name)]
+        if named:
+            candidates = named
 
-        try:
-            sia_address = (
-                int(str(raw_sia_address)) if raw_sia_address is not None else None
-            )
-        except (TypeError, ValueError):
-            sia_address = None
-
-        device = XBusDeviceState(
-            device_id=device_id,
-            name=(
-                str(event["KEYPAD_NAME"])
-                if event.get("KEYPAD_NAME") is not None
-                else None
-            ),
-            sia_address=sia_address,
+    raw_sia_address = event.get("SIA_ADDRESS")
+    try:
+        sia_address = (
+            int(str(raw_sia_address)) if raw_sia_address is not None else None
         )
+    except (TypeError, ValueError):
+        sia_address = None
 
-        devices[device_id] = device
+    if len(candidates) > 1 and sia_address is not None:
+        addressed = [
+            device for device in candidates if device.sia_address == sia_address
+        ]
+        if addressed:
+            candidates = addressed
 
+    # Do not guess when a branch-local ID still maps to several peripherals.
+    # The periodic STATUS_XBUS reconciliation remains authoritative.
+    if len(candidates) != 1:
+        return False
+
+    device = candidates[0]
     changed = False
 
     # Refresh descriptive metadata whenever SPC provides it.
