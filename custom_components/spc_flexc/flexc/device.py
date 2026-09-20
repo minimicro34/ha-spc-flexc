@@ -130,25 +130,42 @@ def migrate_xbus_registry_identity(
     entity_domain: str,
     entity_suffix: str,
 ) -> None:
-    """Migrate an unambiguous legacy X-BUS entity from local ID to serial."""
+    """Migrate a legacy local-ID X-BUS registry identity to its serial."""
     device = coordinator.data.xbus_devices[serial_number]
     same_id = [
         candidate
         for candidate in coordinator.data.xbus_devices.values()
         if candidate.device_id == device.device_id
     ]
-    if len(same_id) != 1:
-        return
 
     entry_id = coordinator.entry.entry_id
     old_unique_id = f"{entry_id}_xbus_{device.device_id}_{entity_suffix}"
     new_unique_id = f"{entry_id}_xbus_{serial_number}_{entity_suffix}"
-    registry = er.async_get(coordinator.hass)
-    entity_id = registry.async_get_entity_id(entity_domain, DOMAIN, old_unique_id)
-    if entity_id is None:
-        return
-    registry.async_update_entity(entity_id, new_unique_id=new_unique_id)
+    entity_registry = er.async_get(coordinator.hass)
+    entity_id = entity_registry.async_get_entity_id(entity_domain, DOMAIN, old_unique_id)
 
+    panel_serial = coordinator.data.panel.serial_number or entry_id
+    old_identifier = (DOMAIN, f"{panel_serial}_xbus_{device.device_id}")
+    new_identifier = (DOMAIN, f"{panel_serial}_xbus_{serial_number}")
+    device_registry = dr.async_get(coordinator.hass)
+    old_device = device_registry.async_get_device(identifiers={old_identifier})
+
+    if len(same_id) == 1:
+        if entity_id is not None:
+            entity_registry.async_update_entity(entity_id, new_unique_id=new_unique_id)
+        if old_device is not None:
+            device_registry.async_update_device(
+                old_device.id, new_identifiers={new_identifier}
+            )
+        return
+
+    # A legacy local ID cannot identify one physical device when that ID is
+    # reused. Remove only the obsolete X-BUS registry records; the serial-based
+    # entities/devices created immediately afterwards are unambiguous.
+    if entity_id is not None:
+        entity_registry.async_remove(entity_id)
+    if old_device is not None:
+        device_registry.async_remove_device(old_device.id)
 
 
 def _set_parent_device(
