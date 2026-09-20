@@ -61,7 +61,7 @@ async def async_setup_entry(
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
     known_doors: set[int] = set()
-    known_xbus: set[int] = set()
+    known_xbus: set[str] = set()
 
     def add_dynamic_entities() -> None:
         entities: list[SensorEntity] = []
@@ -280,14 +280,14 @@ class SpcDoorModeSensor(SpcDoorSensorBase):
 class SpcXBusSensorBase(CoordinatorEntity[SpcFlexCCoordinator], SensorEntity):
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
+    def __init__(self, coordinator: SpcFlexCCoordinator, serial_number: str) -> None:
         super().__init__(coordinator)
-        self.device_id = device_id
-        self._attr_device_info = build_xbus_device_info(coordinator, device_id)
+        self.serial_number = serial_number
+        self._attr_device_info = build_xbus_device_info(coordinator, serial_number)
 
     @property
     def available(self) -> bool:
-        return self.device_id in self.coordinator.data.xbus_devices
+        return self.serial_number in self.coordinator.data.xbus_devices
 
 
 class SpcXBusAuxVoltageSensor(SpcXBusSensorBase):
@@ -296,15 +296,15 @@ class SpcXBusAuxVoltageSensor(SpcXBusSensorBase):
     _attr_suggested_display_precision = 1
     _attr_translation_key = "xbus_aux_voltage"
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
-        super().__init__(coordinator, device_id)
+    def __init__(self, coordinator: SpcFlexCCoordinator, serial_number: str) -> None:
+        super().__init__(coordinator, serial_number)
         self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_voltage"
+            f"{coordinator.entry.entry_id}_xbus_{serial_number}_aux_voltage"
         )
 
     @property
     def native_value(self) -> float | None:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         return None if device is None else device.aux_voltage
 
 
@@ -313,15 +313,15 @@ class SpcXBusAuxCurrentSensor(SpcXBusSensorBase):
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.MILLIAMPERE
     _attr_translation_key = "xbus_aux_current"
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
-        super().__init__(coordinator, device_id)
+    def __init__(self, coordinator: SpcFlexCCoordinator, serial_number: str) -> None:
+        super().__init__(coordinator, serial_number)
         self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_xbus_{device_id}_aux_current"
+            f"{coordinator.entry.entry_id}_xbus_{serial_number}_aux_current"
         )
 
     @property
     def native_value(self) -> float | None:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         return None if device is None else device.aux_current
 
 
@@ -329,20 +329,20 @@ class SpcXBusDiagnosticSensor(SpcXBusSensorBase):
     _attr_translation_key = "xbus_diagnostics"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator: SpcFlexCCoordinator, device_id: int) -> None:
-        super().__init__(coordinator, device_id)
+    def __init__(self, coordinator: SpcFlexCCoordinator, serial_number: str) -> None:
+        super().__init__(coordinator, serial_number)
         self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_xbus_{device_id}_diagnostics"
+            f"{coordinator.entry.entry_id}_xbus_{serial_number}_diagnostics"
         )
 
     @property
     def native_value(self) -> str | None:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         return None if device is None else device.status_raw
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         if device is None:
             return {}
         return {
@@ -375,19 +375,19 @@ class SpcXBusInventorySensor(SpcXBusSensorBase):
     def __init__(
         self,
         coordinator: SpcFlexCCoordinator,
-        device_id: int,
+        serial_number: str,
         field: str,
         *,
         diagnostic: bool = False,
     ) -> None:
-        super().__init__(coordinator, device_id)
+        super().__init__(coordinator, serial_number)
         self.field = field
         self._attr_translation_key = f"xbus_{field}"
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{device_id}_{field}"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{serial_number}_{field}"
         if diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> int | None:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         return None if device is None else getattr(device, self.field)
