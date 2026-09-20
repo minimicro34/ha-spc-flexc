@@ -123,7 +123,6 @@ def build_xbus_device_info(
     return device_info
 
 
-
 def migrate_xbus_registry_identity(
     coordinator: SpcFlexCCoordinator,
     serial_number: str,
@@ -142,7 +141,9 @@ def migrate_xbus_registry_identity(
     old_unique_id = f"{entry_id}_xbus_{device.device_id}_{entity_suffix}"
     new_unique_id = f"{entry_id}_xbus_{serial_number}_{entity_suffix}"
     entity_registry = er.async_get(coordinator.hass)
-    entity_id = entity_registry.async_get_entity_id(entity_domain, DOMAIN, old_unique_id)
+    entity_id = entity_registry.async_get_entity_id(
+        entity_domain, DOMAIN, old_unique_id
+    )
 
     panel_serial = coordinator.data.panel.serial_number or entry_id
     old_identifier = (DOMAIN, f"{panel_serial}_xbus_{device.device_id}")

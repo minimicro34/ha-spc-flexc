@@ -125,9 +125,7 @@ def test_migrate_unambiguous_xbus_registry_identity() -> None:
             return_value=device_registry,
         ),
     ):
-        migrate_xbus_registry_identity(
-            coordinator, "XB7", "sensor", "aux_voltage"
-        )
+        migrate_xbus_registry_identity(coordinator, "XB7", "sensor", "aux_voltage")
 
     entity_registry.async_update_entity.assert_called_once_with(
         "sensor.legacy_xbus",
@@ -166,9 +164,7 @@ def test_remove_ambiguous_legacy_xbus_registry_identity() -> None:
             return_value=device_registry,
         ),
     ):
-        migrate_xbus_registry_identity(
-            coordinator, "AAA", "sensor", "aux_voltage"
-        )
+        migrate_xbus_registry_identity(coordinator, "AAA", "sensor", "aux_voltage")
 
     entity_registry.async_update_entity.assert_not_called()
     entity_registry.async_remove.assert_called_once_with("sensor.legacy_xbus")

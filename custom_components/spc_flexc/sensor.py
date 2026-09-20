@@ -99,7 +99,9 @@ async def async_setup_entry(
                 migrate_xbus_registry_identity(coordinator, device_id, "sensor", suffix)
             if device.device_type in (2, 6):
                 for suffix in ("input_count", "output_count"):
-                    migrate_xbus_registry_identity(coordinator, device_id, "sensor", suffix)
+                    migrate_xbus_registry_identity(
+                        coordinator, device_id, "sensor", suffix
+                    )
             entities.extend(
                 (
                     SpcXBusAuxVoltageSensor(coordinator, device_id),
