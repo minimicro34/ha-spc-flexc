@@ -45,7 +45,7 @@ def _coordinator_stub() -> MagicMock:
     coordinator._detected_area_ids = set()
     coordinator._detected_zone_ids = set()
     coordinator._detected_door_ids = set()
-    coordinator._detected_xbus_ids = set()
+    coordinator._detected_xbus_serials = set()
     coordinator._ats_discovery_complete = False
     coordinator._area_discovery_complete = False
     coordinator._zone_discovery_complete = False
@@ -318,7 +318,7 @@ async def test_background_discovery_populates_all_object_families() -> None:
     doors = AsyncMock(return_value=[{"DOOR_ID": "2", "NAME": "Garage"}])
     xbus = AsyncMock(
         return_value=[
-            {"ID": "1", "NAME": "CLA 1", "TYPE": "1"},
+            {"ID": "1", "SN": "4CADF0DA", "NAME": "CLA 1", "TYPE": "1"},
             {"NAME": "invalid"},
         ]
     )
@@ -336,7 +336,7 @@ async def test_background_discovery_populates_all_object_families() -> None:
     assert coordinator._detected_area_ids == {1}
     assert coordinator._detected_zone_ids == {4}
     assert coordinator._detected_door_ids == {2}
-    assert coordinator._detected_xbus_ids == {1}
+    assert coordinator._detected_xbus_serials == {"4CADF0DA"}
     assert coordinator._ats_discovery_complete is True
     assert coordinator._area_discovery_complete is True
     assert coordinator._zone_discovery_complete is True
@@ -346,6 +346,45 @@ async def test_background_discovery_populates_all_object_families() -> None:
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
     coordinator._schedule_zone_polling.assert_called_once_with()
     coordinator._schedule_xbus_polling.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_xbus_discovery_preserves_duplicate_branch_local_ids() -> None:
+    """Twelve ENETNODEs remain distinct when branch-local IDs are reused."""
+    coordinator = _coordinator_stub()
+    coordinator._discovery_task = asyncio.current_task()
+    coordinator.async_set_updated_data = MagicMock()
+    coordinator._schedule_zone_polling = MagicMock()
+    coordinator._schedule_xbus_polling = MagicMock()
+    coordinator.client.async_get_flexc_ats_status = AsyncMock(
+        side_effect=[FlexMLError("not present"), FlexMLError("not present")]
+    )
+    rows = [
+        (1, "1139A083", 1, "SPCE650 ID 1 LT"), (7, "12953F1B", 2, "SPCE650 ID 7 Gar"),
+        (5, "10FFED63", 3, "SPCE650 ID 6 Gar"), (2, "0D9CC533", 4, "Garage"),
+        (3, "10308F73", 5, "Studio"), (6, "10CE234B", 6, "SPCE650 ID 6 CG"),
+        (9, "1D1F3A4A", 7, "SPCE450 ID 9 Gar"), (1, "4C28EE12", 8, "SPCA210 ID 1 Gar"),
+        (8, "11D250C3", 9, "SPCE450 ID 8 Gar"), (2, "04F420A3", 10, "SPCE450 ID 2 LT"),
+        (3, "02CB67CB", 11, "SPCE650 ID 3 PE"), (1, "06299D7B", 12, "Maison"),
+    ]
+    xbus = AsyncMock(return_value=[
+        {"ID": str(device_id), "SN": serial, "POSITION_1": str(position), "NAME": name}
+        for device_id, serial, position, name in rows
+    ])
+
+    with (
+        patch("custom_components.spc_flexc.coordinator.ATS_IDS", (1, 2)),
+        patch("custom_components.spc_flexc.coordinator.async_discover_areas", AsyncMock(return_value=[])),
+        patch("custom_components.spc_flexc.coordinator.async_discover_zones", AsyncMock(return_value=[])),
+        patch("custom_components.spc_flexc.coordinator.async_discover_doors", AsyncMock(return_value=[])),
+        patch("custom_components.spc_flexc.coordinator.async_get_xbus_status", xbus),
+    ):
+        await SpcFlexCCoordinator._async_discover_panel_objects(coordinator)
+
+    assert len(coordinator.state.xbus_devices) == 12
+    assert len(coordinator._detected_xbus_serials) == 12
+    assert sum(device.device_id == 1 for device in coordinator.state.xbus_devices.values()) == 3
+    assert {device.position_1 for device in coordinator.state.xbus_devices.values()} == set(range(1, 13))
 
 
 @pytest.mark.asyncio
