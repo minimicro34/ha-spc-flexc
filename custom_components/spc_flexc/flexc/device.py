@@ -102,16 +102,16 @@ def _xbus_model(
 
 def build_xbus_device_info(
     coordinator: SpcFlexCCoordinator,
-    device_id: int,
+    serial_number: str,
 ) -> DeviceInfo:
     """Return a dedicated Home Assistant device for one X-BUS peripheral."""
     panel = coordinator.data.panel
-    device = coordinator.data.xbus_devices[device_id]
+    device = coordinator.data.xbus_devices[serial_number]
     panel_serial = panel.serial_number or coordinator.entry.entry_id
 
     device_info = DeviceInfo(
-        identifiers={(DOMAIN, f"{panel_serial}_xbus_{device_id}")},
-        name=device.name or f"X-BUS {device_id}",
+        identifiers={(DOMAIN, f"{panel_serial}_xbus_{serial_number}")},
+        name=device.name or f"X-BUS {device.device_id}",
         manufacturer="Vanderbilt",
         model=_xbus_model(device.device_type, device.input_count, device.output_count),
         serial_number=device.serial_number,
