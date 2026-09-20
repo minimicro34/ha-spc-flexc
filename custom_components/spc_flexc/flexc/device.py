@@ -4,6 +4,7 @@ from typing import Any, cast
 
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import DOMAIN
@@ -120,6 +121,34 @@ def build_xbus_device_info(
 
     _set_parent_device(coordinator, device_info, (DOMAIN, str(panel_serial)))
     return device_info
+
+
+
+def migrate_xbus_registry_identity(
+    coordinator: SpcFlexCCoordinator,
+    serial_number: str,
+    entity_domain: str,
+    entity_suffix: str,
+) -> None:
+    """Migrate an unambiguous legacy X-BUS entity from local ID to serial."""
+    device = coordinator.data.xbus_devices[serial_number]
+    same_id = [
+        candidate
+        for candidate in coordinator.data.xbus_devices.values()
+        if candidate.device_id == device.device_id
+    ]
+    if len(same_id) != 1:
+        return
+
+    entry_id = coordinator.entry.entry_id
+    old_unique_id = f"{entry_id}_xbus_{device.device_id}_{entity_suffix}"
+    new_unique_id = f"{entry_id}_xbus_{serial_number}_{entity_suffix}"
+    registry = er.async_get(coordinator.hass)
+    entity_id = registry.async_get_entity_id(entity_domain, DOMAIN, old_unique_id)
+    if entity_id is None:
+        return
+    registry.async_update_entity(entity_id, new_unique_id=new_unique_id)
+
 
 
 def _set_parent_device(
