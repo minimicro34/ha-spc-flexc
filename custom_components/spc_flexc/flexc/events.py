@@ -191,7 +191,9 @@ def apply_xbus_event(
     # multi-branch panels.  Inventory is keyed by the hardware serial number,
     # so resolve events against the discovered devices instead of treating the
     # keypad ID as globally unique.
-    candidates = [device for device in devices.values() if device.device_id == device_id]
+    candidates = [
+        device for device in devices.values() if device.device_id == device_id
+    ]
 
     raw_name = event.get("KEYPAD_NAME")
     if len(candidates) > 1 and raw_name is not None:
@@ -201,9 +203,7 @@ def apply_xbus_event(
 
     raw_sia_address = event.get("SIA_ADDRESS")
     try:
-        sia_address = (
-            int(str(raw_sia_address)) if raw_sia_address is not None else None
-        )
+        sia_address = int(str(raw_sia_address)) if raw_sia_address is not None else None
     except (TypeError, ValueError):
         sia_address = None
 

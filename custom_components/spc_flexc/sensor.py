@@ -383,7 +383,9 @@ class SpcXBusInventorySensor(SpcXBusSensorBase):
         super().__init__(coordinator, serial_number)
         self.field = field
         self._attr_translation_key = f"xbus_{field}"
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_xbus_{serial_number}_{field}"
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_xbus_{serial_number}_{field}"
+        )
         if diagnostic:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
 

@@ -80,7 +80,9 @@ def test_device_info_fallback_names_and_no_parent_helper() -> None:
     coordinator.data.panel.spc_type = None
     coordinator.data.areas[5] = AreaState(area_id=5)
     coordinator.data.doors[6] = DoorState(door_id=6, zone_name="Zone porte")
-    coordinator.data.xbus_devices["XB7"] = XBusDeviceState(device_id=7, serial_number="XB7")
+    coordinator.data.xbus_devices["XB7"] = XBusDeviceState(
+        device_id=7, serial_number="XB7"
+    )
 
     with patch(
         "custom_components.spc_flexc.flexc.device.dr.async_get_device_id_by_identifier",

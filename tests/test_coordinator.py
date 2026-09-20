@@ -360,31 +360,58 @@ async def test_xbus_discovery_preserves_duplicate_branch_local_ids() -> None:
         side_effect=[FlexMLError("not present"), FlexMLError("not present")]
     )
     rows = [
-        (1, "1139A083", 1, "SPCE650 ID 1 LT"), (7, "12953F1B", 2, "SPCE650 ID 7 Gar"),
-        (5, "10FFED63", 3, "SPCE650 ID 6 Gar"), (2, "0D9CC533", 4, "Garage"),
-        (3, "10308F73", 5, "Studio"), (6, "10CE234B", 6, "SPCE650 ID 6 CG"),
-        (9, "1D1F3A4A", 7, "SPCE450 ID 9 Gar"), (1, "4C28EE12", 8, "SPCA210 ID 1 Gar"),
-        (8, "11D250C3", 9, "SPCE450 ID 8 Gar"), (2, "04F420A3", 10, "SPCE450 ID 2 LT"),
-        (3, "02CB67CB", 11, "SPCE650 ID 3 PE"), (1, "06299D7B", 12, "Maison"),
+        (1, "1139A083", 1, "SPCE650 ID 1 LT"),
+        (7, "12953F1B", 2, "SPCE650 ID 7 Gar"),
+        (5, "10FFED63", 3, "SPCE650 ID 6 Gar"),
+        (2, "0D9CC533", 4, "Garage"),
+        (3, "10308F73", 5, "Studio"),
+        (6, "10CE234B", 6, "SPCE650 ID 6 CG"),
+        (9, "1D1F3A4A", 7, "SPCE450 ID 9 Gar"),
+        (1, "4C28EE12", 8, "SPCA210 ID 1 Gar"),
+        (8, "11D250C3", 9, "SPCE450 ID 8 Gar"),
+        (2, "04F420A3", 10, "SPCE450 ID 2 LT"),
+        (3, "02CB67CB", 11, "SPCE650 ID 3 PE"),
+        (1, "06299D7B", 12, "Maison"),
     ]
-    xbus = AsyncMock(return_value=[
-        {"ID": str(device_id), "SN": serial, "POSITION_1": str(position), "NAME": name}
-        for device_id, serial, position, name in rows
-    ])
+    xbus = AsyncMock(
+        return_value=[
+            {
+                "ID": str(device_id),
+                "SN": serial,
+                "POSITION_1": str(position),
+                "NAME": name,
+            }
+            for device_id, serial, position, name in rows
+        ]
+    )
 
     with (
         patch("custom_components.spc_flexc.coordinator.ATS_IDS", (1, 2)),
-        patch("custom_components.spc_flexc.coordinator.async_discover_areas", AsyncMock(return_value=[])),
-        patch("custom_components.spc_flexc.coordinator.async_discover_zones", AsyncMock(return_value=[])),
-        patch("custom_components.spc_flexc.coordinator.async_discover_doors", AsyncMock(return_value=[])),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_discover_areas",
+            AsyncMock(return_value=[]),
+        ),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_discover_zones",
+            AsyncMock(return_value=[]),
+        ),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_discover_doors",
+            AsyncMock(return_value=[]),
+        ),
         patch("custom_components.spc_flexc.coordinator.async_get_xbus_status", xbus),
     ):
         await SpcFlexCCoordinator._async_discover_panel_objects(coordinator)
 
     assert len(coordinator.state.xbus_devices) == 12
     assert len(coordinator._detected_xbus_serials) == 12
-    assert sum(device.device_id == 1 for device in coordinator.state.xbus_devices.values()) == 3
-    assert {device.position_1 for device in coordinator.state.xbus_devices.values()} == set(range(1, 13))
+    assert (
+        sum(device.device_id == 1 for device in coordinator.state.xbus_devices.values())
+        == 3
+    )
+    assert {
+        device.position_1 for device in coordinator.state.xbus_devices.values()
+    } == set(range(1, 13))
 
 
 @pytest.mark.asyncio
