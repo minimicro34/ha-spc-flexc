@@ -8,6 +8,7 @@ from custom_components.spc_flexc.flexc.device import (
     build_door_device_info,
     build_panel_device_info,
     build_xbus_device_info,
+    migrate_xbus_registry_identity,
 )
 from custom_components.spc_flexc.models import (
     AreaState,
@@ -100,3 +101,76 @@ def test_device_info_fallback_names_and_no_parent_helper() -> None:
     assert door["name"] == "Zone porte"
     assert xbus["name"] == "X-BUS 7"
     assert "via_device_id" not in area
+
+
+def test_migrate_unambiguous_xbus_registry_identity() -> None:
+    coordinator = _coordinator()
+    coordinator.data.xbus_devices["XB7"] = XBusDeviceState(
+        device_id=7, serial_number="XB7"
+    )
+    entity_registry = MagicMock()
+    entity_registry.async_get_entity_id.return_value = "sensor.legacy_xbus"
+    device_registry = MagicMock()
+    old_device = MagicMock()
+    old_device.id = "legacy-device"
+    device_registry.async_get_device.return_value = old_device
+
+    with (
+        patch(
+            "custom_components.spc_flexc.flexc.device.er.async_get",
+            return_value=entity_registry,
+        ),
+        patch(
+            "custom_components.spc_flexc.flexc.device.dr.async_get",
+            return_value=device_registry,
+        ),
+    ):
+        migrate_xbus_registry_identity(
+            coordinator, "XB7", "sensor", "aux_voltage"
+        )
+
+    entity_registry.async_update_entity.assert_called_once_with(
+        "sensor.legacy_xbus",
+        new_unique_id="entry_xbus_XB7_aux_voltage",
+    )
+    entity_registry.async_remove.assert_not_called()
+    device_registry.async_update_device.assert_called_once_with(
+        "legacy-device",
+        new_identifiers={("spc_flexc", "SERIAL_xbus_XB7")},
+    )
+    device_registry.async_remove_device.assert_not_called()
+
+
+def test_remove_ambiguous_legacy_xbus_registry_identity() -> None:
+    coordinator = _coordinator()
+    coordinator.data.xbus_devices["AAA"] = XBusDeviceState(
+        device_id=1, serial_number="AAA"
+    )
+    coordinator.data.xbus_devices["BBB"] = XBusDeviceState(
+        device_id=1, serial_number="BBB"
+    )
+    entity_registry = MagicMock()
+    entity_registry.async_get_entity_id.return_value = "sensor.legacy_xbus"
+    device_registry = MagicMock()
+    old_device = MagicMock()
+    old_device.id = "legacy-device"
+    device_registry.async_get_device.return_value = old_device
+
+    with (
+        patch(
+            "custom_components.spc_flexc.flexc.device.er.async_get",
+            return_value=entity_registry,
+        ),
+        patch(
+            "custom_components.spc_flexc.flexc.device.dr.async_get",
+            return_value=device_registry,
+        ),
+    ):
+        migrate_xbus_registry_identity(
+            coordinator, "AAA", "sensor", "aux_voltage"
+        )
+
+    entity_registry.async_update_entity.assert_not_called()
+    entity_registry.async_remove.assert_called_once_with("sensor.legacy_xbus")
+    device_registry.async_update_device.assert_not_called()
+    device_registry.async_remove_device.assert_called_once_with("legacy-device")
