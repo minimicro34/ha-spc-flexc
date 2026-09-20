@@ -531,8 +531,9 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
     """Periodic STATUS_XBUS refreshes inventory without overwriting event state."""
     coordinator = MagicMock()
     coordinator.state = SpcState()
-    coordinator.state.xbus_devices[1] = XBusDeviceState(
+    coordinator.state.xbus_devices["4CADF0DA"] = XBusDeviceState(
         device_id=1,
+        serial_number="4CADF0DA",
         name="CLA 1",
         tamper_fault=True,
         tamper_isolated=True,
@@ -540,7 +541,7 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
         raw={"ID": "1", "INPUT": "0000"},
     )
     coordinator._xbus_discovery_complete = True
-    coordinator._detected_xbus_ids = {1}
+    coordinator._detected_xbus_serials = {"4CADF0DA"}
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
@@ -551,6 +552,7 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
         return_value=[
             {
                 "ID": "1",
+                "SN": "4CADF0DA",
                 "NAME": "CLA 1",
                 "STATUS": "00000004",
                 "INPUT": "0002",
@@ -568,7 +570,7 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
     ):
         await SpcFlexCCoordinator._async_xbus_poll_loop(coordinator)
 
-    device = coordinator.state.xbus_devices[1]
+    device = coordinator.state.xbus_devices["4CADF0DA"]
     assert device.status_raw == "00000004"
     assert device.input_raw == "0002"
     assert device.isolate_raw == "0002"
