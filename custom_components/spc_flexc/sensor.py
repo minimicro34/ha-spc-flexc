@@ -22,7 +22,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SpcFlexCCoordinator
-from .flexc.device import build_door_device_info, build_xbus_device_info
+from .flexc.device import (
+    build_door_device_info,
+    build_xbus_device_info,
+    migrate_xbus_registry_identity,
+)
 from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
@@ -91,6 +95,11 @@ async def async_setup_entry(
             if device_id in known_xbus:
                 continue
             known_xbus.add(device_id)
+            for suffix in ("aux_voltage", "aux_current", "diagnostics", "device_id"):
+                migrate_xbus_registry_identity(coordinator, device_id, "sensor", suffix)
+            if device.device_type in (2, 6):
+                for suffix in ("input_count", "output_count"):
+                    migrate_xbus_registry_identity(coordinator, device_id, "sensor", suffix)
             entities.extend(
                 (
                     SpcXBusAuxVoltageSensor(coordinator, device_id),
