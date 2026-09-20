@@ -289,7 +289,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._zone_discovery_complete = False
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
-        self._detected_xbus_ids: set[int] = set()
+        self._detected_xbus_serials: set[str] = set()
         self._xbus_discovery_complete = False
         self._discovery_requested = False
         self._client_operation_lock = asyncio.Lock()
@@ -430,24 +430,26 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     detected_door_ids.add(door.door_id)
                 self._detected_door_ids.update(detected_door_ids)
                 self._door_discovery_complete = True
-                detected_xbus_ids: set[int] = set()
+                detected_xbus_serials: set[str] = set()
                 raw_xbus_devices = await async_retry_read_once(
                     partial(async_get_xbus_status, self.client),
                     description="discovering X-BUS devices",
                 )
                 for raw_device in raw_xbus_devices:
-                    raw_id = _int_value(raw_device.get("ID"))
-                    previous = (
-                        self.state.xbus_devices.get(raw_id)
-                        if raw_id is not None
-                        else None
-                    )
+                    serial = raw_device.get("SN")
+                    if not serial:
+                        _LOGGER.warning(
+                            "Ignoring X-BUS ENETNODE without a serial number: %s",
+                            raw_device,
+                        )
+                        continue
+                    previous = self.state.xbus_devices.get(serial)
                     device = _xbus_device_state_from_status(raw_device, previous)
                     if device is None:
                         continue
-                    self.state.xbus_devices[device.device_id] = device
-                    detected_xbus_ids.add(device.device_id)
-                self._detected_xbus_ids = detected_xbus_ids
+                    self.state.xbus_devices[serial] = device
+                    detected_xbus_serials.add(serial)
+                self._detected_xbus_serials = detected_xbus_serials
                 self._xbus_discovery_complete = True
             _LOGGER.info(
                 "FlexC discovery completed: ATS=%s areas=%s zones=%s doors=%s X-BUS=%s",
@@ -455,7 +457,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 sorted(self._detected_area_ids),
                 sorted(self._detected_zone_ids),
                 sorted(self._detected_door_ids),
-                sorted(self._detected_xbus_ids),
+                sorted(self._detected_xbus_serials),
             )
             self.async_set_updated_data(self.state)
             self._schedule_zone_polling()
@@ -576,30 +578,32 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         )
 
                     changed = False
-                    seen_ids: set[int] = set()
+                    seen_serials: set[str] = set()
                     for raw_device in raw_devices:
-                        raw_id = _int_value(raw_device.get("ID"))
-                        previous = (
-                            self.state.xbus_devices.get(raw_id)
-                            if raw_id is not None
-                            else None
-                        )
+                        serial = raw_device.get("SN")
+                        if not serial:
+                            _LOGGER.warning(
+                                "Ignoring X-BUS ENETNODE without a serial number: %s",
+                                raw_device,
+                            )
+                            continue
+                        previous = self.state.xbus_devices.get(serial)
                         device = _xbus_device_state_from_status(raw_device, previous)
                         if device is None:
                             continue
-                        seen_ids.add(device.device_id)
+                        seen_serials.add(serial)
                         if previous is None or previous.raw != device.raw:
                             changed = True
-                        self.state.xbus_devices[device.device_id] = device
+                        self.state.xbus_devices[serial] = device
 
-                    missing_ids = set(self.state.xbus_devices) - seen_ids
-                    if missing_ids:
+                    missing_serials = set(self.state.xbus_devices) - seen_serials
+                    if missing_serials:
                         changed = True
-                        for device_id in missing_ids:
-                            del self.state.xbus_devices[device_id]
+                        for serial in missing_serials:
+                            del self.state.xbus_devices[serial]
 
-                    if seen_ids != self._detected_xbus_ids:
-                        self._detected_xbus_ids = seen_ids
+                    if seen_serials != self._detected_xbus_serials:
+                        self._detected_xbus_serials = seen_serials
                         changed = True
 
                     if changed:
