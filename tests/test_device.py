@@ -42,7 +42,7 @@ def test_panel_area_door_and_xbus_device_info() -> None:
     coordinator = _coordinator()
     coordinator.data.areas[1] = AreaState(area_id=1, name="Logis")
     coordinator.data.doors[2] = DoorState(door_id=2, name="Garage", area_id=1)
-    coordinator.data.xbus_devices[3] = XBusDeviceState(
+    coordinator.data.xbus_devices["XB3"] = XBusDeviceState(
         device_id=3,
         name="Extension",
         device_type=2,
@@ -60,7 +60,7 @@ def test_panel_area_door_and_xbus_device_info() -> None:
         panel = build_panel_device_info(coordinator)
         area = build_area_device_info(coordinator, 1)
         door = build_door_device_info(coordinator, 2)
-        xbus = build_xbus_device_info(coordinator, 3)
+        xbus = build_xbus_device_info(coordinator, "XB3")
 
     assert panel["model"] == "SPC4300"
     assert area["name"] == "Logis"
@@ -80,7 +80,7 @@ def test_device_info_fallback_names_and_no_parent_helper() -> None:
     coordinator.data.panel.spc_type = None
     coordinator.data.areas[5] = AreaState(area_id=5)
     coordinator.data.doors[6] = DoorState(door_id=6, zone_name="Zone porte")
-    coordinator.data.xbus_devices[7] = XBusDeviceState(device_id=7)
+    coordinator.data.xbus_devices["XB7"] = XBusDeviceState(device_id=7, serial_number="XB7")
 
     with patch(
         "custom_components.spc_flexc.flexc.device.dr.async_get_device_id_by_identifier",
@@ -90,7 +90,7 @@ def test_device_info_fallback_names_and_no_parent_helper() -> None:
         panel = build_panel_device_info(coordinator)
         area = build_area_device_info(coordinator, 5)
         door = build_door_device_info(coordinator, 6)
-        xbus = build_xbus_device_info(coordinator, 7)
+        xbus = build_xbus_device_info(coordinator, "XB7")
 
     assert panel["name"] == "SPC"
     assert panel["model"] == "SPC"
