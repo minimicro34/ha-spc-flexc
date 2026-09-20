@@ -312,7 +312,7 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
     coordinator = _coordinator()
     coordinator.data.zones[1] = ZoneState(zone_id=1)
     coordinator.data.ats[1] = AtsState(ats_id=1, atps={1: AtpState(atp_id=1)})
-    coordinator.data.xbus_devices["XB1"] = XBusDeviceState(device_id=1)
+    coordinator.data.xbus_devices["XB1"] = XBusDeviceState(device_id=1, serial_number="XB1")
     entry = MagicMock()
     entry.runtime_data = coordinator
     callbacks: list[object] = []
