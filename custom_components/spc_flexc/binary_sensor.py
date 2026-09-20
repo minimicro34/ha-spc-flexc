@@ -21,6 +21,7 @@ from .flexc.device import (
     build_area_device_info,
     build_panel_device_info,
     build_xbus_device_info,
+    migrate_xbus_registry_identity,
 )
 
 ZONE_ACTIVITY_PULSE_SECONDS = 2.0
@@ -351,6 +352,9 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
                 if key in known_xbus_entities:
                     continue
                 known_xbus_entities.add(key)
+                migrate_xbus_registry_identity(
+                    coordinator, serial_number, "binary_sensor", state_key
+                )
                 entities.append(
                     SpcXBusDeviceBinarySensor(coordinator, serial_number, state_key)
                 )
