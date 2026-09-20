@@ -272,7 +272,7 @@ def test_xbus_mask_and_tamper_sensors() -> None:
     assert _xbus_mask_state("0002", 2) is True
 
     coordinator = _coordinator()
-    coordinator.data.xbus_devices[1] = XBusDeviceState(
+    coordinator.data.xbus_devices["XB1"] = XBusDeviceState(
         device_id=1,
         name="CLA",
         serial_number="XB1",
@@ -284,9 +284,9 @@ def test_xbus_mask_and_tamper_sensors() -> None:
         inhibit_raw="0002",
         isolate_raw="0000",
     )
-    fault = SpcXBusDeviceBinarySensor(coordinator, 1, "tamper_fault")
-    inhibited = SpcXBusDeviceBinarySensor(coordinator, 1, "tamper_inhibited")
-    isolated = SpcXBusDeviceBinarySensor(coordinator, 1, "tamper_isolated")
+    fault = SpcXBusDeviceBinarySensor(coordinator, "XB1", "tamper_fault")
+    inhibited = SpcXBusDeviceBinarySensor(coordinator, "XB1", "tamper_inhibited")
+    isolated = SpcXBusDeviceBinarySensor(coordinator, "XB1", "tamper_isolated")
 
     assert fault.is_on is True
     assert inhibited.is_on is True
@@ -296,12 +296,12 @@ def test_xbus_mask_and_tamper_sensors() -> None:
     assert attrs["input_raw"] == "0002"
     assert attrs["tamper_inhibited"] is True
 
-    coordinator.data.xbus_devices[1].tamper_fault = False
-    coordinator.data.xbus_devices[1].tamper_isolated = True
+    coordinator.data.xbus_devices["XB1"].tamper_fault = False
+    coordinator.data.xbus_devices["XB1"].tamper_isolated = True
     assert fault.is_on is False
     assert isolated.is_on is True
 
-    del coordinator.data.xbus_devices[1]
+    del coordinator.data.xbus_devices["XB1"]
     assert fault.is_on is None
     assert fault.available is False
     assert fault.extra_state_attributes == {}
@@ -312,7 +312,7 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
     coordinator = _coordinator()
     coordinator.data.zones[1] = ZoneState(zone_id=1)
     coordinator.data.ats[1] = AtsState(ats_id=1, atps={1: AtpState(atp_id=1)})
-    coordinator.data.xbus_devices[1] = XBusDeviceState(device_id=1)
+    coordinator.data.xbus_devices["XB1"] = XBusDeviceState(device_id=1)
     entry = MagicMock()
     entry.runtime_data = coordinator
     callbacks: list[object] = []
@@ -333,6 +333,6 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
 
     coordinator.data.zones[2] = ZoneState(zone_id=2)
     coordinator.data.ats[1].atps[2] = AtpState(atp_id=2)
-    coordinator.data.xbus_devices[2] = XBusDeviceState(device_id=2)
+    coordinator.data.xbus_devices["XB2"] = XBusDeviceState(device_id=2, serial_number="XB2")
     callbacks[0]()
     assert [len(batch) for batch in batches[4:]] == [1, 1, 3]
