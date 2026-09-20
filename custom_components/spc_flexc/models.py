@@ -268,4 +268,6 @@ class SpcState:
     doors: dict[int, DoorState] = field(default_factory=dict)
     mapping_gates: dict[int, MappingGateState] = field(default_factory=dict)
     ats: dict[int, AtsState] = field(default_factory=dict)
-    # ENETNODE.ID is only unique within its X-BUS branch.  The hardware serial\n    # number (SN) is stable across branches and is therefore the inventory key.\n    xbus_devices: dict[str, XBusDeviceState] = field(default_factory=dict)
+    # ENETNODE.ID is not globally unique on observed multi-branch panels.
+    # The hardware serial number (SN) is therefore used as the inventory key.
+    xbus_devices: dict[str, XBusDeviceState] = field(default_factory=dict)
