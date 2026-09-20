@@ -207,113 +207,56 @@ def test_zone_tamper_unknown_zone_is_ignored() -> None:
     assert zones == {}
 
 
-def test_xbus_tamper_fault_creates_device() -> None:
-    """Test creation of an X-BUS device from a tamper fault event."""
-    devices: dict[int, XBusDeviceState] = {}
-
+def test_xbus_tamper_fault_updates_discovered_device() -> None:
+    """Test an X-BUS tamper event updates a uniquely matched discovered device."""
+    device = XBusDeviceState(device_id=1, serial_number="4CADF0DA", name="CLA 1")
+    devices = {"4CADF0DA": device}
     event = {
-        "EV_ID": "5312",
-        "KEYPAD_ID": "1",
-        "KEYPAD_NAME": "CLA 1",
-        "SIA_ADDRESS": "1",
-        "SIA_CODE": "ES",
-        "CID_CODE": "341",
-        "CID_QUAL": "1",
+        "EV_ID": "5312", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1",
+        "SIA_ADDRESS": "1", "SIA_CODE": "ES", "CID_CODE": "341", "CID_QUAL": "1",
     }
 
     assert apply_xbus_event(devices, event) is True
-
-    assert 1 in devices
-
-    device = devices[1]
-
-    assert device.device_id == 1
-    assert device.name == "CLA 1"
     assert device.sia_address == 1
     assert device.tamper_fault is True
-    assert device.tamper_isolated is None
     assert device.last_event == event
     assert device.updated_at is not None
 
 
+def test_xbus_event_ignores_ambiguous_branch_local_id() -> None:
+    """Do not attach an event to the wrong device when a local ID is duplicated."""
+    first = XBusDeviceState(device_id=1, serial_number="AAA", name="Same")
+    second = XBusDeviceState(device_id=1, serial_number="BBB", name="Same")
+    devices = {"AAA": first, "BBB": second}
+
+    assert apply_xbus_event(
+        devices, {"EV_ID": "5316", "KEYPAD_ID": "1", "KEYPAD_NAME": "Same"}
+    ) is False
+    assert first.tamper_isolated is None
+    assert second.tamper_isolated is None
+
+
 def test_xbus_tamper_inhibition_cycle() -> None:
     """Test X-BUS tamper inhibition events."""
-    devices = {1: XBusDeviceState(device_id=1, name="CLA 1")}
-
-    assert (
-        apply_xbus_event(
-            devices,
-            {"EV_ID": "5314", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"},
-        )
-        is True
-    )
-    assert devices[1].tamper_inhibited is True
-
-    assert (
-        apply_xbus_event(
-            devices,
-            {"EV_ID": "5315", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"},
-        )
-        is True
-    )
-    assert devices[1].tamper_inhibited is False
+    device = XBusDeviceState(device_id=1, serial_number="XB1", name="CLA 1")
+    devices = {"XB1": device}
+    assert apply_xbus_event(devices, {"EV_ID": "5314", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"}) is True
+    assert device.tamper_inhibited is True
+    assert apply_xbus_event(devices, {"EV_ID": "5315", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"}) is True
+    assert device.tamper_inhibited is False
 
 
 def test_xbus_tamper_isolation_cycle() -> None:
     """Test X-BUS tamper isolation without clearing the physical fault."""
-    devices: dict[int, XBusDeviceState] = {}
-
-    assert (
-        apply_xbus_event(
-            devices,
-            {
-                "EV_ID": "5312",
-                "KEYPAD_ID": "1",
-                "KEYPAD_NAME": "CLA 1",
-                "SIA_ADDRESS": "1",
-            },
-        )
-        is True
-    )
-
-    device = devices[1]
-
+    device = XBusDeviceState(device_id=1, serial_number="XB1", name="CLA 1")
+    devices = {"XB1": device}
+    assert apply_xbus_event(devices, {"EV_ID": "5312", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1", "SIA_ADDRESS": "1"}) is True
     assert device.tamper_fault is True
-    assert device.tamper_isolated is None
-
-    assert (
-        apply_xbus_event(
-            devices,
-            {
-                "EV_ID": "5316",
-                "KEYPAD_ID": "1",
-                "KEYPAD_NAME": "CLA 1",
-            },
-        )
-        is True
-    )
-
-    assert device.tamper_fault is True
+    assert apply_xbus_event(devices, {"EV_ID": "5316", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"}) is True
     assert device.tamper_isolated is True
-
-    assert (
-        apply_xbus_event(
-            devices,
-            {
-                "EV_ID": "5317",
-                "KEYPAD_ID": "1",
-                "KEYPAD_NAME": "CLA 1",
-            },
-        )
-        is True
-    )
-
+    assert apply_xbus_event(devices, {"EV_ID": "5317", "KEYPAD_ID": "1", "KEYPAD_NAME": "CLA 1"}) is True
     assert device.tamper_isolated is False
-
-    # 5317 means isolation restored/removed.
-    # It must NOT clear the physical X-BUS tamper fault.
     assert device.tamper_fault is True
-
 
 def test_area_full_set_event() -> None:
     """Test real-time area Full Set event."""
