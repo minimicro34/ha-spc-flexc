@@ -247,22 +247,22 @@ class SpcXBusDeviceBinarySensor(
     _attr_has_entity_name = True
 
     def __init__(
-        self, coordinator: SpcFlexCCoordinator, device_id: int, state_key: str
+        self, coordinator: SpcFlexCCoordinator, serial_number: str, state_key: str
     ) -> None:
         super().__init__(coordinator)
-        self.device_id = device_id
+        self.serial_number = serial_number
         self.state_key = state_key
         self._attr_translation_key = f"xbus_{state_key}"
         if state_key == "tamper_fault":
             self._attr_device_class = BinarySensorDeviceClass.PROBLEM
         self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_xbus_{device_id}_{state_key}"
+            f"{coordinator.entry.entry_id}_xbus_{serial_number}_{state_key}"
         )
-        self._attr_device_info = build_xbus_device_info(coordinator, device_id)
+        self._attr_device_info = build_xbus_device_info(coordinator, serial_number)
 
     @property
     def is_on(self) -> bool | None:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         if device is None:
             return None
         event_state = getattr(device, self.state_key)
@@ -278,11 +278,11 @@ class SpcXBusDeviceBinarySensor(
 
     @property
     def available(self) -> bool:
-        return self.device_id in self.coordinator.data.xbus_devices
+        return self.serial_number in self.coordinator.data.xbus_devices
 
     @property
     def extra_state_attributes(self) -> dict:
-        device = self.coordinator.data.xbus_devices.get(self.device_id)
+        device = self.coordinator.data.xbus_devices.get(self.serial_number)
         if device is None:
             return {}
         return {
@@ -319,7 +319,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
     )
     known_atps: set[tuple[int, int]] = set()
     known_zones: set[int] = set()
-    known_xbus_entities: set[tuple[int, str]] = set()
+    known_xbus_entities: set[tuple[str, str]] = set()
 
     def add_zone_entities() -> None:
         entities: list[BinarySensorEntity] = []
@@ -345,14 +345,14 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
 
     def add_xbus_entities() -> None:
         entities: list[BinarySensorEntity] = []
-        for device_id in coordinator.data.xbus_devices:
+        for serial_number in coordinator.data.xbus_devices:
             for state_key in ("tamper_fault", "tamper_inhibited", "tamper_isolated"):
-                key = (device_id, state_key)
+                key = (serial_number, state_key)
                 if key in known_xbus_entities:
                     continue
                 known_xbus_entities.add(key)
                 entities.append(
-                    SpcXBusDeviceBinarySensor(coordinator, device_id, state_key)
+                    SpcXBusDeviceBinarySensor(coordinator, serial_number, state_key)
                 )
         if entities:
             async_add_entities(entities)
