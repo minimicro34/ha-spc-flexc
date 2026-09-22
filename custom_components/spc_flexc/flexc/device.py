@@ -165,8 +165,12 @@ def migrate_xbus_registry_identity(
     # entities/devices created immediately afterwards are unambiguous.
     if entity_id is not None:
         entity_registry.async_remove(entity_id)
-    if old_device is not None:
-        device_registry.async_remove_device(old_device.id)
+    # Do not remove the legacy device here. This helper runs once per entity
+    # while Home Assistant is creating the new serial-based devices. Removing an
+    # ambiguous legacy device during platform setup can detach entities that are
+    # still being migrated or recreated. The serial-based DeviceInfo identifiers
+    # will create the unambiguous devices without mutating that shared legacy
+    # device.
 
 
 def _set_parent_device(
