@@ -139,7 +139,7 @@ def test_migrate_unambiguous_xbus_registry_identity() -> None:
     device_registry.async_remove_device.assert_not_called()
 
 
-def test_remove_ambiguous_legacy_xbus_registry_identity() -> None:
+def test_remove_ambiguous_legacy_xbus_entity_identity_without_device_removal() -> None:
     coordinator = _coordinator()
     coordinator.data.xbus_devices["AAA"] = XBusDeviceState(
         device_id=1, serial_number="AAA"
@@ -169,4 +169,46 @@ def test_remove_ambiguous_legacy_xbus_registry_identity() -> None:
     entity_registry.async_update_entity.assert_not_called()
     entity_registry.async_remove.assert_called_once_with("sensor.legacy_xbus")
     device_registry.async_update_device.assert_not_called()
-    device_registry.async_remove_device.assert_called_once_with("legacy-device")
+    device_registry.async_remove_device.assert_not_called()
+
+
+def test_ambiguous_xbus_devices_keep_distinct_serial_device_info() -> None:
+    coordinator = _coordinator()
+    coordinator.data.xbus_devices["EXPANDER"] = XBusDeviceState(
+        device_id=1,
+        name="SPCE650 ID 1",
+        device_type=2,
+        serial_number="EXPANDER",
+    )
+    coordinator.data.xbus_devices["KEYPAD"] = XBusDeviceState(
+        device_id=1,
+        name="Maison",
+        device_type=7,
+        serial_number="KEYPAD",
+    )
+    coordinator.data.xbus_devices["DOOR"] = XBusDeviceState(
+        device_id=1,
+        name="SPCA210 ID 1",
+        device_type=6,
+        serial_number="DOOR",
+    )
+
+    with patch(
+        "custom_components.spc_flexc.flexc.device.dr.async_get_device_id_by_identifier",
+        return_value="panel-device",
+        create=True,
+    ):
+        expander = build_xbus_device_info(coordinator, "EXPANDER")
+        keypad = build_xbus_device_info(coordinator, "KEYPAD")
+        door = build_xbus_device_info(coordinator, "DOOR")
+
+    assert expander["identifiers"] == {("spc_flexc", "SERIAL_xbus_EXPANDER")}
+    assert keypad["identifiers"] == {("spc_flexc", "SERIAL_xbus_KEYPAD")}
+    assert door["identifiers"] == {("spc_flexc", "SERIAL_xbus_DOOR")}
+    assert len(
+        {
+            next(iter(expander["identifiers"])),
+            next(iter(keypad["identifiers"])),
+            next(iter(door["identifiers"])),
+        }
+    ) == 3
