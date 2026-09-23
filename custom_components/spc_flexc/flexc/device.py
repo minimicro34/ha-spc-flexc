@@ -149,7 +149,9 @@ def migrate_xbus_registry_identity(
     old_identifier = (DOMAIN, f"{panel_serial}_xbus_{device.device_id}")
     new_identifier = (DOMAIN, f"{panel_serial}_xbus_{serial_number}")
     device_registry = dr.async_get(coordinator.hass)
-    old_device = device_registry.async_get_device_by_identifier(old_identifier)
+    old_device = device_registry.async_get_device_by_identifier(
+        old_identifier, entry_id
+    )
 
     if len(same_id) == 1:
         if entity_id is not None:
