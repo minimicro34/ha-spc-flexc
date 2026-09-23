@@ -131,6 +131,14 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                     _LOGGER.exception(
                         "Unexpected error while polling SPC Mapping Gates; polling will continue"
                     )
+        except asyncio.CancelledError:
+            _LOGGER.warning(
+                "SPC Mapping Gate polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                self.entry.state,
+                self.hass.state,
+                self._discovery_requested,
+            )
+            raise
         finally:
             _LOGGER.debug("SPC Mapping Gate polling stopped")
             current_task = asyncio.current_task()
