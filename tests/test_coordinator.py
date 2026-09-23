@@ -55,6 +55,7 @@ def _coordinator_stub() -> MagicMock:
     coordinator._discovery_task = None
     coordinator._zone_poll_task = None
     coordinator._xbus_poll_task = None
+    coordinator._last_area_diagnostic_log = 0.0
     coordinator.client.async_ensure_connected = AsyncMock()
     return coordinator
 
