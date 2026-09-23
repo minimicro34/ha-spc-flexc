@@ -296,6 +296,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
         self._xbus_poll_task: asyncio.Task[None] | None = None
+        self._last_area_diagnostic_log = 0.0
 
     async def _async_update_data(self) -> SpcState:
         try:
@@ -341,9 +342,30 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         lambda: self.client.async_get_area_status(area_ids),
                         description="reading area status",
                     )
+                    area_modes: dict[int, int | None] = {}
                     for raw_area in raw_areas:
                         area = _area_state_from_status(raw_area, timezone)
+                        previous = self.state.areas.get(area.area_id)
+                        area_modes[area.area_id] = area.mode
+                        if previous is not None and previous.mode != area.mode:
+                            _LOGGER.warning(
+                                "SPC area reconciliation changed mode: area_id=%d name=%r %s -> %s",
+                                area.area_id,
+                                area.name,
+                                previous.mode,
+                                area.mode,
+                            )
                         self.state.areas[area.area_id] = area
+
+                    now = asyncio.get_running_loop().time()
+                    if now - self._last_area_diagnostic_log >= 600.0:
+                        _LOGGER.warning(
+                            "SPC area reconciliation diagnostic: modes=%s entry_state=%s hass_state=%s",
+                            area_modes,
+                            self.entry.state,
+                            self.hass.state,
+                        )
+                        self._last_area_diagnostic_log = now
             if self._discovery_requested and not self._discovery_complete:
                 self._schedule_discovery()
             return self.state
@@ -537,6 +559,14 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     _LOGGER.exception(
                         "Unexpected error while polling SPC zones; polling will continue"
                     )
+        except asyncio.CancelledError:
+            _LOGGER.warning(
+                "SPC zone polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                self.entry.state,
+                self.hass.state,
+                self._discovery_requested,
+            )
+            raise
         finally:
             _LOGGER.debug("SPC zone polling stopped")
             current_task = asyncio.current_task()
@@ -616,6 +646,14 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     _LOGGER.exception(
                         "Unexpected error while polling SPC X-BUS; polling will continue"
                     )
+        except asyncio.CancelledError:
+            _LOGGER.warning(
+                "SPC X-BUS polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                self.entry.state,
+                self.hass.state,
+                self._discovery_requested,
+            )
+            raise
         finally:
             _LOGGER.debug("SPC X-BUS polling stopped")
             current_task = asyncio.current_task()
