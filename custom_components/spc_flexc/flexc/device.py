@@ -149,7 +149,10 @@ def migrate_xbus_registry_identity(
     old_identifier = (DOMAIN, f"{panel_serial}_xbus_{device.device_id}")
     new_identifier = (DOMAIN, f"{panel_serial}_xbus_{serial_number}")
     device_registry = dr.async_get(coordinator.hass)
-    old_device = device_registry.async_get_device_by_identifier(
+    # The current Home Assistant DeviceRegistry API provides this helper, but
+    # older pytest-homeassistant-custom-component type information may not yet
+    # expose it to mypy.
+    old_device = device_registry.async_get_device_by_identifier(  # type: ignore[attr-defined]
         old_identifier, entry_id
     )
 
