@@ -205,10 +205,13 @@ def test_ambiguous_xbus_devices_keep_distinct_serial_device_info() -> None:
     assert expander["identifiers"] == {("spc_flexc", "SERIAL_xbus_EXPANDER")}
     assert keypad["identifiers"] == {("spc_flexc", "SERIAL_xbus_KEYPAD")}
     assert door["identifiers"] == {("spc_flexc", "SERIAL_xbus_DOOR")}
-    assert len(
-        {
-            next(iter(expander["identifiers"])),
-            next(iter(keypad["identifiers"])),
-            next(iter(door["identifiers"])),
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                next(iter(expander["identifiers"])),
+                next(iter(keypad["identifiers"])),
+                next(iter(door["identifiers"])),
+            }
+        )
+        == 3
+    )
