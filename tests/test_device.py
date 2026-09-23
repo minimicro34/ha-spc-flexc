@@ -113,7 +113,7 @@ def test_migrate_unambiguous_xbus_registry_identity() -> None:
     device_registry = MagicMock()
     old_device = MagicMock()
     old_device.id = "legacy-device"
-    device_registry.async_get_device.return_value = old_device
+    device_registry.async_get_device_by_identifier.return_value = old_device
 
     with (
         patch(
@@ -152,7 +152,7 @@ def test_remove_ambiguous_legacy_xbus_entity_identity_without_device_removal() -
     device_registry = MagicMock()
     old_device = MagicMock()
     old_device.id = "legacy-device"
-    device_registry.async_get_device.return_value = old_device
+    device_registry.async_get_device_by_identifier.return_value = old_device
 
     with (
         patch(
