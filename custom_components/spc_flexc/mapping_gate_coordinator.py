@@ -199,7 +199,9 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                     (
                         "UNKNOWN"
                         if refreshed is None or refreshed.state is None
-                        else "ON" if refreshed.state else "OFF"
+                        else "ON"
+                        if refreshed.state
+                        else "OFF"
                     ),
                 )
 
