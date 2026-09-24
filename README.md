@@ -27,7 +27,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 > [!IMPORTANT]
 > SPC FlexC can change the state of your alarm system.
 >
-> State-changing commands are deliberately never automatically retried after an uncertain communication failure. The integration also checks SPC-reported capabilities before sending supported alarm, inhibition and isolation commands.
+> State-changing commands are never retried blindly after an uncertain communication failure. A bounded retry is only allowed when a fresh SPC status read can first prove that the requested effect was not applied; otherwise the outcome remains uncertain and the command is not replayed. The integration also checks SPC-reported capabilities before sending supported alarm, inhibition and isolation commands.
 
 ---
 
@@ -71,6 +71,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - ⚡ Processing of unsolicited FlexC events
 - 📶 FlexC ATS / ATP communication monitoring
 - 🔁 Bounded recovery/retry handling for read-only status requests
+- ♻️ Command-timeout recovery through session invalidation, fresh SPC reconnect/handshake/POLL synchronization and a new valid command context
 
 ### Alarm
 
@@ -351,6 +352,10 @@ The integration:
 4. refreshes Mapping Gate status;
 5. confirms the resulting state reported by SPC.
 
+If a Mapping Gate control times out, the timed-out FlexC session is invalidated. The integration waits for the SPC to reconnect and establish a fresh handshake/POLL command context before reading Mapping Gate status again.
+
+If the requested state is already reported, the timed-out command is treated as applied and is not repeated. If the fresh status explicitly proves that the requested state was not applied, the control is retried once and its resulting state is verified. If the result cannot be determined unambiguously, the command is not replayed.
+
 A command is rejected when the Mapping Gate is unknown or the requested state cannot be confirmed.
 
 ---
@@ -416,7 +421,11 @@ Do not expose the FlexC listener directly to the Internet.
 
 ### Global Full Set is not atomic
 
-Global Full Set coordinates individual area operations. All areas are prechecked first, but a later communication failure or panel state change can still result in an incomplete operation. State-changing commands are never automatically retried after an uncertain result.
+Global Full Set coordinates individual area operations. All areas are prechecked first, but a later communication failure or panel state change can still result in an incomplete operation. State-changing commands are not blindly retried after an uncertain result. Automatic recovery is only used for operations whose resulting SPC state can be verified unambiguously.
+
+### Door-control timeout recovery
+
+After a door-control timeout, SPC FlexC recovers the FlexC session and refreshes the door status, but it does not automatically replay the door action. The effects of the supported door actions have not yet been validated sufficiently to make such a retry unambiguous and safe.
 
 ### Hardware-dependent diagnostics
 
