@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.spc_flexc.flexc.connection import FlexCCommandTimeout
 from custom_components.spc_flexc.models import DoorState, SpcState, ZoneState
 from custom_components.spc_flexc.zone_control_coordinator import (
     SpcFlexCZoneControlCoordinator,
@@ -346,6 +347,53 @@ async def test_control_door_rejects_bad_refresh() -> None:
         pytest.raises(ValueError, match="returned door 2"),
     ):
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 5)
+
+
+@pytest.mark.asyncio
+async def test_control_door_recovers_session_but_does_not_retry_unknown_effect() -> None:
+    """Door controls recover transport but are never replayed without proven semantics."""
+    coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
+    coordinator.state = SpcState(doors={1: DoorState(door_id=1, name="Garage")})
+    coordinator.client = MagicMock()
+    coordinator.client.command_username = "user"
+    coordinator.client.command_password = "password"
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_recover_session = AsyncMock()
+    coordinator.client.async_send_flexml = AsyncMock(
+        side_effect=[FlexCCommandTimeout("timeout"), "status"]
+    )
+    coordinator._client_operation_lock = AsyncMockContextManager()
+    coordinator.async_set_updated_data = MagicMock()
+    coordinator._update_door_states = lambda raw: (
+        SpcFlexCZoneControlCoordinator._update_door_states(coordinator, raw)
+    )
+
+    with (
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_control_command",
+            return_value="control-cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch",
+            return_value="status-cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_status",
+            return_value=[{"DOOR_ID": "1", "STATUS": "1"}],
+        ),
+        pytest.raises(FlexCCommandTimeout),
+    ):
+        await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 8)
+
+    coordinator.client.async_recover_session.assert_awaited_once_with()
+    assert coordinator.client.async_send_flexml.await_count == 2
+    assert coordinator.client.async_send_flexml.await_args_list[0].args == (
+        "control-cmd",
+    )
+    assert coordinator.client.async_send_flexml.await_args_list[1].args == (
+        "status-cmd",
+    )
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 def _coordinator_with_zone(zone: ZoneState) -> MagicMock:
