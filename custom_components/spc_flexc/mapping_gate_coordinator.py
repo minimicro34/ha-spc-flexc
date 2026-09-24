@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import MG_POLL_INTERVAL, MG_POLL_PHASE
 from .coordinator import poll_delay_for_phase
-from .flexc.connection import FlexCError
+from .flexc.connection import FlexCCommandTimeout, FlexCError
 from .flexc.flexml import (
     FlexMLError,
     build_mg_control_command,
@@ -164,12 +164,73 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 self.client.command_username,
                 self.client.command_password,
             )
-            response = await self.client.async_send_flexml(command)
-            parse_mg_control(response, mg_id)
             status_command = build_mg_status_command(
                 self.client.command_username,
                 self.client.command_password,
             )
+
+            try:
+                response = await self.client.async_send_flexml(command)
+                parse_mg_control(response, mg_id)
+            except FlexCCommandTimeout:
+                _LOGGER.warning(
+                    "Mapping Gate %d control timed out; recovering FlexC session",
+                    mg_id,
+                )
+                await self.client.async_recover_session()
+                status_response = await async_retry_read_once(
+                    lambda: self.client.async_send_flexml(status_command),
+                    description=f"checking Mapping Gate {mg_id} after timeout",
+                )
+                raw_mapping_gates = parse_mg_status(status_response)
+                self._update_mapping_gate_states(raw_mapping_gates)
+                refreshed = self.state.mapping_gates.get(mg_id)
+
+                if refreshed is not None and refreshed.state is state:
+                    _LOGGER.info(
+                        "Mapping Gate %d status confirms requested state %s; "
+                        "timed-out command was already applied",
+                        mg_id,
+                        "ON" if state else "OFF",
+                    )
+                    self.async_set_updated_data(self.state)
+                    return
+
+                if refreshed is None or refreshed.state is None:
+                    _LOGGER.error(
+                        "Mapping Gate %d control outcome is unknown after timeout; "
+                        "command was not retried",
+                        mg_id,
+                    )
+                    raise
+
+                _LOGGER.warning(
+                    "Mapping Gate %d did not reach requested state %s after "
+                    "timeout; retrying control once",
+                    mg_id,
+                    "ON" if state else "OFF",
+                )
+                response = await self.client.async_send_flexml(command)
+                parse_mg_control(response, mg_id)
+                status_response = await async_retry_read_once(
+                    lambda: self.client.async_send_flexml(status_command),
+                    description=f"refreshing Mapping Gate {mg_id} after retry",
+                )
+                raw_mapping_gates = parse_mg_status(status_response)
+                self._update_mapping_gate_states(raw_mapping_gates)
+                refreshed = self.state.mapping_gates.get(mg_id)
+                if refreshed is None or refreshed.state is not state:
+                    raise ValueError(
+                        f"SPC Mapping Gate {mg_id} did not confirm the requested "
+                        "state after retry"
+                    )
+                _LOGGER.info(
+                    "Mapping Gate %d control recovered successfully after one retry",
+                    mg_id,
+                )
+                self.async_set_updated_data(self.state)
+                return
+
             status_response = await async_retry_read_once(
                 lambda: self.client.async_send_flexml(status_command),
                 description=f"refreshing Mapping Gate {mg_id} after control",
