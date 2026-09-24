@@ -390,6 +390,86 @@ async def test_set_mapping_gate_retries_once_when_recovered_status_proves_no_eff
 
 
 @pytest.mark.asyncio
+async def test_set_mapping_gate_recovers_verification_timeout_then_confirms() -> None:
+    """A verification timeout recovers the session without surfacing a false failure."""
+    coordinator = MagicMock()
+    coordinator.state = SpcState(
+        mapping_gates={1: MappingGateState(mg_id=1, state=False)}
+    )
+    coordinator._client_operation_lock = _AsyncLock()
+    coordinator.client.command_username = "HomeAssistant"
+    coordinator.client.command_password = "MyPassword"
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_recover_session = AsyncMock()
+    control_reply = (
+        '<FLEXML_REPLY VER="1.0"><REPLY_MG_CONTROL RESULT="0" CMD_RESULT="OK">'
+        '<MG_CONTROL MG_ID="1" RESULT="0" /></REPLY_MG_CONTROL></FLEXML_REPLY>'
+    )
+    status_on = (
+        '<FLEXML_REPLY VER="1.0"><REPLY_GET_MG_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<MG_STATUS MG_ID="1" STATE="1" /></REPLY_GET_MG_STATUS></FLEXML_REPLY>'
+    )
+    coordinator.client.async_send_flexml = AsyncMock(
+        side_effect=[control_reply, FlexCCommandTimeout("timeout"), status_on]
+    )
+    coordinator._update_mapping_gate_states = lambda raw: (
+        SpcFlexCMappingGateCoordinator._update_mapping_gate_states(coordinator, raw)
+    )
+    coordinator.async_set_updated_data = MagicMock()
+
+    await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(coordinator, 1, True)
+
+    coordinator.client.async_recover_session.assert_awaited_once_with()
+    assert coordinator.client.async_send_flexml.await_count == 3
+    assert coordinator.state.mapping_gates[1].state is True
+
+
+@pytest.mark.asyncio
+async def test_set_mapping_gate_retries_after_verification_timeout_if_still_off() -> None:
+    """After recovery, a proven opposite state permits one bounded control retry."""
+    coordinator = MagicMock()
+    coordinator.state = SpcState(
+        mapping_gates={1: MappingGateState(mg_id=1, state=False)}
+    )
+    coordinator._client_operation_lock = _AsyncLock()
+    coordinator.client.command_username = "HomeAssistant"
+    coordinator.client.command_password = "MyPassword"
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_recover_session = AsyncMock()
+    control_reply = (
+        '<FLEXML_REPLY VER="1.0"><REPLY_MG_CONTROL RESULT="0" CMD_RESULT="OK">'
+        '<MG_CONTROL MG_ID="1" RESULT="0" /></REPLY_MG_CONTROL></FLEXML_REPLY>'
+    )
+    status_off = (
+        '<FLEXML_REPLY VER="1.0"><REPLY_GET_MG_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<MG_STATUS MG_ID="1" STATE="0" /></REPLY_GET_MG_STATUS></FLEXML_REPLY>'
+    )
+    status_on = (
+        '<FLEXML_REPLY VER="1.0"><REPLY_GET_MG_STATUS RESULT="0" CMD_RESULT="OK">'
+        '<MG_STATUS MG_ID="1" STATE="1" /></REPLY_GET_MG_STATUS></FLEXML_REPLY>'
+    )
+    coordinator.client.async_send_flexml = AsyncMock(
+        side_effect=[
+            control_reply,
+            FlexCCommandTimeout("timeout"),
+            status_off,
+            control_reply,
+            status_on,
+        ]
+    )
+    coordinator._update_mapping_gate_states = lambda raw: (
+        SpcFlexCMappingGateCoordinator._update_mapping_gate_states(coordinator, raw)
+    )
+    coordinator.async_set_updated_data = MagicMock()
+
+    await SpcFlexCMappingGateCoordinator.async_set_mapping_gate(coordinator, 1, True)
+
+    coordinator.client.async_recover_session.assert_awaited_once_with()
+    assert coordinator.client.async_send_flexml.await_count == 5
+    assert coordinator.state.mapping_gates[1].state is True
+
+
+@pytest.mark.asyncio
 async def test_shutdown_cancels_mapping_gate_polling() -> None:
     """Shutdown cancels Mapping Gate polling before delegating to the base coordinator."""
     coordinator = object.__new__(SpcFlexCMappingGateCoordinator)
