@@ -123,7 +123,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         return changed
 
     async def async_control_door(self, door_id: int, action: int) -> None:
-        """Send one SPCLink-proven door action and immediately refresh status."""
+        """Send one SPCLink-proven door action and refresh status after recovery."""
         if door_id not in self.state.doors:
             raise ValueError(f"Unknown SPC door {door_id}")
         if action not in DOOR_ACTIONS:
@@ -140,46 +140,69 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             status_command = build_door_status_batch(
                 [door_id], self.client.command_username, self.client.command_password
             )
+            _LOGGER.info("Door %d control requested: action=%d", door_id, action)
+            control_timed_out = False
             try:
                 response = await self.client.async_send_flexml(command)
                 parse_door_control(response)
+                _LOGGER.info(
+                    "Door %d control accepted by SPC: action=%d", door_id, action
+                )
             except FlexCCommandTimeout:
+                control_timed_out = True
                 _LOGGER.warning(
-                    "Door %d control timed out; recovering FlexC session",
+                    "Door %d control timed out; recovering FlexC session "
+                    "(action=%d)",
                     door_id,
+                    action,
                 )
                 await self.client.async_recover_session()
+
+            if control_timed_out:
                 status_response = await async_retry_read_once(
                     lambda: self.client.async_send_flexml(status_command),
                     description=f"checking door {door_id} after timeout",
                 )
-                raw_doors = parse_door_status(status_response)
-                if raw_doors and int(raw_doors[0]["DOOR_ID"]) == door_id:
-                    self._update_door_states(raw_doors)
-                    self.async_set_updated_data(self.state)
-                _LOGGER.error(
-                    "Door %d control outcome is unknown after timeout; action %d "
-                    "was not retried because SPC door mode semantics are not "
-                    "validated for safe recovery",
+            else:
+                try:
+                    status_response = await async_retry_read_once(
+                        lambda: self.client.async_send_flexml(status_command),
+                        description=f"refreshing door {door_id} after control",
+                    )
+                except FlexCCommandTimeout:
+                    _LOGGER.warning(
+                        "Door %d verification timed out after SPC accepted action "
+                        "%d; recovering FlexC session",
+                        door_id,
+                        action,
+                    )
+                    await self.client.async_recover_session()
+                    status_response = await async_retry_read_once(
+                        lambda: self.client.async_send_flexml(status_command),
+                        description=f"checking door {door_id} after verification timeout",
+                    )
+
+            raw_doors = parse_door_status(status_response)
+            if not raw_doors:
+                raise ValueError(f"SPC door {door_id} returned no status after control")
+            if int(raw_doors[0]["DOOR_ID"]) != door_id:
+                raise ValueError(
+                    f"SPC returned door {raw_doors[0].get('DOOR_ID')} while refreshing door {door_id}"
+                )
+            self._update_door_states(raw_doors)
+            self.async_set_updated_data(self.state)
+            if control_timed_out:
+                _LOGGER.warning(
+                    "Door %d status refreshed after control timeout; action %d was "
+                    "not retried because SPC door mode semantics are not validated "
+                    "for safe recovery",
                     door_id,
                     action,
                 )
-                raise
-
-            status_response = await async_retry_read_once(
-                lambda: self.client.async_send_flexml(status_command),
-                description=f"refreshing door {door_id} after control",
+                return
+            _LOGGER.info(
+                "Door %d status refreshed after action %d", door_id, action
             )
-
-        raw_doors = parse_door_status(status_response)
-        if not raw_doors:
-            raise ValueError(f"SPC door {door_id} returned no status after control")
-        if int(raw_doors[0]["DOOR_ID"]) != door_id:
-            raise ValueError(
-                f"SPC returned door {raw_doors[0].get('DOOR_ID')} while refreshing door {door_id}"
-            )
-        self._update_door_states(raw_doors)
-        self.async_set_updated_data(self.state)
 
     def _update_zone_from_control_status(
         self, zone_id: int, raw_zone: dict[str, str]
