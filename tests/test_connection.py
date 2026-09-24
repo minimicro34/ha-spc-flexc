@@ -361,6 +361,27 @@ def test_build_outbound_data_contains_application() -> None:
 
 
 @pytest.mark.asyncio
+async def test_recover_session_waits_for_fresh_command_context() -> None:
+    """Recovery requires both a connection and a fresh POLL command context."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._command_context = None
+    client._context_event.clear()
+
+    async def establish_context() -> None:
+        await asyncio.sleep(0)
+        client._command_context = _message()
+        client._context_event.set()
+
+    task = asyncio.create_task(establish_context())
+    await client.async_recover_session()
+    await task
+
+    client.async_ensure_connected.assert_awaited_once_with()
+    assert client._command_context is not None
+
+
+@pytest.mark.asyncio
 async def test_send_wire_requires_active_connection_and_writes_frame() -> None:
     """Wire writes fail without a session and drain an active writer."""
     client = _client()
