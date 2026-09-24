@@ -82,6 +82,10 @@ class FlexCCommandError(FlexCError):
     """SPC rejected a FlexC command."""
 
 
+class FlexCCommandTimeout(FlexCCommandError):
+    """A FLEXML command did not receive a reply before the timeout."""
+
+
 def _be16(value: bytes) -> int:
     return int.from_bytes(value, "big")
 
@@ -155,6 +159,7 @@ class FlexCClient:
         # for another POLL before every FLEXML request.
         self._command_context: dict[str, Any] | None = None
         self._context_event = asyncio.Event()
+        self._recovery_started_at: float | None = None
 
     async def async_ensure_connected(self) -> None:
         """Ensure that the SPC has established a FlexC session."""
@@ -590,6 +595,17 @@ class FlexCClient:
                 self._rct_sequence = int(message["rct_sequence"])
                 self._context_event.set()
 
+                if self._recovery_started_at is not None:
+                    elapsed = (
+                        asyncio.get_running_loop().time() - self._recovery_started_at
+                    )
+                    self._recovery_started_at = None
+                    _LOGGER.info(
+                        "FlexC session restored after %.1fs; fresh POLL received "
+                        "and command context is valid",
+                        elapsed,
+                    )
+
             poll_waiter = self._poll_waiter
 
             if poll_waiter is not None and not poll_waiter.done():
@@ -804,6 +820,12 @@ class FlexCClient:
                 # handshake/POLL synchronization point.
                 self._command_context = None
                 self._context_event.clear()
+                self._recovery_started_at = asyncio.get_running_loop().time()
+                _LOGGER.warning(
+                    "FlexC command timed out after %.0fs; invalidating session "
+                    "and waiting for a fresh handshake/POLL",
+                    COMMAND_TIMEOUT,
+                )
                 self.connected = False
                 self._connected_event.clear()
 
@@ -819,7 +841,7 @@ class FlexCClient:
                     except (ConnectionError, OSError):
                         pass
 
-                raise FlexCCommandError(
+                raise FlexCCommandTimeout(
                     "Timeout waiting for FlexC FLEXML reply"
                 ) from err
 
@@ -834,6 +856,27 @@ class FlexCClient:
 
                 self._response_buffer = bytearray()
                 self._response_length = None
+
+    async def async_recover_session(self) -> None:
+        """Wait until a timed-out FlexC session has a fresh command context."""
+        await self.async_ensure_connected()
+
+        if self._command_context is not None:
+            return
+
+        try:
+            async with asyncio.timeout(CONNECT_TIMEOUT):
+                await self._context_event.wait()
+        except TimeoutError as err:
+            raise FlexCConnectionError(
+                "FlexC reconnected but no fresh POLL established a command "
+                f"context within {CONNECT_TIMEOUT:.0f}s"
+            ) from err
+
+        if self._command_context is None:
+            raise FlexCConnectionError(
+                "FlexC recovery completed without a valid command context"
+            )
 
     async def async_get_panel_summary(
         self,
