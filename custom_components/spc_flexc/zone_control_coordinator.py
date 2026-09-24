@@ -151,8 +151,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             except FlexCCommandTimeout:
                 control_timed_out = True
                 _LOGGER.warning(
-                    "Door %d control timed out; recovering FlexC session "
-                    "(action=%d)",
+                    "Door %d control timed out; recovering FlexC session (action=%d)",
                     door_id,
                     action,
                 )
@@ -200,9 +199,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                     action,
                 )
                 return
-            _LOGGER.info(
-                "Door %d status refreshed after action %d", door_id, action
-            )
+            _LOGGER.info("Door %d status refreshed after action %d", door_id, action)
 
     def _update_zone_from_control_status(
         self, zone_id: int, raw_zone: dict[str, str]

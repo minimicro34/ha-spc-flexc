@@ -232,9 +232,7 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
             )
 
             if refreshed is not None and refreshed.state is state:
-                _LOGGER.info(
-                    "Mapping Gate %d state confirmed: %s", mg_id, requested
-                )
+                _LOGGER.info("Mapping Gate %d state confirmed: %s", mg_id, requested)
                 self.async_set_updated_data(self.state)
                 return
 
@@ -273,9 +271,7 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                     f"SPC Mapping Gate {mg_id} did not confirm the requested "
                     "state after retry"
                 )
-            _LOGGER.info(
-                "Mapping Gate %d final status confirmed: %s", mg_id, requested
-            )
+            _LOGGER.info("Mapping Gate %d final status confirmed: %s", mg_id, requested)
             self.async_set_updated_data(self.state)
 
     async def async_shutdown(self) -> None:

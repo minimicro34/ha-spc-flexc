@@ -398,7 +398,9 @@ async def test_control_door_recovers_session_but_does_not_retry_unknown_effect()
 
 
 @pytest.mark.asyncio
-async def test_control_door_recovers_verification_timeout_without_false_failure() -> None:
+async def test_control_door_recovers_verification_timeout_without_false_failure() -> (
+    None
+):
     """A door status timeout is recovered after an accepted control response."""
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
     coordinator.state = SpcState(doors={1: DoorState(door_id=1, name="Garage")})

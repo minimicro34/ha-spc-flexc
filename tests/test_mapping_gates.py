@@ -435,7 +435,9 @@ async def test_set_mapping_gate_recovers_verification_timeout_then_confirms() ->
 
 
 @pytest.mark.asyncio
-async def test_set_mapping_gate_retries_after_verification_timeout_if_still_off() -> None:
+async def test_set_mapping_gate_retries_after_verification_timeout_if_still_off() -> (
+    None
+):
     """After recovery, a proven opposite state permits one bounded control retry."""
     coordinator = MagicMock()
     coordinator.state = SpcState(
