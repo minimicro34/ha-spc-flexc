@@ -297,6 +297,16 @@ async def test_set_mapping_gate_rejects_unknown_and_unconfirmed_state() -> None:
                 'CMD_RESULT="OK"><MG_STATUS MG_ID="1" STATE="0" />'
                 "</REPLY_GET_MG_STATUS></FLEXML_REPLY>"
             ),
+            (
+                '<FLEXML_REPLY VER="1.0"><REPLY_MG_CONTROL RESULT="0" '
+                'CMD_RESULT="OK"><MG_CONTROL MG_ID="1" RESULT="0" />'
+                "</REPLY_MG_CONTROL></FLEXML_REPLY>"
+            ),
+            (
+                '<FLEXML_REPLY VER="1.0"><REPLY_GET_MG_STATUS RESULT="0" '
+                'CMD_RESULT="OK"><MG_STATUS MG_ID="1" STATE="0" />'
+                "</REPLY_GET_MG_STATUS></FLEXML_REPLY>"
+            ),
         ]
     )
     coordinator._update_mapping_gate_states = lambda raw: (
