@@ -344,7 +344,9 @@ async def test_set_mapping_gate_recovers_timeout_without_duplicate_control() -> 
 
 
 @pytest.mark.asyncio
-async def test_set_mapping_gate_retries_once_when_recovered_status_proves_no_effect() -> None:
+async def test_set_mapping_gate_retries_once_when_recovered_status_proves_no_effect() -> (
+    None
+):
     """Retry once only when fresh binary status proves the first control had no effect."""
     coordinator = MagicMock()
     coordinator.state = SpcState(

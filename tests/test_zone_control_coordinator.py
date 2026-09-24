@@ -350,7 +350,9 @@ async def test_control_door_rejects_bad_refresh() -> None:
 
 
 @pytest.mark.asyncio
-async def test_control_door_recovers_session_but_does_not_retry_unknown_effect() -> None:
+async def test_control_door_recovers_session_but_does_not_retry_unknown_effect() -> (
+    None
+):
     """Door controls recover transport but are never replayed without proven semantics."""
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
     coordinator.state = SpcState(doors={1: DoorState(door_id=1, name="Garage")})
