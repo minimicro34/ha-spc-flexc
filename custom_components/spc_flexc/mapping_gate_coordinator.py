@@ -174,10 +174,17 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 parse_mg_control(response, mg_id)
             except FlexCCommandTimeout:
                 _LOGGER.warning(
-                    "Mapping Gate %d control timed out; recovering FlexC session",
+                    "Mapping Gate %d control timed out; recovering FlexC session "
+                    "(requested=%s)",
                     mg_id,
+                    "ON" if state else "OFF",
                 )
                 await self.client.async_recover_session()
+                _LOGGER.info(
+                    "Mapping Gate %d FlexC session recovered; reading status "
+                    "before any retry",
+                    mg_id,
+                )
                 status_response = await async_retry_read_once(
                     lambda: self.client.async_send_flexml(status_command),
                     description=f"checking Mapping Gate {mg_id} after timeout",
@@ -185,6 +192,16 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 raw_mapping_gates = parse_mg_status(status_response)
                 self._update_mapping_gate_states(raw_mapping_gates)
                 refreshed = self.state.mapping_gates.get(mg_id)
+                _LOGGER.info(
+                    "Mapping Gate %d post-recovery status: requested=%s current=%s",
+                    mg_id,
+                    "ON" if state else "OFF",
+                    (
+                        "UNKNOWN"
+                        if refreshed is None or refreshed.state is None
+                        else "ON" if refreshed.state else "OFF"
+                    ),
+                )
 
                 if refreshed is not None and refreshed.state is state:
                     _LOGGER.info(
@@ -212,6 +229,10 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 )
                 response = await self.client.async_send_flexml(command)
                 parse_mg_control(response, mg_id)
+                _LOGGER.info(
+                    "Mapping Gate %d retry command accepted; verifying final status",
+                    mg_id,
+                )
                 status_response = await async_retry_read_once(
                     lambda: self.client.async_send_flexml(status_command),
                     description=f"refreshing Mapping Gate {mg_id} after retry",
