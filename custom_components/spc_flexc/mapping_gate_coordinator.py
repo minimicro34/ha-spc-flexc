@@ -151,10 +151,11 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                     self._schedule_mg_polling()
 
     async def async_set_mapping_gate(self, mg_id: int, state: bool) -> None:
-        """Set one Mapping Gate and immediately verify its state."""
+        """Set one Mapping Gate and verify/recover the requested state."""
         if mg_id not in self.state.mapping_gates:
             raise ValueError(f"Unknown SPC Mapping Gate {mg_id}")
 
+        requested = "ON" if state else "OFF"
         action = 1 if state else 0
         async with self._client_operation_lock:
             await self.client.async_ensure_connected()
@@ -168,105 +169,114 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                 self.client.command_username,
                 self.client.command_password,
             )
+            _LOGGER.info("Mapping Gate %d control requested: %s", mg_id, requested)
 
+            control_timed_out = False
             try:
                 response = await self.client.async_send_flexml(command)
                 parse_mg_control(response, mg_id)
+                _LOGGER.info(
+                    "Mapping Gate %d control accepted by SPC: %s", mg_id, requested
+                )
             except FlexCCommandTimeout:
+                control_timed_out = True
                 _LOGGER.warning(
                     "Mapping Gate %d control timed out; recovering FlexC session "
                     "(requested=%s)",
                     mg_id,
-                    "ON" if state else "OFF",
+                    requested,
                 )
                 await self.client.async_recover_session()
-                _LOGGER.info(
-                    "Mapping Gate %d FlexC session recovered; reading status "
-                    "before any retry",
-                    mg_id,
-                )
+
+            if control_timed_out:
                 status_response = await async_retry_read_once(
                     lambda: self.client.async_send_flexml(status_command),
                     description=f"checking Mapping Gate {mg_id} after timeout",
                 )
-                raw_mapping_gates = parse_mg_status(status_response)
-                self._update_mapping_gate_states(raw_mapping_gates)
-                refreshed = self.state.mapping_gates.get(mg_id)
-                _LOGGER.info(
-                    "Mapping Gate %d post-recovery status: requested=%s current=%s",
-                    mg_id,
-                    "ON" if state else "OFF",
-                    (
-                        "UNKNOWN"
-                        if refreshed is None or refreshed.state is None
-                        else "ON"
-                        if refreshed.state
-                        else "OFF"
-                    ),
-                )
-
-                if refreshed is not None and refreshed.state is state:
-                    _LOGGER.info(
-                        "Mapping Gate %d status confirms requested state %s; "
-                        "timed-out command was already applied",
+            else:
+                try:
+                    status_response = await async_retry_read_once(
+                        lambda: self.client.async_send_flexml(status_command),
+                        description=f"refreshing Mapping Gate {mg_id} after control",
+                    )
+                except FlexCCommandTimeout:
+                    _LOGGER.warning(
+                        "Mapping Gate %d verification timed out after SPC accepted "
+                        "control; recovering FlexC session (requested=%s)",
                         mg_id,
-                        "ON" if state else "OFF",
+                        requested,
                     )
-                    self.async_set_updated_data(self.state)
-                    return
+                    await self.client.async_recover_session()
+                    status_response = await async_retry_read_once(
+                        lambda: self.client.async_send_flexml(status_command),
+                        description=(
+                            f"checking Mapping Gate {mg_id} after verification timeout"
+                        ),
+                    )
 
-                if refreshed is None or refreshed.state is None:
-                    _LOGGER.error(
-                        "Mapping Gate %d control outcome is unknown after timeout; "
-                        "command was not retried",
-                        mg_id,
-                    )
-                    raise
+            raw_mapping_gates = parse_mg_status(status_response)
+            self._update_mapping_gate_states(raw_mapping_gates)
+            refreshed = self.state.mapping_gates.get(mg_id)
+            current = (
+                "UNKNOWN"
+                if refreshed is None or refreshed.state is None
+                else "ON"
+                if refreshed.state
+                else "OFF"
+            )
+            _LOGGER.info(
+                "Mapping Gate %d verified status: requested=%s current=%s",
+                mg_id,
+                requested,
+                current,
+            )
 
-                _LOGGER.warning(
-                    "Mapping Gate %d did not reach requested state %s after "
-                    "timeout; retrying control once",
-                    mg_id,
-                    "ON" if state else "OFF",
-                )
-                response = await self.client.async_send_flexml(command)
-                parse_mg_control(response, mg_id)
+            if refreshed is not None and refreshed.state is state:
                 _LOGGER.info(
-                    "Mapping Gate %d retry command accepted; verifying final status",
-                    mg_id,
-                )
-                status_response = await async_retry_read_once(
-                    lambda: self.client.async_send_flexml(status_command),
-                    description=f"refreshing Mapping Gate {mg_id} after retry",
-                )
-                raw_mapping_gates = parse_mg_status(status_response)
-                self._update_mapping_gate_states(raw_mapping_gates)
-                refreshed = self.state.mapping_gates.get(mg_id)
-                if refreshed is None or refreshed.state is not state:
-                    raise ValueError(
-                        f"SPC Mapping Gate {mg_id} did not confirm the requested "
-                        "state after retry"
-                    )
-                _LOGGER.info(
-                    "Mapping Gate %d control recovered successfully after one retry",
-                    mg_id,
+                    "Mapping Gate %d state confirmed: %s", mg_id, requested
                 )
                 self.async_set_updated_data(self.state)
                 return
 
+            if refreshed is None or refreshed.state is None:
+                _LOGGER.error(
+                    "Mapping Gate %d outcome is unknown after recovery; command "
+                    "was not retried",
+                    mg_id,
+                )
+                raise ValueError(
+                    f"SPC Mapping Gate {mg_id} state is unknown after recovery"
+                )
+
+            _LOGGER.warning(
+                "Mapping Gate %d remains %s while %s was requested; retrying "
+                "control once",
+                mg_id,
+                current,
+                requested,
+            )
+            response = await self.client.async_send_flexml(command)
+            parse_mg_control(response, mg_id)
+            _LOGGER.info(
+                "Mapping Gate %d retry accepted by SPC; verifying final status",
+                mg_id,
+            )
             status_response = await async_retry_read_once(
                 lambda: self.client.async_send_flexml(status_command),
-                description=f"refreshing Mapping Gate {mg_id} after control",
+                description=f"refreshing Mapping Gate {mg_id} after retry",
             )
-
-        raw_mapping_gates = parse_mg_status(status_response)
-        self._update_mapping_gate_states(raw_mapping_gates)
-        refreshed = self.state.mapping_gates.get(mg_id)
-        if refreshed is None or refreshed.state is not state:
-            raise ValueError(
-                f"SPC Mapping Gate {mg_id} did not confirm the requested state"
+            raw_mapping_gates = parse_mg_status(status_response)
+            self._update_mapping_gate_states(raw_mapping_gates)
+            refreshed = self.state.mapping_gates.get(mg_id)
+            if refreshed is None or refreshed.state is not state:
+                raise ValueError(
+                    f"SPC Mapping Gate {mg_id} did not confirm the requested "
+                    "state after retry"
+                )
+            _LOGGER.info(
+                "Mapping Gate %d final status confirmed: %s", mg_id, requested
             )
-        self.async_set_updated_data(self.state)
+            self.async_set_updated_data(self.state)
 
     async def async_shutdown(self) -> None:
         """Stop Mapping Gate polling and shut down the base coordinator."""
