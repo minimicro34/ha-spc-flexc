@@ -199,7 +199,17 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                     action,
                 )
                 return
-            _LOGGER.info("Door %d status refreshed after action %d", door_id, action)
+            refreshed = self.state.doors[door_id]
+            _LOGGER.info(
+                "Door %d status after action %d: STATUS=%s MODE=%s "
+                "DPS_INPUT=%s DRS_INPUT=%s",
+                door_id,
+                action,
+                refreshed.status,
+                refreshed.mode,
+                refreshed.dps_input,
+                refreshed.drs_input,
+            )
 
     def _update_zone_from_control_status(
         self, zone_id: int, raw_zone: dict[str, str]
