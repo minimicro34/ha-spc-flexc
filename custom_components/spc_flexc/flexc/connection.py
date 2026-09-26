@@ -871,6 +871,7 @@ class FlexCClient:
                 self._reader = None
 
                 if writer is not None:
+                    self._local_close_reasons[writer] = "command timeout recovery"
                     writer.close()
 
                     try:
