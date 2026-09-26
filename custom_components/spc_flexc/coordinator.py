@@ -281,6 +281,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self.state = SpcState()
         self.client = FlexCClient(entry.data)
         self.client.set_event_callback(self._handle_flexc_event)
+        self.client.set_session_ready_callback(self._handle_session_ready)
         self._detected_ats_ids: set[int] = set()
         self._ats_discovery_complete = False
         self._detected_area_ids: set[int] = set()
@@ -296,6 +297,140 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
         self._xbus_poll_task: asyncio.Task[None] | None = None
+        self._reconnect_reconcile_task: asyncio.Task[None] | None = None
+        self._pending_reconcile_generation = 0
+        self._last_reconciled_generation = 0
+
+    def _handle_session_ready(self, generation: int) -> None:
+        """Schedule state reconciliation after a replacement FlexC session."""
+        if not self._discovery_requested or not self._discovery_complete:
+            return
+        self._pending_reconcile_generation = max(
+            self._pending_reconcile_generation, generation
+        )
+        if (
+            self._reconnect_reconcile_task is not None
+            and not self._reconnect_reconcile_task.done()
+        ):
+            return
+        self._reconnect_reconcile_task = self.entry.async_create_background_task(
+            self.hass,
+            self._async_reconcile_after_reconnect(),
+            name=f"{DOMAIN} reconnect reconciliation",
+            eager_start=False,
+        )
+
+    async def _async_reconcile_after_reconnect(self) -> None:
+        """Refresh known live state after the SPC establishes a new session."""
+        try:
+            while self._pending_reconcile_generation > self._last_reconciled_generation:
+                generation = self._pending_reconcile_generation
+                started = asyncio.get_running_loop().time()
+                _LOGGER.info(
+                    "FlexC state reconciliation started after connection #%d",
+                    generation,
+                )
+                try:
+                    async with self._client_operation_lock:
+                        await self.client.async_ensure_connected()
+                        changed = await self._async_reconcile_known_state_locked()
+                except asyncio.CancelledError:
+                    raise
+                except (FlexCError, FlexMLError) as err:
+                    _LOGGER.warning(
+                        "FlexC state reconciliation failed after connection #%d: %s",
+                        generation,
+                        err,
+                    )
+                    self._last_reconciled_generation = generation
+                    continue
+
+                self._last_reconciled_generation = generation
+                if changed:
+                    self.async_set_updated_data(self.state)
+                elapsed = asyncio.get_running_loop().time() - started
+                _LOGGER.info(
+                    "FlexC state reconciliation completed after connection #%d "
+                    "in %.3fs (changed=%s)",
+                    generation,
+                    elapsed,
+                    changed,
+                )
+        finally:
+            self._reconnect_reconcile_task = None
+            if self._pending_reconcile_generation > self._last_reconciled_generation:
+                self._handle_session_ready(self._pending_reconcile_generation)
+
+    async def _async_reconcile_known_state_locked(self) -> bool:
+        """Refresh known base states while the shared operation lock is held."""
+        changed = False
+        timezone = ZoneInfo(self.hass.config.time_zone)
+
+        if self._area_discovery_complete and self._detected_area_ids:
+            area_ids = sorted(self._detected_area_ids)
+            raw_areas = await async_retry_read_once(
+                lambda: self.client.async_get_area_status(area_ids),
+                description="reconciling areas after reconnect",
+            )
+            for raw_area in raw_areas:
+                area = _area_state_from_status(raw_area, timezone)
+                previous = self.state.areas.get(area.area_id)
+                if previous is None or previous.raw != area.raw:
+                    _LOGGER.info(
+                        "Area %d reconciliation changed state after reconnect: "
+                        "MODE=%s -> %s",
+                        area.area_id,
+                        None if previous is None else previous.mode,
+                        area.mode,
+                    )
+                    changed = True
+                self.state.areas[area.area_id] = area
+
+        if self._zone_discovery_complete and self._detected_zone_ids:
+            zone_ids = sorted(self._detected_zone_ids)
+            for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
+                batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                raw_zones = await async_retry_read_once(
+                    partial(self.client.async_get_zone_status, batch),
+                    description=f"reconciling zones {batch[0]}..{batch[-1]} after reconnect",
+                )
+                for raw_zone in raw_zones:
+                    zone = _zone_state_from_status(raw_zone)
+                    previous = self.state.zones.get(zone.zone_id)
+                    if previous is not None:
+                        zone.event_tamper = previous.event_tamper
+                        zone.last_event = previous.last_event
+                    if previous is None or previous.raw != zone.raw:
+                        changed = True
+                    self.state.zones[zone.zone_id] = zone
+
+        if self._xbus_discovery_complete:
+            raw_devices = await async_retry_read_once(
+                partial(async_get_xbus_status, self.client),
+                description="reconciling X-BUS devices after reconnect",
+            )
+            seen_serials: set[str] = set()
+            for raw_device in raw_devices:
+                serial = raw_device.get("SN")
+                if not serial:
+                    continue
+                previous = self.state.xbus_devices.get(serial)
+                device = _xbus_device_state_from_status(raw_device, previous)
+                if device is None:
+                    continue
+                seen_serials.add(serial)
+                if previous is None or previous.raw != device.raw:
+                    changed = True
+                self.state.xbus_devices[serial] = device
+            missing_serials = set(self.state.xbus_devices) - seen_serials
+            for serial in missing_serials:
+                del self.state.xbus_devices[serial]
+                changed = True
+            if seen_serials != self._detected_xbus_serials:
+                self._detected_xbus_serials = seen_serials
+                changed = True
+
+        return changed
 
     async def _async_update_data(self) -> SpcState:
         try:
@@ -667,6 +802,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             xbus_task.cancel()
             with suppress(asyncio.CancelledError):
                 await xbus_task
+        reconcile_task = self._reconnect_reconcile_task
+        self._reconnect_reconcile_task = None
+        if reconcile_task is not None and not reconcile_task.done():
+            reconcile_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await reconcile_task
         discovery_task = self._discovery_task
         self._discovery_task = None
         if discovery_task is not None and not discovery_task.done():
