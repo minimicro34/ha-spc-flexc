@@ -3,7 +3,7 @@
 import asyncio
 import hashlib
 import zlib
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 from homeassistant.const import CONF_HOST
@@ -435,6 +435,28 @@ async def test_handle_message_connection_and_poll_context() -> None:
     assert client._rct_sequence == poll["rct_sequence"]
     assert client._context_event.is_set()
     assert waiter.result() == poll
+
+
+@pytest.mark.asyncio
+async def test_session_ready_callback_runs_once_per_connection_generation() -> None:
+    """A valid POLL announces each TCP session exactly once."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    callback = MagicMock()
+    client.set_session_ready_callback(callback)
+
+    poll = _message()
+    poll["message_id"] = MSG_POLL
+
+    client._session_generation = 1
+    await client._handle_message(poll)
+    await client._handle_message(poll)
+    callback.assert_called_once_with(1)
+
+    client._session_generation = 2
+    await client._handle_message(poll)
+    assert callback.call_args_list == [call(1), call(2)]
 
 
 @pytest.mark.asyncio
