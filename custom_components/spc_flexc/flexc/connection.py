@@ -259,7 +259,7 @@ class FlexCClient:
                     err,
                 )
             else:
-                _LOGGER.debug("FlexC connection closed by peer")
+                _LOGGER.info("FlexC connection closed by peer %s", peer_host)
 
         except (ConnectionError, OSError) as err:
             _LOGGER.warning("FlexC connection lost: %s", err)
