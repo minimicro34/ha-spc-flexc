@@ -338,13 +338,20 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     raise
                 except (FlexCError, FlexMLError) as err:
                     _LOGGER.warning(
-                        "FlexC state reconciliation failed after connection #%d: %s",
+                        "FlexC state reconciliation for connection #%d was interrupted: %s",
                         generation,
                         err,
                     )
-                    self._last_reconciled_generation = generation
-                    continue
+                    return
 
+                if self._pending_reconcile_generation != generation:
+                    _LOGGER.info(
+                        "FlexC state reconciliation for connection #%d completed "
+                        "after connection #%d became ready; a fresh reconciliation "
+                        "will follow",
+                        generation,
+                        self._pending_reconcile_generation,
+                    )
                 self._last_reconciled_generation = generation
                 if changed:
                     self.async_set_updated_data(self.state)
