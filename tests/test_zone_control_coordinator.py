@@ -268,10 +268,8 @@ async def test_reconnect_reconciliation_refreshes_stale_door_mode() -> None:
     coordinator.client.command_username = "user"
     coordinator.client.command_password = "password"
     coordinator.client.async_send_flexml = AsyncMock(return_value="status")
-    coordinator._async_reconcile_known_state_locked = (
-        lambda: SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(
-            coordinator
-        )
+    coordinator._async_reconcile_known_state_locked = lambda: (
+        SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(coordinator)
     )
 
     with (
@@ -288,8 +286,10 @@ async def test_reconnect_reconciliation_refreshes_stale_door_mode() -> None:
             return_value=[{"DOOR_ID": "1", "DOOR_NAME": "Garage", "MODE": "2"}],
         ),
     ):
-        changed = await SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(
-            coordinator
+        changed = (
+            await SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(
+                coordinator
+            )
         )
 
     assert changed is True

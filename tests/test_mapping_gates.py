@@ -260,8 +260,10 @@ async def test_reconnect_reconciliation_refreshes_mapping_gate_state() -> None:
         "custom_components.spc_flexc.mapping_gate_coordinator.SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked",
         new=AsyncMock(return_value=False),
     ):
-        changed = await SpcFlexCMappingGateCoordinator._async_reconcile_known_state_locked(
-            coordinator
+        changed = (
+            await SpcFlexCMappingGateCoordinator._async_reconcile_known_state_locked(
+                coordinator
+            )
         )
 
     assert changed is True
