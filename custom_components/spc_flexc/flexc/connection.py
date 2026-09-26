@@ -153,6 +153,7 @@ class FlexCClient:
         self._event_callback: Callable[[dict[str, str]], None] | None = None
         self._session_ready_callback: Callable[[int], None] | None = None
         self._session_generation = 0
+        self._notified_session_generation = 0
         self._connection_started_at: float | None = None
         self._local_close_reasons: dict[asyncio.StreamWriter, str] = {}
 
@@ -637,7 +638,11 @@ class FlexCClient:
                     )
 
                 callback = self._session_ready_callback
-                if callback is not None:
+                if (
+                    callback is not None
+                    and self._notified_session_generation != self._session_generation
+                ):
+                    self._notified_session_generation = self._session_generation
                     callback(self._session_generation)
 
             poll_waiter = self._poll_waiter
