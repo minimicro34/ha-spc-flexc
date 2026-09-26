@@ -122,6 +122,38 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             self.state.doors[door.door_id] = door
         return changed
 
+    async def _async_reconcile_known_state_locked(self) -> bool:
+        """Extend reconnect reconciliation with current door state."""
+        changed = await super()._async_reconcile_known_state_locked()
+        if not self._door_discovery_complete or not self._detected_door_ids:
+            return changed
+
+        door_ids = sorted(self._detected_door_ids)
+        command = build_door_status_batch(
+            door_ids, self.client.command_username, self.client.command_password
+        )
+        response = await async_retry_read_once(
+            lambda: self.client.async_send_flexml(command),
+            description="reconciling doors after reconnect",
+        )
+        raw_doors = parse_door_status(response)
+        for raw_door in raw_doors:
+            door_id = int(raw_door["DOOR_ID"])
+            previous = self.state.doors.get(door_id)
+            previous_mode = None if previous is None else previous.mode
+            door = _door_state_from_status(raw_door)
+            if previous is None or previous.raw != door.raw:
+                _LOGGER.info(
+                    "Door %d reconciliation changed state after reconnect: "
+                    "MODE=%s -> %s",
+                    door_id,
+                    previous_mode,
+                    door.mode,
+                )
+                changed = True
+            self.state.doors[door_id] = door
+        return changed
+
     async def async_control_door(self, door_id: int, action: int) -> None:
         """Send one SPCLink-proven door action and refresh status after recovery."""
         if door_id not in self.state.doors:
