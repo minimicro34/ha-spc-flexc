@@ -150,6 +150,40 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                     )
                     self._schedule_mg_polling()
 
+    async def _async_reconcile_known_state_locked(self) -> bool:
+        """Extend reconnect reconciliation with Mapping Gate state."""
+        changed = await super()._async_reconcile_known_state_locked()
+        if not self._mg_discovery_complete:
+            return changed
+
+        command = build_mg_status_command(
+            self.client.command_username,
+            self.client.command_password,
+        )
+        response = await async_retry_read_once(
+            lambda: self.client.async_send_flexml(command),
+            description="reconciling Mapping Gates after reconnect",
+        )
+        raw_mapping_gates = parse_mg_status(response)
+        previous_states = {
+            mg_id: mapping_gate.state
+            for mg_id, mapping_gate in self.state.mapping_gates.items()
+        }
+        mg_changed = self._update_mapping_gate_states(raw_mapping_gates)
+        if mg_changed:
+            changed = True
+            for mg_id, mapping_gate in self.state.mapping_gates.items():
+                previous = previous_states.get(mg_id)
+                if previous != mapping_gate.state:
+                    _LOGGER.info(
+                        "Mapping Gate %d reconciliation changed state after reconnect: "
+                        "%s -> %s",
+                        mg_id,
+                        previous,
+                        mapping_gate.state,
+                    )
+        return changed
+
     async def async_set_mapping_gate(self, mg_id: int, state: bool) -> None:
         """Set one Mapping Gate and verify/recover the requested state."""
         if mg_id not in self.state.mapping_gates:
