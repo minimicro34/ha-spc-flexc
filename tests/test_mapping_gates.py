@@ -235,6 +235,40 @@ async def test_mg_polling_restarts_if_task_stops_unexpectedly() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reconnect_reconciliation_refreshes_mapping_gate_state() -> None:
+    """Reconnect reconciliation repairs a stale Mapping Gate state."""
+    coordinator = MagicMock(spec=SpcFlexCMappingGateCoordinator)
+    coordinator.state = SpcState(
+        mapping_gates={1: MappingGateState(mg_id=1, state=False)}
+    )
+    coordinator._mg_discovery_complete = True
+    coordinator.client = MagicMock()
+    coordinator.client.command_username = "HomeAssistant"
+    coordinator.client.command_password = "MyPassword"
+    coordinator.client.async_send_flexml = AsyncMock(
+        return_value=(
+            '<FLEXML_REPLY VER="1.0"><REPLY_GET_MG_STATUS RESULT="0" '
+            'CMD_RESULT="OK"><MG_STATUS MG_ID="1" STATE="1" />'
+            "</REPLY_GET_MG_STATUS></FLEXML_REPLY>"
+        )
+    )
+    coordinator._update_mapping_gate_states = lambda raw: (
+        SpcFlexCMappingGateCoordinator._update_mapping_gate_states(coordinator, raw)
+    )
+
+    with patch(
+        "custom_components.spc_flexc.mapping_gate_coordinator.SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked",
+        new=AsyncMock(return_value=False),
+    ):
+        changed = await SpcFlexCMappingGateCoordinator._async_reconcile_known_state_locked(
+            coordinator
+        )
+
+    assert changed is True
+    assert coordinator.state.mapping_gates[1].state is True
+
+
+@pytest.mark.asyncio
 async def test_set_mapping_gate_validates_refresh() -> None:
     """Control publishes only a state confirmed by a fresh panel read."""
     coordinator = MagicMock()
