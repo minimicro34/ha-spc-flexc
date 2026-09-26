@@ -381,13 +381,13 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             )
             for raw_area in raw_areas:
                 area = _area_state_from_status(raw_area, timezone)
-                previous = self.state.areas.get(area.area_id)
-                if previous is None or previous.raw != area.raw:
+                previous_area = self.state.areas.get(area.area_id)
+                if previous_area is None or previous_area.raw != area.raw:
                     _LOGGER.info(
                         "Area %d reconciliation changed state after reconnect: "
                         "MODE=%s -> %s",
                         area.area_id,
-                        None if previous is None else previous.mode,
+                        None if previous_area is None else previous_area.mode,
                         area.mode,
                     )
                     changed = True
@@ -403,11 +403,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 )
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
-                    previous = self.state.zones.get(zone.zone_id)
-                    if previous is not None:
-                        zone.event_tamper = previous.event_tamper
-                        zone.last_event = previous.last_event
-                    if previous is None or previous.raw != zone.raw:
+                    previous_zone = self.state.zones.get(zone.zone_id)
+                    if previous_zone is not None:
+                        zone.event_tamper = previous_zone.event_tamper
+                        zone.last_event = previous_zone.last_event
+                    if previous_zone is None or previous_zone.raw != zone.raw:
                         changed = True
                     self.state.zones[zone.zone_id] = zone
 
@@ -421,12 +421,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 serial = raw_device.get("SN")
                 if not serial:
                     continue
-                previous = self.state.xbus_devices.get(serial)
-                device = _xbus_device_state_from_status(raw_device, previous)
+                previous_xbus = self.state.xbus_devices.get(serial)
+                device = _xbus_device_state_from_status(raw_device, previous_xbus)
                 if device is None:
                     continue
                 seen_serials.add(serial)
-                if previous is None or previous.raw != device.raw:
+                if previous_xbus is None or previous_xbus.raw != device.raw:
                     changed = True
                 self.state.xbus_devices[serial] = device
             missing_serials = set(self.state.xbus_devices) - seen_serials
