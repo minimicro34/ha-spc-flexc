@@ -241,6 +241,66 @@ def test_unknown_flexc_event_does_not_notify() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reconnect_reconciliation_refreshes_known_base_state() -> None:
+    """Reconnect reconciliation repairs stale area, zone and X-BUS state."""
+    coordinator = _coordinator_stub()
+    coordinator._area_discovery_complete = True
+    coordinator._detected_area_ids = {1}
+    coordinator._zone_discovery_complete = True
+    coordinator._detected_zone_ids = {4}
+    coordinator._xbus_discovery_complete = True
+    coordinator._detected_xbus_serials = {"4CADF0DA"}
+    coordinator.client.async_get_area_status = AsyncMock(
+        return_value=[{"AREA_ID": "1", "AREA_NAME": "Home", "MODE": "1"}]
+    )
+    coordinator.client.async_get_zone_status = AsyncMock(
+        return_value=[{"ZONE_ID": "4", "ZONE_NAME": "TV", "INPUT": "1"}]
+    )
+    xbus = AsyncMock(
+        return_value=[
+            {
+                "ID": "1",
+                "SN": "4CADF0DA",
+                "NAME": "CLA 1",
+                "INPUT": "0002",
+                "INHIBIT": "0000",
+                "ISOLATE": "0000",
+            }
+        ]
+    )
+
+    with patch("custom_components.spc_flexc.coordinator.async_get_xbus_status", xbus):
+        changed = await SpcFlexCCoordinator._async_reconcile_known_state_locked(
+            coordinator
+        )
+
+    assert changed is True
+    assert coordinator.state.areas[1].mode == 1
+    assert coordinator.state.zones[4].input_state == 1
+    assert coordinator.state.xbus_devices["4CADF0DA"].tamper_fault is True
+
+
+@pytest.mark.asyncio
+async def test_reconnect_reconciliation_publishes_new_generation() -> None:
+    """A ready replacement session reconciles state and publishes changes."""
+    coordinator = _coordinator_stub()
+    coordinator._pending_reconcile_generation = 3
+    coordinator._last_reconciled_generation = 2
+    coordinator._reconnect_reconcile_task = asyncio.current_task()
+    coordinator._async_reconcile_known_state_locked = AsyncMock(return_value=True)
+    coordinator.async_set_updated_data = MagicMock()
+    coordinator._handle_session_ready = MagicMock()
+
+    await SpcFlexCCoordinator._async_reconcile_after_reconnect(coordinator)
+
+    coordinator.client.async_ensure_connected.assert_awaited_once_with()
+    coordinator._async_reconcile_known_state_locked.assert_awaited_once_with()
+    assert coordinator._last_reconciled_generation == 3
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+    assert coordinator._reconnect_reconcile_task is None
+
+
+@pytest.mark.asyncio
 async def test_update_data_refreshes_discovered_panel_objects() -> None:
     """Regular refresh updates panel, ATS and areas already found by discovery."""
     coordinator = _coordinator_stub()
