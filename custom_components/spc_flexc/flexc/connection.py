@@ -154,7 +154,6 @@ class FlexCClient:
         self._session_ready_callback: Callable[[int], None] | None = None
         self._session_generation = 0
         self._notified_session_generation = 0
-        self._connection_started_at: float | None = None
         self._local_close_reasons: dict[asyncio.StreamWriter, str] = {}
 
         # Transport context used to build the next outbound DATA frame.
@@ -241,7 +240,6 @@ class FlexCClient:
         self._session_generation += 1
         generation = self._session_generation
         connection_started_at = asyncio.get_running_loop().time()
-        self._connection_started_at = connection_started_at
         self._reader = reader
         self._writer = writer
         self._command_context = None
