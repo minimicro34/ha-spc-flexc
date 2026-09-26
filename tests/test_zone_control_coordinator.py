@@ -256,6 +256,48 @@ def test_update_door_states_detects_changes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reconnect_reconciliation_refreshes_stale_door_mode() -> None:
+    """A reconnect status read repairs a stale Home Assistant door mode."""
+    coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
+    coordinator.state = SpcState(
+        doors={1: DoorState(door_id=1, mode=0, raw={"DOOR_ID": "1", "MODE": "0"})}
+    )
+    coordinator._door_discovery_complete = True
+    coordinator._detected_door_ids = {1}
+    coordinator.client = MagicMock()
+    coordinator.client.command_username = "user"
+    coordinator.client.command_password = "password"
+    coordinator.client.async_send_flexml = AsyncMock(return_value="status")
+    coordinator._async_reconcile_known_state_locked = (
+        lambda: SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(
+            coordinator
+        )
+    )
+
+    with (
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.SpcFlexCCoordinator._async_reconcile_known_state_locked",
+            new=AsyncMock(return_value=False),
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch",
+            return_value="status-cmd",
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_status",
+            return_value=[{"DOOR_ID": "1", "DOOR_NAME": "Garage", "MODE": "2"}],
+        ),
+    ):
+        changed = await SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(
+            coordinator
+        )
+
+    assert changed is True
+    assert coordinator.state.doors[1].mode == 2
+    coordinator.client.async_send_flexml.assert_awaited_once_with("status-cmd")
+
+
+@pytest.mark.asyncio
 async def test_control_door_validation_and_refresh() -> None:
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
     coordinator.state = SpcState(doors={1: DoorState(door_id=1, name="Garage")})
