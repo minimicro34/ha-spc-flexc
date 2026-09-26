@@ -129,8 +129,33 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         if action not in DOOR_ACTIONS:
             raise ValueError(f"Unsupported SPC door action {action}")
 
+        loop = asyncio.get_running_loop()
+        requested_at = loop.time()
+        _LOGGER.info(
+            "Door %d control entered: action=%d connected=%s lock_held=%s",
+            door_id,
+            action,
+            self.client.connected,
+            self._client_operation_lock.locked(),
+        )
         async with self._client_operation_lock:
+            lock_acquired_at = loop.time()
+            _LOGGER.info(
+                "Door %d operation lock acquired after %.3fs: action=%d connected=%s",
+                door_id,
+                lock_acquired_at - requested_at,
+                action,
+                self.client.connected,
+            )
             await self.client.async_ensure_connected()
+            connection_ready_at = loop.time()
+            _LOGGER.info(
+                "Door %d FlexC connection ready after %.3fs (total %.3fs): action=%d",
+                door_id,
+                connection_ready_at - lock_acquired_at,
+                connection_ready_at - requested_at,
+                action,
+            )
             command = build_door_control_command(
                 door_id,
                 action,
