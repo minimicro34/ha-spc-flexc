@@ -132,11 +132,10 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         loop = asyncio.get_running_loop()
         requested_at = loop.time()
         _LOGGER.info(
-            "Door %d control entered: action=%d connected=%s lock_held=%s",
+            "Door %d control entered: action=%d connected=%s",
             door_id,
             action,
             self.client.connected,
-            self._client_operation_lock.locked(),
         )
         async with self._client_operation_lock:
             lock_acquired_at = loop.time()
