@@ -635,13 +635,13 @@ class FlexCClient:
                         elapsed,
                     )
 
-                callback = self._session_ready_callback
+                session_ready_callback = self._session_ready_callback
                 if (
-                    callback is not None
+                    session_ready_callback is not None
                     and self._notified_session_generation != self._session_generation
                 ):
                     self._notified_session_generation = self._session_generation
-                    callback(self._session_generation)
+                    session_ready_callback(self._session_generation)
 
             poll_waiter = self._poll_waiter
 
@@ -661,10 +661,10 @@ class FlexCClient:
             event = parse_event_payload(bytes(message["app_data"]))
 
             if event is not None:
-                callback = self._event_callback
+                event_callback = self._event_callback
 
-                if callback is not None:
-                    callback(event)
+                if event_callback is not None:
+                    event_callback(event)
 
             return
 
