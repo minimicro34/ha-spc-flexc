@@ -151,6 +151,10 @@ class FlexCClient:
         self._response_length: int | None = None
 
         self._event_callback: Callable[[dict[str, str]], None] | None = None
+        self._session_ready_callback: Callable[[int], None] | None = None
+        self._session_generation = 0
+        self._connection_started_at: float | None = None
+        self._local_close_reasons: dict[asyncio.StreamWriter, str] = {}
 
         # Transport context used to build the next outbound DATA frame.
         #
@@ -160,6 +164,10 @@ class FlexCClient:
         self._command_context: dict[str, Any] | None = None
         self._context_event = asyncio.Event()
         self._recovery_started_at: float | None = None
+
+    def set_session_ready_callback(self, callback: Callable[[int], None]) -> None:
+        """Register a callback invoked when a fresh session context is ready."""
+        self._session_ready_callback = callback
 
     async def async_ensure_connected(self) -> None:
         """Ensure that the SPC has established a FlexC session."""
@@ -226,14 +234,21 @@ class FlexCClient:
                 "Replacing existing FlexC connection with new connection from %s",
                 peer_host,
             )
+            self._local_close_reasons[self._writer] = "replaced by a new SPC connection"
             self._writer.close()
 
+        self._session_generation += 1
+        generation = self._session_generation
+        connection_started_at = asyncio.get_running_loop().time()
+        self._connection_started_at = connection_started_at
         self._reader = reader
         self._writer = writer
         self._command_context = None
         self._context_event.clear()
 
-        _LOGGER.info("SPC FlexC TCP connection accepted from %s", peer_host)
+        _LOGGER.info(
+            "SPC FlexC TCP connection #%d accepted from %s", generation, peer_host
+        )
 
         try:
             while not self._closed:
@@ -259,7 +274,22 @@ class FlexCClient:
                     err,
                 )
             else:
-                _LOGGER.info("FlexC connection closed by peer %s", peer_host)
+                reason = self._local_close_reasons.pop(writer, None)
+                elapsed = asyncio.get_running_loop().time() - connection_started_at
+                if reason is None:
+                    _LOGGER.info(
+                        "FlexC connection #%d closed by peer %s after %.1fs",
+                        generation,
+                        peer_host,
+                        elapsed,
+                    )
+                else:
+                    _LOGGER.info(
+                        "FlexC connection #%d closed locally after %.1fs: %s",
+                        generation,
+                        elapsed,
+                        reason,
+                    )
 
         except (ConnectionError, OSError) as err:
             _LOGGER.warning("FlexC connection lost: %s", err)
@@ -605,6 +635,10 @@ class FlexCClient:
                         "and command context is valid",
                         elapsed,
                     )
+
+                callback = self._session_ready_callback
+                if callback is not None:
+                    callback(self._session_generation)
 
             poll_waiter = self._poll_waiter
 
