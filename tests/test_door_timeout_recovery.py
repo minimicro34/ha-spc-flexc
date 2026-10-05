@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.spc_flexc.flexc.connection import FlexCCommandTimeout
+from custom_components.spc_flexc.flexc.connection import FlexCClient, FlexCCommandTimeout
 from custom_components.spc_flexc.models import DoorState, SpcState
 from custom_components.spc_flexc.zone_control_coordinator import (
     SpcFlexCZoneControlCoordinator,
@@ -114,3 +114,14 @@ async def test_timeout_does_not_replay_unknown_mode() -> None:
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 8)
 
     assert coordinator.client.async_send_flexml.await_count == 2
+
+
+def test_command_diagnostic_label_exposes_only_command_names() -> None:
+    command = (
+        '<FLEXML_CMD PANEL_USERNAME="secret-user" PANEL_PASSWORD="secret-password">'
+        '<CMD_GET_DOOR_STATUS DOOR_ID="1" /><CMD_GET_DOOR_STATUS DOOR_ID="2" />'
+        "</FLEXML_CMD>"
+    )
+    label = FlexCClient._command_diagnostic_label(command)
+    assert label == "CMD_GET_DOOR_STATUS"
+    assert "secret" not in label
