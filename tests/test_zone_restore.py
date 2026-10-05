@@ -93,6 +93,46 @@ async def test_restore_zone_action4_and_verify_permission_clears() -> None:
 
 
 @pytest.mark.asyncio
+async def test_restore_zone_retries_empty_status_then_confirms() -> None:
+    coordinator = _coordinator(ZoneState(zone_id=1, restore_allowed=True))
+    coordinator.client.async_get_zone_status.side_effect = [
+        [],
+        [{"ZONE_ID": "1", "STATUS": "0", "ALARM_STATE": "0"}],
+    ]
+
+    with (
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.async_restore_zone",
+            new=AsyncMock(),
+        ),
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.asyncio.sleep",
+            new=AsyncMock(),
+        ) as sleep,
+    ):
+        await SpcFlexCZoneControlCoordinator.async_restore_zone(coordinator, 1)
+
+    assert coordinator.client.async_get_zone_status.await_count == 2
+    sleep.assert_awaited_once()
+    assert coordinator.state.zones[1].restore_allowed is None
+
+
+@pytest.mark.asyncio
+async def test_restore_zone_rejects_mismatched_status_zone() -> None:
+    coordinator = _coordinator(ZoneState(zone_id=1, restore_allowed=True))
+    coordinator.client.async_get_zone_status.return_value = [{"ZONE_ID": "2"}]
+
+    with (
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.async_restore_zone",
+            new=AsyncMock(),
+        ),
+        pytest.raises(ValueError, match="returned zone 2 while refreshing zone 1"),
+    ):
+        await SpcFlexCZoneControlCoordinator.async_restore_zone(coordinator, 1)
+
+
+@pytest.mark.asyncio
 async def test_restore_zone_fails_if_panel_still_allows_restore() -> None:
     coordinator = _coordinator(ZoneState(zone_id=1, restore_allowed=True))
     coordinator.client.async_get_zone_status.return_value = [
