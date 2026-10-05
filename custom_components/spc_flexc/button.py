@@ -63,6 +63,15 @@ class SpcZoneRestoreButton(
         zone = self.coordinator.data.zones.get(self.zone_id)
         return zone is not None and zone.restore_allowed is True
 
+    @property
+    def extra_state_attributes(self) -> dict[str, bool | int | None]:
+        """Expose the zone identity and current restore permission."""
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        return {
+            "zone_id": self.zone_id,
+            "restore_allowed": None if zone is None else zone.restore_allowed,
+        }
+
     async def async_press(self) -> None:
         """Restore the zone using validated FlexC action 4."""
         await self.coordinator.async_restore_zone(self.zone_id)
