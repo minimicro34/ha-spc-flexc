@@ -111,7 +111,11 @@ async def test_setup_adds_four_buttons_once_and_discovers_new_door() -> None:
     listener[0]()
     assert len(batches) == 2
     assert len(batches[1]) == 5
-    assert {entity.door_id for entity in batches[1] if isinstance(entity, SpcDoorActionButton)} == {4}
+    assert {
+        entity.door_id
+        for entity in batches[1]
+        if isinstance(entity, SpcDoorActionButton)
+    } == {4}
     restore_buttons = [
         entity for entity in batches[1] if isinstance(entity, SpcZoneRestoreButton)
     ]
