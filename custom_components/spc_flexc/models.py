@@ -134,6 +134,7 @@ class ZoneState:
     last_event: dict[str, Any] | None = None
     inhibit_allowed: bool | None = None
     isolate_allowed: bool | None = None
+    restore_allowed: bool | None = None
     actuations_since_last_read: int | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
