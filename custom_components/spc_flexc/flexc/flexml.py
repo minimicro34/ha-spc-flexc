@@ -61,10 +61,11 @@ def build_zone_status_batch(
 def build_zone_control_command(
     zone_id: int, action: int, username: str, password: str
 ) -> str:
-    """Build validated CMD_ZONE_CONTROL (0/1 inhibit, 2/3 isolate)."""
-    if action not in (0, 1, 2, 3):
+    """Build validated CMD_ZONE_CONTROL (0/1 inhibit, 2/3 isolate, 4 restore)."""
+    if action not in (0, 1, 2, 3, 4):
         raise ValueError(
-            "Zone action must be 0 (inhibit), 1 (deinhibit), 2 (isolate), or 3 (deisolate)"
+            "Zone action must be 0 (inhibit), 1 (deinhibit), 2 (isolate), "
+            "3 (deisolate), or 4 (restore)"
         )
     return _build_command_envelope(
         f'<CMD_ZONE_CONTROL ZONE_ID="{zone_id}" ACTION="{action}" />',
