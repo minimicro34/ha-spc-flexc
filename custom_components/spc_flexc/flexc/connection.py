@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import re
 import zlib
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
@@ -64,6 +65,7 @@ MSG_ERROR = 0xFF
 CONNECT_TIMEOUT = 30.0
 COMMAND_TIMEOUT = 15.0
 MAX_FRAME_LENGTH = 65536
+COMMAND_NAME_PATTERN = re.compile(r"<(CMD_[A-Z0-9_]+)\\b")
 
 
 class FlexCError(Exception):
@@ -804,6 +806,14 @@ class FlexCClient:
         else:
             _LOGGER.warning("%s", error)
 
+    @staticmethod
+    def _command_diagnostic_label(command: str) -> str:
+        """Return command names suitable for logs without exposing credentials."""
+        names = list(dict.fromkeys(COMMAND_NAME_PATTERN.findall(command)))
+        if not names:
+            return "unknown"
+        return ",".join(names)
+
     async def async_send_flexml(self, command: str) -> str:
         """Send one FLEXML command and return FLEXML_REPLY."""
         await self.async_ensure_connected()
@@ -859,8 +869,9 @@ class FlexCClient:
                 self._context_event.clear()
                 self._recovery_started_at = asyncio.get_running_loop().time()
                 _LOGGER.warning(
-                    "FlexC command timed out after %.0fs; invalidating session "
+                    "FlexC command %s timed out after %.0fs; invalidating session "
                     "and waiting for a fresh handshake/POLL",
+                    self._command_diagnostic_label(command),
                     COMMAND_TIMEOUT,
                 )
                 self.connected = False
