@@ -103,12 +103,15 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - Independent X-BUS tamper fault, inhibition and isolation diagnostics with real-time event updates and status reconciliation
 - Device-specific metadata retained in Home Assistant diagnostics
 
-### Outputs
+### Outputs and access control
 
 - Mapping Gate discovery
 - Mapping Gate state monitoring
 - Home Assistant switch entities for discovered Mapping Gates
 - Resulting output state verification after commands
+- Door status monitoring for discovered access-control doors
+- Validated door actions: temporary open, permanent open/free access, normal mode and forced lock
+- Persistent door-mode verification and bounded timeout recovery
 
 ### Home Assistant
 
@@ -425,7 +428,11 @@ Global Full Set coordinates individual area operations. All areas are prechecked
 
 ### Door-control timeout recovery
 
-After a door-control timeout, SPC FlexC recovers the FlexC session and refreshes the door status, but it does not automatically replay the door action. The effects of the supported door actions have not yet been validated sufficiently to make such a retry unambiguous and safe.
+Door actions 6 (permanent open/free access), 7 (normal mode) and 8 (forced lock) have persistent, verifiable target modes. After a control timeout, SPC FlexC recovers the FlexC session and reads the current door status before deciding whether any replay is safe.
+
+If the requested mode is already reported, the timed-out command is treated as applied and is not repeated. If the fresh status reports another known persistent mode, the control is retried once and the final mode is verified. If the resulting mode is unknown or ambiguous, the command is not replayed.
+
+Action 5 (temporary open) remains deliberately non-replaying after a timeout because the persistent door mode cannot prove whether the temporary pulse has already been executed.
 
 ### Hardware-dependent diagnostics
 
