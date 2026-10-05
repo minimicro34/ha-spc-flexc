@@ -7,9 +7,10 @@ import pytest
 from custom_components.spc_flexc.button import (
     DOOR_BUTTONS,
     SpcDoorActionButton,
+    SpcZoneRestoreButton,
     async_setup_entry,
 )
-from custom_components.spc_flexc.models import DoorState, SpcState
+from custom_components.spc_flexc.models import AreaState, DoorState, SpcState, ZoneState
 
 
 def _coordinator() -> MagicMock:
@@ -35,6 +36,48 @@ async def test_door_action_button_properties_and_press() -> None:
 
     del coordinator.data.doors[3]
     assert button.available is False
+
+
+@pytest.mark.asyncio
+async def test_zone_restore_button_properties_availability_and_press() -> None:
+    coordinator = _coordinator()
+    coordinator.data.areas[1] = AreaState(area_id=1, name="Logis")
+    coordinator.data.zones[1] = ZoneState(
+        zone_id=1, name="TV", area_id=1, restore_allowed=True
+    )
+    coordinator.async_restore_zone = AsyncMock()
+
+    button = SpcZoneRestoreButton(coordinator, 1)
+
+    assert button.available is True
+    assert button.unique_id == "test_zone_1_restore"
+    assert button.extra_state_attributes == {
+        "zone_id": 1,
+        "restore_allowed": True,
+    }
+
+    await button.async_press()
+    coordinator.async_restore_zone.assert_awaited_once_with(1)
+
+    coordinator.data.zones[1].restore_allowed = False
+    assert button.available is False
+    assert button.extra_state_attributes["restore_allowed"] is False
+
+    del coordinator.data.zones[1]
+    assert button.available is False
+    assert button.extra_state_attributes["restore_allowed"] is None
+
+
+def test_zone_restore_button_falls_back_to_panel_device() -> None:
+    coordinator = _coordinator()
+    coordinator.data.zones[2] = ZoneState(
+        zone_id=2, name=None, area_id=None, restore_allowed=True
+    )
+
+    button = SpcZoneRestoreButton(coordinator, 2)
+
+    assert button.unique_id == "test_zone_2_restore"
+    assert button.available is True
 
 
 @pytest.mark.asyncio
