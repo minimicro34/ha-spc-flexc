@@ -65,7 +65,7 @@ MSG_ERROR = 0xFF
 CONNECT_TIMEOUT = 30.0
 COMMAND_TIMEOUT = 15.0
 MAX_FRAME_LENGTH = 65536
-COMMAND_NAME_PATTERN = re.compile(r"<(CMD_[A-Z0-9_]+)\\b")
+COMMAND_NAME_PATTERN = re.compile(r"<(CMD_[A-Z0-9_]+)\b")
 
 
 class FlexCError(Exception):
