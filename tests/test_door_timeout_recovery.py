@@ -4,7 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.spc_flexc.flexc.connection import FlexCClient, FlexCCommandTimeout
+from custom_components.spc_flexc.flexc.connection import (
+    FlexCClient,
+    FlexCCommandTimeout,
+)
 from custom_components.spc_flexc.models import DoorState, SpcState
 from custom_components.spc_flexc.zone_control_coordinator import (
     SpcFlexCZoneControlCoordinator,
@@ -89,7 +92,9 @@ async def test_timeout_replays_persistent_action_once_and_verifies() -> None:
         await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 8)
 
     assert coordinator.client.async_send_flexml.await_count == 4
-    assert coordinator.client.async_send_flexml.await_args_list[2].args == ("control-cmd",)
+    assert coordinator.client.async_send_flexml.await_args_list[2].args == (
+        "control-cmd",
+    )
     assert coordinator.state.doors[1].mode == 1
 
 
