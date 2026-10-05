@@ -44,7 +44,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - [Available entities](#available-entities)
 - [SPC FlexC Card](#spc-flexc-card)
 - [Alarm control](#alarm-control)
-- [Zone inhibition and isolation](#zone-inhibition-and-isolation)
+- [Zone inhibition, isolation and restoration](#zone-inhibition-isolation-and-restoration)
 - [Mapping Gates / outputs](#mapping-gates--outputs)
 - [X-BUS](#x-bus)
 - [Diagnostics](#diagnostics)
@@ -93,6 +93,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - Live zone state monitoring
 - Zone inhibition and de-inhibition controls when explicitly allowed by SPC
 - Zone isolation and de-isolation controls when explicitly allowed by SPC
+- Zone restoration through a dedicated Home Assistant button when SPC reports `RESTORE_ALLOWED=1`
 - Dynamic creation of supported Home Assistant control entities
 
 ### X-BUS
@@ -148,6 +149,7 @@ Actual feature availability depends on the panel model, firmware, installed modu
 | Part Set A / B | ✅ When enabled by the area |
 | Zone inhibition | ✅ When allowed by SPC |
 | Zone isolation | ✅ When allowed by SPC |
+| Zone restoration | ✅ When `RESTORE_ALLOWED=1` |
 | Mapping Gates / outputs | ✅ |
 | X-BUS discovery | ✅ |
 | FlexC events | ✅ |
@@ -263,7 +265,7 @@ An `alarm_control_panel` entity is created for every discovered SPC area, togeth
 
 ### Zones
 
-Discovered zones are represented in Home Assistant and are also used to resolve SPC arming refusal reasons. When SPC explicitly reports the relevant capabilities, dedicated switches are dynamically created for zone inhibition and isolation.
+Discovered zones are represented in Home Assistant and are also used to resolve SPC arming refusal reasons. When SPC explicitly reports the relevant capabilities, dedicated switches are dynamically created for zone inhibition and isolation. A dedicated **Restore** button is also created for each zone and becomes available only while SPC explicitly reports `RESTORE_ALLOWED=1`.
 
 ### Mapping Gates
 
@@ -324,9 +326,9 @@ Unknown reason codes are preserved and are not assigned guessed meanings.
 
 ---
 
-## Zone inhibition and isolation
+## Zone inhibition, isolation and restoration
 
-SPC FlexC exposes zone inhibition and isolation controls only when the SPC panel explicitly reports the corresponding capability.
+SPC FlexC exposes zone inhibition and isolation controls only when the SPC panel explicitly reports the corresponding capability. Zone restoration is likewise exposed only when the zone status explicitly reports `RESTORE_ALLOWED=1`.
 
 Real-panel testing validated:
 
@@ -336,10 +338,13 @@ Real-panel testing validated:
 | `1` | De-inhibit |
 | `2` | Isolate |
 | `3` | De-isolate |
+| `4` | Restore |
 
 `ISOLATED=1` is used as the canonical reported zone isolation state. `ISOLATE_ALLOWED=1` and `DEISOLATE_ALLOWED=1` are used as the corresponding capability fields.
 
 The integration does not infer permission from unrelated status values. If the expected capability is not explicitly reported, the state-changing command is not sent.
+
+Zone restore action `4` was validated end-to-end on an SPC4300: a zone at physical rest with a latched alarm reported `RESTORE_ALLOWED=1`; the restore command returned `RESULT=0`, the subsequent zone status returned to normal and `RESTORE_ALLOWED` disappeared. After a restore request, SPC FlexC rereads the zone status and only considers the operation complete once SPC no longer reports restoration as allowed.
 
 ---
 
