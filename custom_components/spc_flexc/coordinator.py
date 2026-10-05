@@ -195,6 +195,7 @@ def _zone_state_from_status(raw_zone: dict[str, str]) -> ZoneState:
         alarm_state=_int_value(raw_zone.get("ALARM_STATE")),
         inhibit_allowed=_bool_value(raw_zone.get("INHIBIT_ALLOWED")),
         isolate_allowed=_bool_value(raw_zone.get("ISOLATE_ALLOWED")),
+        restore_allowed=_bool_value(raw_zone.get("RESTORE_ALLOWED")),
         actuations_since_last_read=_int_value(
             raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
         ),
@@ -674,6 +675,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             or previous.status != zone.status
                             or previous.alarm_state != zone.alarm_state
                             or previous.inhibited != zone.inhibited
+                            or previous.restore_allowed != zone.restore_allowed
                             or previous.actuations_since_last_read
                             != zone.actuations_since_last_read
                         ):
