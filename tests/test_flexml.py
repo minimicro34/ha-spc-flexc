@@ -46,12 +46,12 @@ def test_zone_batch_uses_credentials() -> None:
 
 
 def test_zone_control_builds_validated_actions() -> None:
-    """All four real-panel validated zone actions may be emitted."""
-    for action in (0, 1, 2, 3):
+    """All five real-panel validated zone actions may be emitted."""
+    for action in (0, 1, 2, 3, 4):
         xml = build_zone_control_command(1, action, "HomeAssistant", "MyPassword")
         assert f'<CMD_ZONE_CONTROL ZONE_ID="1" ACTION="{action}" />' in xml
     with pytest.raises(ValueError):
-        build_zone_control_command(1, 4, "HomeAssistant", "MyPassword")
+        build_zone_control_command(1, 5, "HomeAssistant", "MyPassword")
 
 
 def test_parse_zone_control_real_panel_reply() -> None:
