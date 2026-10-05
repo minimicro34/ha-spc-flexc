@@ -255,6 +255,21 @@ def test_update_door_states_detects_changes() -> None:
     )
 
 
+def test_door_state_uses_fallback_names_and_mode() -> None:
+    raw = {
+        "DOOR_ID": "5",
+        "NAME": "Atelier",
+        "MODE": "2",
+        "AREA_SIDE_1": "1",
+    }
+
+    door = _door_state_from_status(raw)
+
+    assert door.name == "Atelier"
+    assert door.mode == 2
+    assert door.area_side_1 == 1
+
+
 @pytest.mark.asyncio
 async def test_read_doors_uses_operation_lock_and_parses_status() -> None:
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
