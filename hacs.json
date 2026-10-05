@@ -1,5 +1,6 @@
 {
   "name": "SPC FlexC",
   "render_readme": true,
-  "homeassistant": "2026.7.0"
+  "homeassistant": "2026.7.0",
+  "domains": ["spc_flexc"]
 }
