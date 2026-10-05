@@ -9,6 +9,7 @@ ZONE_ACTION_INHIBIT = 0
 ZONE_ACTION_DEINHIBIT = 1
 ZONE_ACTION_ISOLATE = 2
 ZONE_ACTION_DEISOLATE = 3
+ZONE_ACTION_RESTORE = 4
 
 
 async def async_set_zone_inhibited(
@@ -21,6 +22,21 @@ async def async_set_zone_inhibited(
     command = build_zone_control_command(
         zone_id,
         action,
+        client.command_username,
+        client.command_password,
+    )
+    response = await client.async_send_flexml(command)
+    parse_zone_control(response, zone_id)
+
+
+async def async_restore_zone(
+    client: FlexCClient,
+    zone_id: int,
+) -> None:
+    """Restore one SPC zone when the panel explicitly permits it."""
+    command = build_zone_control_command(
+        zone_id,
+        ZONE_ACTION_RESTORE,
         client.command_username,
         client.command_password,
     )
