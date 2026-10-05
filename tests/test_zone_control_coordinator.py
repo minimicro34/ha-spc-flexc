@@ -554,14 +554,7 @@ async def test_control_door_recovers_verification_timeout_without_false_failure(
 async def test_shutdown_cancels_door_poller_before_base_shutdown() -> None:
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
     coordinator._discovery_requested = True
-    door_task = MagicMock()
-    door_task.done.return_value = False
-    door_task.cancel.side_effect = lambda: None
-
-    async def cancelled_task() -> None:
-        raise asyncio.CancelledError
-
-    door_task.__await__ = cancelled_task().__await__
+    door_task = asyncio.create_task(asyncio.sleep(60))
     coordinator._door_poll_task = door_task
 
     with patch(
@@ -572,7 +565,7 @@ async def test_shutdown_cancels_door_poller_before_base_shutdown() -> None:
 
     assert coordinator._discovery_requested is False
     assert coordinator._door_poll_task is None
-    door_task.cancel.assert_called_once_with()
+    assert door_task.cancelled()
     base_shutdown.assert_awaited_once_with()
 
 
