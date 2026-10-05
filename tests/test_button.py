@@ -105,7 +105,18 @@ async def test_setup_adds_four_buttons_once_and_discovers_new_door() -> None:
     assert len(batches) == 1
 
     coordinator.data.doors[4] = DoorState(door_id=4, name="Studio")
+    coordinator.data.zones[1] = ZoneState(
+        zone_id=1, name="TV", area_id=None, restore_allowed=True
+    )
     listener[0]()
     assert len(batches) == 2
-    assert len(batches[1]) == 4
-    assert {entity.door_id for entity in batches[1]} == {4}
+    assert len(batches[1]) == 5
+    assert {entity.door_id for entity in batches[1] if isinstance(entity, SpcDoorActionButton)} == {4}
+    restore_buttons = [
+        entity for entity in batches[1] if isinstance(entity, SpcZoneRestoreButton)
+    ]
+    assert len(restore_buttons) == 1
+    assert restore_buttons[0].zone_id == 1
+
+    listener[0]()
+    assert len(batches) == 2
