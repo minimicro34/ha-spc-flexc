@@ -21,7 +21,11 @@ from .flexc.flexml import (
     parse_door_status,
 )
 from .flexc.read_retry import async_retry_read_once
-from .flexc.zone_control import async_set_zone_inhibited, async_set_zone_isolated
+from .flexc.zone_control import (
+    async_restore_zone,
+    async_set_zone_inhibited,
+    async_set_zone_isolated,
+)
 from .models import DoorState
 
 _LOGGER = logging.getLogger(__name__)
@@ -354,6 +358,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         refreshed.alarm_state = _int_or_none(raw_zone.get("ALARM_STATE"))
         refreshed.inhibit_allowed = _bool_or_none(raw_zone.get("INHIBIT_ALLOWED"))
         refreshed.isolate_allowed = _bool_or_none(raw_zone.get("ISOLATE_ALLOWED"))
+        refreshed.restore_allowed = _bool_or_none(raw_zone.get("RESTORE_ALLOWED"))
         refreshed.actuations_since_last_read = _int_or_none(
             raw_zone.get("ACTUATIONS_SINCE_LAST_READ")
         )
@@ -441,6 +446,42 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
             await self._async_refresh_zone_after_control(
                 zone_id, expected_attribute="isolated", expected_state=isolated
             )
+
+    async def async_restore_zone(self, zone_id: int) -> None:
+        """Restore one SPC zone when FlexC explicitly permits restoration."""
+        zone = self.state.zones.get(zone_id)
+        if zone is None:
+            raise ValueError(f"Unknown SPC zone {zone_id}")
+        if zone.restore_allowed is not True:
+            raise ValueError(f"SPC zone {zone_id} does not currently allow restoration")
+
+        async with self._client_operation_lock:
+            await self.client.async_ensure_connected()
+            await async_restore_zone(self.client, zone_id)
+
+            for attempt in range(ZONE_CONTROL_VERIFY_ATTEMPTS):
+                if attempt:
+                    await asyncio.sleep(ZONE_CONTROL_VERIFY_DELAY)
+                raw_zones = await async_retry_read_once(
+                    lambda: self.client.async_get_zone_status([zone_id]),
+                    description=f"refreshing zone {zone_id} after restoration",
+                )
+                if not raw_zones:
+                    continue
+                raw_zone = raw_zones[0]
+                if int(raw_zone["ZONE_ID"]) != zone_id:
+                    raise ValueError(
+                        f"SPC returned zone {raw_zone.get('ZONE_ID')} while refreshing zone {zone_id}"
+                    )
+                self._update_zone_from_control_status(zone_id, raw_zone)
+                if self.state.zones[zone_id].restore_allowed is not True:
+                    self.async_set_updated_data(self.state)
+                    return
+
+        self.async_set_updated_data(self.state)
+        raise ValueError(
+            f"SPC zone {zone_id} still allows restoration after restore command"
+        )
 
     async def async_inhibit_zone(self, zone_id: int) -> None:
         """Inhibit one SPC zone using the validated FlexC command."""
