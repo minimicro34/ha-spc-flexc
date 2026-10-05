@@ -256,6 +256,56 @@ def test_update_door_states_detects_changes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_read_doors_uses_operation_lock_and_parses_status() -> None:
+    coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
+    coordinator.client = MagicMock()
+    coordinator.client.command_username = "user"
+    coordinator.client.command_password = "password"
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_send_flexml = AsyncMock(return_value="status")
+    coordinator._client_operation_lock = AsyncMockContextManager()
+
+    with (
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.build_door_status_batch",
+            return_value="status-cmd",
+        ) as build_status,
+        patch(
+            "custom_components.spc_flexc.zone_control_coordinator.parse_door_status",
+            return_value=[{"DOOR_ID": "1", "MODE": "0"}],
+        ) as parse_status,
+    ):
+        result = await SpcFlexCZoneControlCoordinator._async_read_doors(
+            coordinator, [1]
+        )
+
+    coordinator.client.async_ensure_connected.assert_awaited_once_with()
+    build_status.assert_called_once_with([1], "user", "password")
+    coordinator.client.async_send_flexml.assert_awaited_once_with("status-cmd")
+    parse_status.assert_called_once_with("status")
+    assert result == [{"DOOR_ID": "1", "MODE": "0"}]
+
+
+@pytest.mark.asyncio
+async def test_reconnect_reconciliation_without_doors_keeps_base_result() -> None:
+    coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
+    coordinator._door_discovery_complete = False
+    coordinator._detected_door_ids = set()
+
+    with patch(
+        "custom_components.spc_flexc.zone_control_coordinator.SpcFlexCCoordinator._async_reconcile_known_state_locked",
+        new=AsyncMock(return_value=True),
+    ):
+        changed = (
+            await SpcFlexCZoneControlCoordinator._async_reconcile_known_state_locked(
+                coordinator
+            )
+        )
+
+    assert changed is True
+
+
+@pytest.mark.asyncio
 async def test_reconnect_reconciliation_refreshes_stale_door_mode() -> None:
     """A reconnect status read repairs a stale Home Assistant door mode."""
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
