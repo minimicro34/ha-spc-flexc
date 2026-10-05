@@ -392,10 +392,10 @@ async def test_control_door_rejects_bad_refresh() -> None:
 
 
 @pytest.mark.asyncio
-async def test_control_door_recovers_session_but_does_not_retry_unknown_effect() -> (
+async def test_control_door_recovers_session_but_does_not_retry_transient_action() -> (
     None
 ):
-    """Door controls recover transport but are never replayed without proven semantics."""
+    """Transient door action 5 recovers transport but is never replayed."""
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
     coordinator.state = SpcState(doors={1: DoorState(door_id=1, name="Garage")})
     coordinator.client = MagicMock()
@@ -426,7 +426,7 @@ async def test_control_door_recovers_session_but_does_not_retry_unknown_effect()
             return_value=[{"DOOR_ID": "1", "STATUS": "1"}],
         ),
     ):
-        await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 8)
+        await SpcFlexCZoneControlCoordinator.async_control_door(coordinator, 1, 5)
 
     coordinator.client.async_recover_session.assert_awaited_once_with()
     assert coordinator.client.async_send_flexml.await_count == 2
