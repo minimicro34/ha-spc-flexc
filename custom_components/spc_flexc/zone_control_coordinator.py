@@ -26,6 +26,10 @@ from .models import DoorState
 
 _LOGGER = logging.getLogger(__name__)
 DOOR_ACTIONS = {5, 6, 7, 8}
+# Persistent door actions empirically validated against SPC door MODE values.
+# Action 5 is a transient pulse and deliberately has no verifiable target mode.
+DOOR_ACTION_TARGET_MODES = {6: 2, 7: 0, 8: 1}
+DOOR_PERSISTENT_MODES = frozenset(DOOR_ACTION_TARGET_MODES.values())
 ZONE_CONTROL_VERIFY_ATTEMPTS = 3
 ZONE_CONTROL_VERIFY_DELAY = 0.25
 
@@ -155,7 +159,7 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         return changed
 
     async def async_control_door(self, door_id: int, action: int) -> None:
-        """Send one SPCLink-proven door action and refresh status after recovery."""
+        """Send one validated door action and verify/recover persistent modes."""
         if door_id not in self.state.doors:
             raise ValueError(f"Unknown SPC door {door_id}")
         if action not in DOOR_ACTIONS:
@@ -246,16 +250,8 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                 )
             self._update_door_states(raw_doors)
             self.async_set_updated_data(self.state)
-            if control_timed_out:
-                _LOGGER.warning(
-                    "Door %d status refreshed after control timeout; action %d was "
-                    "not retried because SPC door mode semantics are not validated "
-                    "for safe recovery",
-                    door_id,
-                    action,
-                )
-                return
             refreshed = self.state.doors[door_id]
+
             _LOGGER.info(
                 "Door %d status after action %d: STATUS=%s MODE=%s "
                 "DPS_INPUT=%s DRS_INPUT=%s",
@@ -265,6 +261,81 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                 refreshed.mode,
                 refreshed.dps_input,
                 refreshed.drs_input,
+            )
+
+            if not control_timed_out:
+                return
+
+            target_mode = DOOR_ACTION_TARGET_MODES.get(action)
+            if target_mode is None:
+                _LOGGER.warning(
+                    "Door %d transient action %d was not retried after timeout; "
+                    "door MODE cannot prove whether the pulse was already executed",
+                    door_id,
+                    action,
+                )
+                return
+
+            if refreshed.mode == target_mode:
+                _LOGGER.info(
+                    "Door %d action %d confirmed after timeout: MODE=%d; "
+                    "control will not be replayed",
+                    door_id,
+                    action,
+                    target_mode,
+                )
+                return
+
+            if refreshed.mode not in DOOR_PERSISTENT_MODES:
+                _LOGGER.error(
+                    "Door %d outcome is unknown after timeout: action=%d "
+                    "expected MODE=%d current MODE=%s; control was not retried",
+                    door_id,
+                    action,
+                    target_mode,
+                    refreshed.mode,
+                )
+                raise ValueError(
+                    f"SPC door {door_id} mode is unknown after control recovery"
+                )
+
+            _LOGGER.warning(
+                "Door %d remains MODE=%s while action %d requires MODE=%d; "
+                "retrying control once",
+                door_id,
+                refreshed.mode,
+                action,
+                target_mode,
+            )
+            response = await self.client.async_send_flexml(command)
+            parse_door_control(response)
+            _LOGGER.info(
+                "Door %d retry accepted by SPC for action %d; verifying final status",
+                door_id,
+                action,
+            )
+            status_response = await async_retry_read_once(
+                lambda: self.client.async_send_flexml(status_command),
+                description=f"refreshing door {door_id} after retry",
+            )
+            raw_doors = parse_door_status(status_response)
+            if not raw_doors or int(raw_doors[0].get("DOOR_ID", -1)) != door_id:
+                raise ValueError(
+                    f"SPC door {door_id} returned invalid status after control retry"
+                )
+            self._update_door_states(raw_doors)
+            self.async_set_updated_data(self.state)
+            refreshed = self.state.doors[door_id]
+            if refreshed.mode != target_mode:
+                raise ValueError(
+                    f"SPC door {door_id} did not confirm MODE={target_mode} "
+                    "after control retry"
+                )
+            _LOGGER.info(
+                "Door %d final status confirmed after retry: action=%d MODE=%d",
+                door_id,
+                action,
+                target_mode,
             )
 
     def _update_zone_from_control_status(
