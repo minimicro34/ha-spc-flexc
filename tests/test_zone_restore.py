@@ -37,6 +37,16 @@ def _coordinator(zone: ZoneState) -> MagicMock:
 
 
 @pytest.mark.asyncio
+async def test_restore_zone_rejects_unknown_zone() -> None:
+    coordinator = _coordinator(ZoneState(zone_id=1, restore_allowed=True))
+
+    with pytest.raises(ValueError, match="Unknown SPC zone 2"):
+        await SpcFlexCZoneControlCoordinator.async_restore_zone(coordinator, 2)
+
+    coordinator.client.async_ensure_connected.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_restore_zone_requires_explicit_permission() -> None:
     coordinator = _coordinator(ZoneState(zone_id=1, restore_allowed=False))
 
