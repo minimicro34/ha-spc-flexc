@@ -10,6 +10,8 @@ from custom_components.spc_flexc.flexc.zone_control import (
     ZONE_ACTION_DEISOLATE,
     ZONE_ACTION_INHIBIT,
     ZONE_ACTION_ISOLATE,
+    ZONE_ACTION_RESTORE,
+    async_restore_zone,
     async_set_zone_inhibited,
     async_set_zone_isolated,
 )
@@ -67,6 +69,21 @@ async def test_async_set_zone_isolated_uses_validated_actions() -> None:
         f'ACTION="{ZONE_ACTION_DEISOLATE}"'
         in client.async_send_flexml.await_args_list[1].args[0]
     )
+
+
+@pytest.mark.asyncio
+async def test_async_restore_zone_uses_validated_action4() -> None:
+    """Restoration uses the action validated against a real SPC4300."""
+    client = MagicMock()
+    client.command_username = "HomeAssistant"
+    client.command_password = "Password"
+    client.async_send_flexml = AsyncMock(return_value=ZONE_CONTROL_REPLY)
+
+    await async_restore_zone(client, 1)
+
+    command = client.async_send_flexml.await_args.args[0]
+    assert f'ACTION="{ZONE_ACTION_RESTORE}"' in command
+    assert 'ZONE_ID="1"' in command
 
 
 @pytest.mark.asyncio
