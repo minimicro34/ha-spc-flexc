@@ -44,7 +44,9 @@ def test_trace_is_bounded_and_relative() -> None:
 
 
 @pytest.mark.asyncio
-async def test_trace_counts_ack_data_event_and_poll_without_logging(caplog: pytest.LogCaptureFixture) -> None:
+async def test_trace_counts_ack_data_event_and_poll_without_logging(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     client = _client()
     client._send_wire = AsyncMock()
     client._build_clone_ack = MagicMock(return_value=b"ack")
