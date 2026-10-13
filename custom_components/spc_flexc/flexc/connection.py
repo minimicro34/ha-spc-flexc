@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import zlib
+from dataclasses import dataclass, field
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
@@ -104,6 +105,31 @@ def _put32(value: int) -> bytes:
     return int(value & 0xFFFFFFFF).to_bytes(4, "big")
 
 
+@dataclass
+class _CommandTrace:
+    """Bounded, credential-free diagnostics for one in-flight command."""
+
+    command_id: int
+    name: str
+    session: int
+    started: float
+    sent_at: float | None = None
+    ack_at: float | None = None
+    data_first_at: float | None = None
+    data_last_at: float | None = None
+    data_frames: int = 0
+    events: int = 0
+    polls: int = 0
+    errors: int = 0
+    unexpected: int = 0
+    timeline: list[str] = field(default_factory=list)
+
+    def record(self, kind: str, now: float) -> None:
+        """Keep a small relative-time history, even on busy sessions."""
+        if len(self.timeline) < 24:
+            self.timeline.append(f"{(now - self.started) * 1000:.0f}ms:{kind}")
+
+
 class FlexCClient:
     """Persistent FlexC receiver/client.
 
@@ -147,6 +173,8 @@ class FlexCClient:
         self._last_message: dict[str, Any] | None = None
         self._rct_sequence = INITIAL_RCT_SEQUENCE
 
+        self._trace_counter = 0
+        self._active_trace: _CommandTrace | None = None
         self._pending_reply: asyncio.Future[str] | None = None
         self._poll_waiter: asyncio.Future[dict[str, Any]] | None = None
         self._response_buffer = bytearray()
@@ -582,6 +610,31 @@ class FlexCClient:
     ) -> None:
         """Process one validated incoming FlexC message."""
         message_id = int(message["message_id"])
+        trace = self._active_trace
+        if trace is not None:
+            now = asyncio.get_running_loop().time()
+            if message_id == MSG_DATA_ACK:
+                if trace.ack_at is None:
+                    trace.ack_at = now
+                trace.record("DATA_ACK", now)
+            elif message_id == MSG_DATA:
+                if trace.data_first_at is None:
+                    trace.data_first_at = now
+                trace.data_last_at = now
+                trace.data_frames += 1
+                trace.record("DATA", now)
+            elif message_id == MSG_EVENT:
+                trace.events += 1
+                trace.record("EVENT", now)
+            elif message_id == MSG_POLL:
+                trace.polls += 1
+                trace.record("POLL", now)
+            elif message_id == MSG_ERROR:
+                trace.errors += 1
+                trace.record("ERROR", now)
+            else:
+                trace.unexpected += 1
+                trace.record(f"0x{message_id:02X}", now)
 
         if message_id == MSG_CONNECTION_REQUEST_LEGACY:
             await self._send_wire(self._build_connection_ack(message))
@@ -841,6 +894,41 @@ class FlexCClient:
             return "unknown"
         return ",".join(names)
 
+    @staticmethod
+    def _elapsed_ms(start: float, end: float | None) -> str:
+        """Format a relative timestamp without logging payloads."""
+        return "none" if end is None else f"{(end - start) * 1000:.0f}"
+
+    def _log_command_timeout(self, trace: _CommandTrace) -> None:
+        """Emit one INFO-compatible diagnostic only when a command times out."""
+        now = asyncio.get_running_loop().time()
+        _LOGGER.warning(
+            "FlexC timeout diagnostic: command_id=%d command=%s session=%d "
+            "elapsed_ms=%.0f sent_ms=%s ack_ms=%s data_first_ms=%s "
+            "data_last_ms=%s data_frames=%d events=%d polls=%d errors=%d "
+            "other_frames=%d connected=%s pending=%s response_bytes=%d "
+            "expected_bytes=%s timeline=%s",
+            trace.command_id,
+            trace.name,
+            trace.session,
+            (now - trace.started) * 1000,
+            self._elapsed_ms(trace.started, trace.sent_at),
+            self._elapsed_ms(trace.started, trace.ack_at),
+            self._elapsed_ms(trace.started, trace.data_first_at),
+            self._elapsed_ms(trace.started, trace.data_last_at),
+            trace.data_frames,
+            trace.events,
+            trace.polls,
+            trace.errors,
+            trace.unexpected,
+            self.connected,
+            self._pending_reply is not None
+            and not self._pending_reply.done(),
+            len(self._response_buffer),
+            self._response_length,
+            ",".join(trace.timeline),
+        )
+
     async def async_send_flexml(self, command: str) -> str:
         """Send one FLEXML command and return FLEXML_REPLY."""
         await self.async_ensure_connected()
@@ -868,6 +956,14 @@ class FlexCClient:
             loop = asyncio.get_running_loop()
             pending: asyncio.Future[str] = loop.create_future()
 
+            self._trace_counter += 1
+            trace = _CommandTrace(
+                command_id=self._trace_counter,
+                name=self._command_diagnostic_label(command),
+                session=self._session_generation,
+                started=loop.time(),
+            )
+            self._active_trace = trace
             self._pending_reply = pending
             self._response_buffer = bytearray()
             self._response_length = None
@@ -884,11 +980,14 @@ class FlexCClient:
 
             try:
                 await self._send_wire(wire)
+                trace.sent_at = loop.time()
+                trace.record("SENT", trace.sent_at)
 
                 async with asyncio.timeout(COMMAND_TIMEOUT):
                     return await pending
 
             except TimeoutError as err:
+                self._log_command_timeout(trace)
                 # Never reuse a context after a command timeout. Tear down the
                 # current socket so the next connection starts from a clean
                 # handshake/POLL synchronization point.
@@ -927,6 +1026,8 @@ class FlexCClient:
                 raise
 
             finally:
+                if self._active_trace is trace:
+                    self._active_trace = None
                 if self._pending_reply is pending:
                     self._pending_reply = None
 
