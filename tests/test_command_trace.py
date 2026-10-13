@@ -111,3 +111,52 @@ async def test_timeout_summary_is_warning_and_never_exposes_credentials(
     assert "secret-password" not in record.message
     assert "test-user" not in record.message
     client._pending_reply.cancel()
+
+@pytest.mark.asyncio
+async def test_command_timeout_emits_diagnostic_and_resets_session(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A real command timeout emits diagnostics and preserves recovery behavior."""
+    from unittest.mock import patch
+
+    from custom_components.spc_flexc.flexc.connection import (
+        FlexCCommandTimeout,
+    )
+
+    client = _client()
+    client.connected = True
+    client._session_generation = 4
+    client._command_context = {"rct_sequence": 1}
+    client.async_ensure_connected = AsyncMock()
+    client._build_application_buffer = MagicMock(return_value=b"application")
+    client._build_outbound_data = MagicMock(return_value=b"wire")
+    client._send_wire = AsyncMock()
+    writer = MagicMock()
+    writer.wait_closed = AsyncMock()
+    client._writer = writer
+
+    with (
+        patch("custom_components.spc_flexc.flexc.connection.COMMAND_TIMEOUT", 0),
+        caplog.at_level(logging.WARNING),
+        pytest.raises(FlexCCommandTimeout, match="Timeout waiting"),
+    ):
+        await client.async_send_flexml(
+            '<CMD_STATUS_ZONE USER="test-user" PASSWORD="secret-password" />'
+        )
+
+    diagnostics = [
+        record for record in caplog.records
+        if record.message.startswith("FlexC timeout diagnostic:")
+    ]
+    assert len(diagnostics) == 1
+    assert "command=CMD_STATUS_ZONE" in diagnostics[0].message
+    assert "session=4" in diagnostics[0].message
+    assert "SENT" in diagnostics[0].message
+    assert "secret-password" not in caplog.text
+    assert "test-user" not in caplog.text
+    assert client._active_trace is None
+    assert client._pending_reply is None
+    assert client._command_context is None
+    assert not client.connected
+    writer.close.assert_called_once_with()
+    writer.wait_closed.assert_awaited_once_with()
