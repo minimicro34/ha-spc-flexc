@@ -112,6 +112,7 @@ async def test_timeout_summary_is_warning_and_never_exposes_credentials(
     assert "test-user" not in record.message
     client._pending_reply.cancel()
 
+
 @pytest.mark.asyncio
 async def test_command_timeout_emits_diagnostic_and_resets_session(
     caplog: pytest.LogCaptureFixture,
@@ -145,7 +146,8 @@ async def test_command_timeout_emits_diagnostic_and_resets_session(
         )
 
     diagnostics = [
-        record for record in caplog.records
+        record
+        for record in caplog.records
         if record.message.startswith("FlexC timeout diagnostic:")
     ]
     assert len(diagnostics) == 1
