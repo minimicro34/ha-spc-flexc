@@ -166,6 +166,9 @@ class FlexCClient:
         self._command_context: dict[str, Any] | None = None
         self._context_event = asyncio.Event()
         self._recovery_started_at: float | None = None
+        # An unsolicited EVENT between commands invalidates the DATA chain.
+        # Wait for the next SPC POLL before sending another command.
+        self._awaiting_poll_after_event = False
 
     def set_session_ready_callback(self, callback: Callable[[int], None]) -> None:
         """Register a callback invoked when a fresh session context is ready."""
@@ -246,6 +249,7 @@ class FlexCClient:
         self._writer = writer
         self._command_context = None
         self._context_event.clear()
+        self._awaiting_poll_after_event = False
 
         _LOGGER.info(
             "SPC FlexC TCP connection #%d accepted from %s", generation, peer_host
@@ -312,6 +316,7 @@ class FlexCClient:
                 self._connected_event.clear()
                 self._command_context = None
                 self._context_event.clear()
+                self._awaiting_poll_after_event = False
 
                 if self._pending_reply is not None and not self._pending_reply.done():
                     self._pending_reply.set_exception(
@@ -622,9 +627,17 @@ class FlexCClient:
             # context. During an active command, the following DATA reply is
             # the authoritative context for the next request.
             if self._pending_reply is None:
+                was_waiting_for_poll = self._awaiting_poll_after_event
                 self._command_context = dict(message)
                 self._rct_sequence = int(message["rct_sequence"])
+                self._awaiting_poll_after_event = False
                 self._context_event.set()
+                if was_waiting_for_poll:
+                    _LOGGER.info(
+                        "FlexC context resynchronized from SPC POLL after "
+                        "unsolicited EVENT (session #%d)",
+                        self._session_generation,
+                    )
 
                 if self._recovery_started_at is not None:
                     elapsed = (
@@ -660,6 +673,19 @@ class FlexCClient:
                 )
             )
 
+            # An EVENT can advance the panel's transport context. Never
+            # replace the context of an in-flight DATA request: its reply
+            # remains authoritative. Between requests, require a fresh POLL.
+            if self._pending_reply is None and not self._awaiting_poll_after_event:
+                self._command_context = None
+                self._context_event.clear()
+                self._awaiting_poll_after_event = True
+                _LOGGER.info(
+                    "FlexC unsolicited EVENT between commands: waiting for "
+                    "fresh SPC POLL before next command (session #%d)",
+                    self._session_generation,
+                )
+
             event = parse_event_payload(bytes(message["app_data"]))
 
             if event is not None:
@@ -686,6 +712,7 @@ class FlexCClient:
             # the next FLEXML command.
             self._command_context = dict(message)
             self._rct_sequence = int(message["rct_sequence"])
+            self._awaiting_poll_after_event = False
             self._context_event.set()
 
             self._handle_incoming_data(message)
