@@ -8,8 +8,8 @@ import logging
 import os
 import re
 import zlib
-from dataclasses import dataclass, field
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
 from Crypto.Cipher import AES
@@ -922,8 +922,7 @@ class FlexCClient:
             trace.errors,
             trace.unexpected,
             self.connected,
-            self._pending_reply is not None
-            and not self._pending_reply.done(),
+            self._pending_reply is not None and not self._pending_reply.done(),
             len(self._response_buffer),
             self._response_length,
             ",".join(trace.timeline),
