@@ -9,7 +9,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -624,7 +624,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             if self._discovery_task is current_task:
                 self._discovery_task = None
 
+    def _should_run_polling(self) -> bool:
+        """Allow polling only while discovery is active and HA is running."""
+        return (
+            self._discovery_requested
+            and self.hass.state not in (CoreState.stopping, CoreState.stopped)
+        )
+
     def _schedule_zone_polling(self) -> None:
+        if not self._should_run_polling():
+            return
         if not self._zone_discovery_complete or not self._detected_zone_ids:
             return
         if self._zone_poll_task is not None and not self._zone_poll_task.done():
@@ -692,24 +701,29 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         "Unexpected error while polling SPC zones; polling will continue"
                     )
         except asyncio.CancelledError:
-            _LOGGER.warning(
-                "SPC zone polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
-                self.entry.state,
-                self.hass.state,
-                self._discovery_requested,
-            )
+            if self._should_run_polling():
+                _LOGGER.warning(
+                    "SPC zone polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
+            else:
+                _LOGGER.debug("SPC zone polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
             raise
         finally:
             _LOGGER.debug("SPC zone polling stopped")
             current_task = asyncio.current_task()
             if self._zone_poll_task is current_task:
                 self._zone_poll_task = None
-                if self._discovery_requested:
+                if self._should_run_polling():
                     _LOGGER.warning("SPC zone polling stopped unexpectedly; restarting")
                     self._schedule_zone_polling()
 
     def _schedule_xbus_polling(self) -> None:
         """Start periodic aggregate X-BUS reconciliation."""
+        if not self._should_run_polling():
+            return
         if not self._xbus_discovery_complete:
             return
         if self._xbus_poll_task is not None and not self._xbus_poll_task.done():
@@ -779,19 +793,22 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         "Unexpected error while polling SPC X-BUS; polling will continue"
                     )
         except asyncio.CancelledError:
-            _LOGGER.warning(
-                "SPC X-BUS polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
-                self.entry.state,
-                self.hass.state,
-                self._discovery_requested,
-            )
+            if self._should_run_polling():
+                _LOGGER.warning(
+                    "SPC X-BUS polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
+            else:
+                _LOGGER.debug("SPC X-BUS polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
             raise
         finally:
             _LOGGER.debug("SPC X-BUS polling stopped")
             current_task = asyncio.current_task()
             if self._xbus_poll_task is current_task:
                 self._xbus_poll_task = None
-                if self._discovery_requested:
+                if self._should_run_polling():
                     _LOGGER.warning(
                         "SPC X-BUS polling stopped unexpectedly; restarting"
                     )
