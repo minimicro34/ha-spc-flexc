@@ -493,6 +493,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     self.client.async_get_alert_status,
                     description="reading panel alerts",
                 )
+                _LOGGER.debug("FlexC panel active alerts: %s", alerts)
                 if not alerts:
                     self.state.faults.modem_1_fault = False
                     self.state.faults.modem_1_line_fault = False
