@@ -215,9 +215,7 @@ def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
         event_tamper=True,
         last_event={"EV_ID": "1008", "ZONE_ID": "8"},
     )
-    normal = ZoneState(
-        zone_id=8, logic_input=0, status=0, proc_state=0, alarm_state=0
-    )
+    normal = ZoneState(zone_id=8, logic_input=0, status=0, proc_state=0, alarm_state=0)
     assert _reconcile_zone_event_state(normal, previous) is True
     assert normal.event_tamper is False
     assert normal.last_event == previous.last_event
@@ -226,9 +224,7 @@ def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
     assert _reconcile_zone_event_state(incomplete, previous) is False
     assert incomplete.event_tamper is True
 
-    active = ZoneState(
-        zone_id=8, logic_input=1, status=0, proc_state=0, alarm_state=0
-    )
+    active = ZoneState(zone_id=8, logic_input=1, status=0, proc_state=0, alarm_state=0)
     assert _reconcile_zone_event_state(active, previous) is False
     assert active.event_tamper is True
 
