@@ -144,7 +144,9 @@ async def test_explicit_coordinator_shutdown_while_ha_running_does_not_warn(
         "custom_components.spc_flexc.coordinator.poll_delay_for_phase",
         return_value=3600.0,
     ):
-        task = asyncio.create_task(SpcFlexCCoordinator._async_zone_poll_loop(coordinator))
+        task = asyncio.create_task(
+            SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+        )
         coordinator._zone_poll_task = task
         await asyncio.sleep(0)
         with caplog.at_level(
