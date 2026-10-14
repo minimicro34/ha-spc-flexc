@@ -911,9 +911,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
         fault_changed = apply_event(self.state.faults, event)
         if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
-            self._tamper_store.async_delay_save(
-                lambda: {"panel_tamper": self.state.faults.panel_tamper}, 1
-            )
+            panel_tamper = self.state.faults.panel_tamper
+            if panel_tamper is not None:
+                self._tamper_store.async_delay_save(
+                    lambda: {"panel_tamper": panel_tamper}, 1
+                )
         panel_changed = apply_panel_event(self.state.panel, event)
         area_changed = apply_area_event(self.state.areas, event)
         zone_changed = apply_zone_event(self.state.zones, event)
