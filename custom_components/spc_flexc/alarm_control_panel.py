@@ -474,12 +474,29 @@ class SpcPanelAlarmControlPanel(
         if all(mode == MODE_SET for mode in modes):
             return AlarmControlPanelState.ARMED_AWAY
 
+        # Home Assistant has no aggregate "mixed" alarm state. Do not report
+        # ARMED_AWAY when only some areas are armed. Consumers can use the
+        # explicit arming_summary attribute below.
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return aggregate SPC panel details."""
+        modes = [area.mode for area in self.coordinator.data.areas.values()]
+        if not modes or any(mode not in MODE_LABELS for mode in modes):
+            arming_summary = "unknown"
+        elif all(mode == MODE_UNSET for mode in modes):
+            arming_summary = "disarmed"
+        elif all(mode == MODE_SET for mode in modes):
+            arming_summary = "armed_away"
+        elif all(mode == MODE_PARTSET_A for mode in modes):
+            arming_summary = "armed_home"
+        elif all(mode == MODE_PARTSET_B for mode in modes):
+            arming_summary = "armed_night"
+        else:
+            arming_summary = "mixed"
         return {
+            "arming_summary": arming_summary,
             "areas": {
                 str(area_id): {
                     "name": area.name or f"Area {area_id}",
