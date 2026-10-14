@@ -204,7 +204,6 @@ def _zone_state_from_status(raw_zone: dict[str, str]) -> ZoneState:
     )
 
 
-
 def _reconcile_zone_event_state(zone: ZoneState, previous: ZoneState | None) -> bool:
     """Preserve event history, but clear stale tamper on confirmed normal status.
 
@@ -216,21 +215,25 @@ def _reconcile_zone_event_state(zone: ZoneState, previous: ZoneState | None) -> 
 
     zone.last_event = previous.last_event
     zone.event_tamper = previous.event_tamper
-    if zone.event_tamper is True and all(
-        value == 0
-        for value in (
-            zone.logic_input,
-            zone.status,
-            zone.proc_state,
-            zone.alarm_state,
+    if (
+        zone.event_tamper is True
+        and all(
+            value == 0
+            for value in (
+                zone.logic_input,
+                zone.status,
+                zone.proc_state,
+                zone.alarm_state,
+            )
         )
-    ) and all(
-        value is not None
-        for value in (
-            zone.logic_input,
-            zone.status,
-            zone.proc_state,
-            zone.alarm_state,
+        and all(
+            value is not None
+            for value in (
+                zone.logic_input,
+                zone.status,
+                zone.proc_state,
+                zone.alarm_state,
+            )
         )
     ):
         zone.event_tamper = False
@@ -442,7 +445,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     event_changed = _reconcile_zone_event_state(
                         zone, previous_zone
                     )
-                    if previous_zone is None or previous_zone.raw != zone.raw or event_changed:
+                    if (
+                        previous_zone is None
+                        or previous_zone.raw != zone.raw
+                        or event_changed
+                    ):
                         changed = True
                     self.state.zones[zone.zone_id] = zone
 
@@ -709,16 +716,20 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
                         event_changed = _reconcile_zone_event_state(zone, previous)
-                        if event_changed or previous is None or (
-                            previous.input_state != zone.input_state
-                            or previous.logic_input != zone.logic_input
-                            or previous.proc_state != zone.proc_state
-                            or previous.status != zone.status
-                            or previous.alarm_state != zone.alarm_state
-                            or previous.inhibited != zone.inhibited
-                            or previous.restore_allowed != zone.restore_allowed
-                            or previous.actuations_since_last_read
-                            != zone.actuations_since_last_read
+                        if (
+                            event_changed
+                            or previous is None
+                            or (
+                                previous.input_state != zone.input_state
+                                or previous.logic_input != zone.logic_input
+                                or previous.proc_state != zone.proc_state
+                                or previous.status != zone.status
+                                or previous.alarm_state != zone.alarm_state
+                                or previous.inhibited != zone.inhibited
+                                or previous.restore_allowed != zone.restore_allowed
+                                or previous.actuations_since_last_read
+                                != zone.actuations_since_last_read
+                            )
                         ):
                             changed = True
                         self.state.zones[zone.zone_id] = zone
