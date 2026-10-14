@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.core import CoreState
@@ -139,6 +139,7 @@ async def test_explicit_coordinator_shutdown_while_ha_running_does_not_warn(
     coordinator._xbus_poll_task = None
     coordinator._reconnect_reconcile_task = None
     coordinator._discovery_task = None
+    coordinator.client.async_close = AsyncMock()
 
     with patch(
         "custom_components.spc_flexc.coordinator.poll_delay_for_phase",
