@@ -204,6 +204,40 @@ def _zone_state_from_status(raw_zone: dict[str, str]) -> ZoneState:
     )
 
 
+
+def _reconcile_zone_event_state(zone: ZoneState, previous: ZoneState | None) -> bool:
+    """Preserve event history, but clear stale tamper on confirmed normal status.
+
+    Only a complete, explicitly normal status can override a missed restore
+    EVENT. Missing fields are not evidence of recovery.
+    """
+    if previous is None:
+        return False
+
+    zone.last_event = previous.last_event
+    zone.event_tamper = previous.event_tamper
+    if zone.event_tamper is True and all(
+        value == 0
+        for value in (
+            zone.logic_input,
+            zone.status,
+            zone.proc_state,
+            zone.alarm_state,
+        )
+    ) and all(
+        value is not None
+        for value in (
+            zone.logic_input,
+            zone.status,
+            zone.proc_state,
+            zone.alarm_state,
+        )
+    ):
+        zone.event_tamper = False
+
+    return zone.event_tamper != previous.event_tamper
+
+
 def _door_state_from_status(raw_door: dict[str, str]) -> DoorState:
     return DoorState(
         door_id=int(raw_door["DOOR_ID"]),
@@ -405,10 +439,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
                     previous_zone = self.state.zones.get(zone.zone_id)
-                    if previous_zone is not None:
-                        zone.event_tamper = previous_zone.event_tamper
-                        zone.last_event = previous_zone.last_event
-                    if previous_zone is None or previous_zone.raw != zone.raw:
+                    event_changed = _reconcile_zone_event_state(
+                        zone, previous_zone
+                    )
+                    if previous_zone is None or previous_zone.raw != zone.raw or event_changed:
                         changed = True
                     self.state.zones[zone.zone_id] = zone
 
@@ -674,10 +708,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     for raw_zone in raw_zones:
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
-                        if previous is not None:
-                            zone.event_tamper = previous.event_tamper
-                            zone.last_event = previous.last_event
-                        if previous is None or (
+                        event_changed = _reconcile_zone_event_state(zone, previous)
+                        if event_changed or previous is None or (
                             previous.input_state != zone.input_state
                             or previous.logic_input != zone.logic_input
                             or previous.proc_state != zone.proc_state
