@@ -53,6 +53,8 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
 
     def _schedule_door_polling(self) -> None:
         """Start periodic status polling for discovered access-control doors."""
+        if not self._should_run_polling():
+            return
         if not self._door_discovery_complete or not self._detected_door_ids:
             return
         if self._door_poll_task is not None and not self._door_poll_task.done():
@@ -90,19 +92,22 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                         "Unexpected error while polling SPC doors; polling will continue"
                     )
         except asyncio.CancelledError:
-            _LOGGER.warning(
-                "SPC door polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
-                self.entry.state,
-                self.hass.state,
-                self._discovery_requested,
-            )
+            if self._should_run_polling():
+                _LOGGER.warning(
+                    "SPC door polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
+            else:
+                _LOGGER.debug("SPC door polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
             raise
         finally:
             _LOGGER.debug("SPC door polling stopped")
             current_task = asyncio.current_task()
             if self._door_poll_task is current_task:
                 self._door_poll_task = None
-                if self._discovery_requested:
+                if self._should_run_polling():
                     _LOGGER.warning("SPC door polling stopped unexpectedly; restarting")
                     self._schedule_door_polling()
 
