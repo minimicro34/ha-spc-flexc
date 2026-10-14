@@ -312,6 +312,8 @@ Part Set controls are only exposed when the corresponding capability is reported
 
 ### Global alarm control
 
+The global `alarm_control_panel` reports a standard Home Assistant alarm state only when all discovered SPC areas have a consistent, known arming mode. If the areas have different modes, its state is `unknown` because Home Assistant does not define a native mixed arming state. The `arming_summary` attribute explicitly reports `mixed` in that case. It can also report `disarmed`, `armed_away`, `armed_home`, `armed_night` or `unknown` according to the aggregate area modes. If any area mode is unavailable or unrecognized, the global state and `arming_summary` remain `unknown` rather than incorrectly indicating that the installation is disarmed. Individual area alarm entities continue to show their own modes.
+
 Before Global Full Set, every discovered area is prechecked. If any precheck fails, the operation is aborted before the first Full Set command is sent. Only after all prechecks succeed are individual area commands sent.
 
 Global Full Set is therefore coordinated but not atomic. A communication failure or panel state change after prechecks can still produce a partially completed operation. State-changing commands are not automatically retried.
