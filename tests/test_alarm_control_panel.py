@@ -266,6 +266,11 @@ def test_panel_entity_states_and_attributes() -> None:
     assert entity.extra_state_attributes["arming_summary"] == "mixed"
     coordinator.data.areas[2].mode = None
     assert entity.extra_state_attributes["arming_summary"] == "unknown"
+    assert entity.alarm_state is None
+    coordinator.data.areas[1].mode = MODE_UNSET
+    assert entity.alarm_state is None
+    coordinator.data.areas[2].mode = 99
+    assert entity.alarm_state is None
     coordinator.data.areas.clear()
     assert entity.available is False
     assert entity.alarm_state is None
