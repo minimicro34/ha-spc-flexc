@@ -258,6 +258,14 @@ def test_panel_entity_states_and_attributes() -> None:
     assert entity.alarm_state == AlarmControlPanelState.ARMED_AWAY
     coordinator.data.areas[2].mode = MODE_UNSET
     assert entity.alarm_state is None
+    assert entity.extra_state_attributes["arming_summary"] == "mixed"
+    coordinator.data.areas[1].mode = MODE_PARTSET_A
+    coordinator.data.areas[2].mode = MODE_PARTSET_A
+    assert entity.extra_state_attributes["arming_summary"] == "armed_home"
+    coordinator.data.areas[2].mode = MODE_PARTSET_B
+    assert entity.extra_state_attributes["arming_summary"] == "mixed"
+    coordinator.data.areas[2].mode = None
+    assert entity.extra_state_attributes["arming_summary"] == "unknown"
     coordinator.data.areas.clear()
     assert entity.available is False
     assert entity.alarm_state is None
