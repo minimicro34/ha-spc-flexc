@@ -442,9 +442,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 for raw_zone in raw_zones:
                     zone = _zone_state_from_status(raw_zone)
                     previous_zone = self.state.zones.get(zone.zone_id)
-                    event_changed = _reconcile_zone_event_state(
-                        zone, previous_zone
-                    )
+                    event_changed = _reconcile_zone_event_state(zone, previous_zone)
                     if (
                         previous_zone is None
                         or previous_zone.raw != zone.raw
