@@ -123,3 +123,40 @@ async def test_polling_cancelled_during_shutdown_does_not_restart_or_warn(
     assert not any(
         "polling stopped unexpectedly" in record.message for record in caplog.records
     )
+
+
+@pytest.mark.asyncio
+async def test_explicit_coordinator_shutdown_while_ha_running_does_not_warn(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """An integration reload cancels polling before HA enters stopping."""
+    coordinator = MagicMock()
+    coordinator.hass.state = CoreState.running
+    coordinator._discovery_requested = True
+    coordinator._should_run_polling.side_effect = lambda: (
+        SpcFlexCCoordinator._should_run_polling(coordinator)
+    )
+    coordinator._xbus_poll_task = None
+    coordinator._reconnect_reconcile_task = None
+    coordinator._discovery_task = None
+
+    with patch(
+        "custom_components.spc_flexc.coordinator.poll_delay_for_phase",
+        return_value=3600.0,
+    ):
+        task = asyncio.create_task(SpcFlexCCoordinator._async_zone_poll_loop(coordinator))
+        coordinator._zone_poll_task = task
+        await asyncio.sleep(0)
+        with caplog.at_level(
+            logging.WARNING, logger="custom_components.spc_flexc.coordinator"
+        ):
+            await SpcFlexCCoordinator.async_shutdown(coordinator)
+
+    assert coordinator._discovery_requested is False
+    assert coordinator._zone_poll_task is None
+    coordinator.entry.async_create_background_task.assert_not_called()
+    coordinator.client.async_close.assert_awaited_once()
+    assert not any("polling cancelled" in record.message for record in caplog.records)
+    assert not any(
+        "polling stopped unexpectedly" in record.message for record in caplog.records
+    )
