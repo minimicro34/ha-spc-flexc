@@ -21,6 +21,7 @@ from custom_components.spc_flexc.coordinator import (
     _spc_datetime,
     _xbus_device_state_from_status,
     _zone_state_from_status,
+    _reconcile_zone_event_state,
     poll_delay_for_phase,
 )
 from custom_components.spc_flexc.flexc.connection import FlexCConnectionError
@@ -205,6 +206,31 @@ def test_protocol_status_mappers() -> None:
     assert door.door_id == 2
     assert door.name == "Garage"
     assert door.mode == 7
+
+
+def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
+    """A missed restore event must not leave an inactive tamper latched."""
+    previous = ZoneState(
+        zone_id=8,
+        event_tamper=True,
+        last_event={"EV_ID": "1008", "ZONE_ID": "8"},
+    )
+    normal = ZoneState(
+        zone_id=8, logic_input=0, status=0, proc_state=0, alarm_state=0
+    )
+    assert _reconcile_zone_event_state(normal, previous) is True
+    assert normal.event_tamper is False
+    assert normal.last_event == previous.last_event
+
+    incomplete = ZoneState(zone_id=8, logic_input=0, status=0, proc_state=0)
+    assert _reconcile_zone_event_state(incomplete, previous) is False
+    assert incomplete.event_tamper is True
+
+    active = ZoneState(
+        zone_id=8, logic_input=1, status=0, proc_state=0, alarm_state=0
+    )
+    assert _reconcile_zone_event_state(active, previous) is False
+    assert active.event_tamper is True
 
 
 def test_handle_flexc_event() -> None:
