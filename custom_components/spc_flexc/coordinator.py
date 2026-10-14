@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -317,6 +318,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         )
         self.entry = entry
         self.state = SpcState()
+        self._tamper_store = Store(hass, 1, f"{DOMAIN}.panel_tamper.{entry.entry_id}")
         self.client = FlexCClient(entry.data)
         self.client.set_event_callback(self._handle_flexc_event)
         self.client.set_session_ready_callback(self._handle_session_ready)
@@ -338,6 +340,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._reconnect_reconcile_task: asyncio.Task[None] | None = None
         self._pending_reconcile_generation = 0
         self._last_reconciled_generation = 0
+
+    async def async_restore_panel_tamper(self) -> None:
+        """Restore last event-confirmed panel tamper state, if available."""
+        try:
+            saved = await self._tamper_store.async_load()
+        except Exception:  # Storage failure must not prevent alarm integration setup.
+            _LOGGER.exception("Could not restore last known panel tamper state")
+            return
+        if isinstance(saved, dict) and type(saved.get("panel_tamper")) is bool:
+            self.state.faults.panel_tamper = saved["panel_tamper"]
+            _LOGGER.debug("Restored last known panel tamper state")
 
     def _handle_session_ready(self, generation: int) -> None:
         """Schedule state reconciliation after a replacement FlexC session."""
@@ -488,13 +501,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     description="reading panel summary",
                 )
                 if summary:
-                    _LOGGER.debug("FlexC panel summary fields: %s", sorted(summary))
                     self.state.panel = _panel_state_from_summary(summary)
                 alerts = await async_retry_read_once(
                     self.client.async_get_alert_status,
                     description="reading panel alerts",
                 )
-                _LOGGER.debug("FlexC panel active alerts: %s", alerts)
                 if not alerts:
                     self.state.faults.modem_1_fault = False
                     self.state.faults.modem_1_line_fault = False
@@ -897,6 +908,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
         fault_changed = apply_event(self.state.faults, event)
+        if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
+            self._tamper_store.async_delay_save(
+                lambda: {"panel_tamper": self.state.faults.panel_tamper}, 1
+            )
         panel_changed = apply_panel_event(self.state.panel, event)
         area_changed = apply_area_event(self.state.areas, event)
         zone_changed = apply_zone_event(self.state.zones, event)
