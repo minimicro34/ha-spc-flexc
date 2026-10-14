@@ -728,3 +728,38 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
     assert device.last_event == {"EV_ID": "5316"}
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
     assert coordinator._xbus_poll_task is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("saved, expected", [
+    ({"panel_tamper": True}, True),
+    ({"panel_tamper": False}, False),
+    (None, None),
+    ({"panel_tamper": "true"}, None),
+])
+async def test_restore_last_known_panel_tamper(saved, expected) -> None:
+    """Only persisted boolean states may restore the enclosure tamper."""
+    coordinator = MagicMock(spec=SpcFlexCCoordinator)
+    coordinator.state = SpcState()
+    coordinator._tamper_store = MagicMock()
+    coordinator._tamper_store.async_load = AsyncMock(return_value=saved)
+
+    await SpcFlexCCoordinator.async_restore_panel_tamper(coordinator)
+
+    assert coordinator.state.faults.panel_tamper is expected
+
+
+@pytest.mark.parametrize("event_id, expected", [("5206", True), ("5207", False)])
+def test_panel_tamper_event_schedules_persistence(event_id, expected) -> None:
+    """Only confirmed panel tamper transitions schedule a stored value."""
+    coordinator = MagicMock(spec=SpcFlexCCoordinator)
+    coordinator.state = SpcState()
+    coordinator._tamper_store = MagicMock()
+
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
+
+    assert coordinator.state.faults.panel_tamper is expected
+    coordinator._tamper_store.async_delay_save.assert_called_once()
+    callback, delay = coordinator._tamper_store.async_delay_save.call_args.args
+    assert callback() == {"panel_tamper": expected}
+    assert delay == 1
