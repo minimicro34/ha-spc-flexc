@@ -626,9 +626,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
     def _should_run_polling(self) -> bool:
         """Allow polling only while discovery is active and HA is running."""
-        return (
-            self._discovery_requested
-            and self.hass.state not in (CoreState.stopping, CoreState.stopped)
+        return self._discovery_requested and self.hass.state not in (
+            CoreState.stopping,
+            CoreState.stopped,
         )
 
     def _schedule_zone_polling(self) -> None:
