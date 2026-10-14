@@ -142,7 +142,12 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                     self._discovery_requested,
                 )
             else:
-                _LOGGER.debug("SPC Mapping Gate polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
+                _LOGGER.debug(
+                    "SPC Mapping Gate polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
             raise
         finally:
             _LOGGER.debug("SPC Mapping Gate polling stopped")
