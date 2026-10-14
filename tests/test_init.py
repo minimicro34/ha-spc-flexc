@@ -17,6 +17,7 @@ async def test_setup_entry_initializes_and_starts_discovery() -> None:
     entry.unique_id = None
 
     coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
     coordinator.data.panel.serial_number = "SPC12345678"
 
@@ -26,6 +27,7 @@ async def test_setup_entry_initializes_and_starts_discovery() -> None:
     ):
         assert await async_setup_entry(hass, entry) is True
 
+    coordinator.async_restore_panel_tamper.assert_awaited_once_with()
     coordinator.async_config_entry_first_refresh.assert_awaited_once_with()
     hass.config_entries.async_update_entry.assert_called_once_with(
         entry, unique_id="SPC12345678"
@@ -46,6 +48,7 @@ async def test_setup_entry_keeps_existing_serial() -> None:
     entry.unique_id = "SPC12345678"
 
     coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
     coordinator.data.panel.serial_number = "SPC12345678"
 
