@@ -318,7 +318,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         )
         self.entry = entry
         self.state = SpcState()
-        self._tamper_store = Store(hass, 1, f"{DOMAIN}.panel_tamper.{entry.entry_id}")
+        self._tamper_store: Store[dict[str, bool]] = Store(
+            hass, 1, f"{DOMAIN}.panel_tamper.{entry.entry_id}"
+        )
         self.client = FlexCClient(entry.data)
         self.client.set_event_callback(self._handle_flexc_event)
         self.client.set_session_ready_callback(self._handle_session_ready)
