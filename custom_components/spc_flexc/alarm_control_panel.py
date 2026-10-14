@@ -506,7 +506,7 @@ class SpcPanelAlarmControlPanel(
                     "partset_b_name": _partset_name(self.coordinator, area, "b"),
                 }
                 for area_id, area in sorted(self.coordinator.data.areas.items())
-            }
+            },
         }
 
     async def async_alarm_arm_away(
