@@ -731,12 +731,15 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("saved, expected", [
-    ({"panel_tamper": True}, True),
-    ({"panel_tamper": False}, False),
-    (None, None),
-    ({"panel_tamper": "true"}, None),
-])
+@pytest.mark.parametrize(
+    "saved, expected",
+    [
+        ({"panel_tamper": True}, True),
+        ({"panel_tamper": False}, False),
+        (None, None),
+        ({"panel_tamper": "true"}, None),
+    ],
+)
 async def test_restore_last_known_panel_tamper(saved, expected) -> None:
     """Only persisted boolean states may restore the enclosure tamper."""
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
