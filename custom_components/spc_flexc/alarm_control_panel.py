@@ -459,13 +459,11 @@ class SpcPanelAlarmControlPanel(
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
         """Return the aggregate SPC panel state."""
-        modes = [
-            area.mode
-            for area in self.coordinator.data.areas.values()
-            if area.mode is not None
-        ]
+        modes = [area.mode for area in self.coordinator.data.areas.values()]
 
-        if not modes:
+        # A missing or unrecognized area mode must never make the aggregate
+        # panel appear fully disarmed or armed based on the remaining areas.
+        if not modes or any(mode not in MODE_LABELS for mode in modes):
             return None
 
         if all(mode == MODE_UNSET for mode in modes):
