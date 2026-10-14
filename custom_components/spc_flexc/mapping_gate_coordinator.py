@@ -100,6 +100,8 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
 
     def _schedule_mg_polling(self) -> None:
         """Start live polling after Mapping Gate discovery."""
+        if not self._should_run_polling():
+            return
         if not self._mg_discovery_complete:
             return
         if self._mg_poll_task is not None and not self._mg_poll_task.done():
@@ -132,19 +134,22 @@ class SpcFlexCMappingGateCoordinator(SpcFlexCZoneControlCoordinator):
                         "Unexpected error while polling SPC Mapping Gates; polling will continue"
                     )
         except asyncio.CancelledError:
-            _LOGGER.warning(
-                "SPC Mapping Gate polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
-                self.entry.state,
-                self.hass.state,
-                self._discovery_requested,
-            )
+            if self._should_run_polling():
+                _LOGGER.warning(
+                    "SPC Mapping Gate polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
+            else:
+                _LOGGER.debug("SPC Mapping Gate polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
             raise
         finally:
             _LOGGER.debug("SPC Mapping Gate polling stopped")
             current_task = asyncio.current_task()
             if self._mg_poll_task is current_task:
                 self._mg_poll_task = None
-                if self._discovery_requested:
+                if self._should_run_polling():
                     _LOGGER.warning(
                         "SPC Mapping Gate polling stopped unexpectedly; restarting"
                     )
