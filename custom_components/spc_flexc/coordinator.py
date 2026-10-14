@@ -709,7 +709,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     self._discovery_requested,
                 )
             else:
-                _LOGGER.debug("SPC zone polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
+                _LOGGER.debug(
+                    "SPC zone polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
             raise
         finally:
             _LOGGER.debug("SPC zone polling stopped")
@@ -801,7 +806,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     self._discovery_requested,
                 )
             else:
-                _LOGGER.debug("SPC X-BUS polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s", self.entry.state, self.hass.state, self._discovery_requested)
+                _LOGGER.debug(
+                    "SPC X-BUS polling cancelled: entry_state=%s hass_state=%s discovery_requested=%s",
+                    self.entry.state,
+                    self.hass.state,
+                    self._discovery_requested,
+                )
             raise
         finally:
             _LOGGER.debug("SPC X-BUS polling stopped")
