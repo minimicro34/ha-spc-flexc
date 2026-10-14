@@ -488,6 +488,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     description="reading panel summary",
                 )
                 if summary:
+                    _LOGGER.debug("FlexC panel summary fields: %s", sorted(summary))
                     self.state.panel = _panel_state_from_summary(summary)
                 alerts = await async_retry_read_once(
                     self.client.async_get_alert_status,
