@@ -61,8 +61,18 @@ def test_polling_not_scheduled_while_stopping(
 @pytest.mark.parametrize(
     ("coordinator_type", "loop_method", "task_attribute", "logger_module"),
     [
-        (SpcFlexCCoordinator, "_async_zone_poll_loop", "_zone_poll_task", "coordinator"),
-        (SpcFlexCCoordinator, "_async_xbus_poll_loop", "_xbus_poll_task", "coordinator"),
+        (
+            SpcFlexCCoordinator,
+            "_async_zone_poll_loop",
+            "_zone_poll_task",
+            "coordinator",
+        ),
+        (
+            SpcFlexCCoordinator,
+            "_async_xbus_poll_loop",
+            "_xbus_poll_task",
+            "coordinator",
+        ),
         (
             SpcFlexCZoneControlCoordinator,
             "_async_door_poll_loop",
@@ -110,4 +120,6 @@ async def test_polling_cancelled_during_shutdown_does_not_restart_or_warn(
     assert getattr(coordinator, task_attribute) is None
     coordinator.entry.async_create_background_task.assert_not_called()
     assert not any("polling cancelled" in record.message for record in caplog.records)
-    assert not any("polling stopped unexpectedly" in record.message for record in caplog.records)
+    assert not any(
+        "polling stopped unexpectedly" in record.message for record in caplog.records
+    )
