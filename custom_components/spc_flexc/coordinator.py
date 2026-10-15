@@ -939,7 +939,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 area_id = None
             area = self.state.areas.get(area_id) if area_id is not None else None
             if area is not None and area.mode == 0:
-                if area.alarm_event_active or area.active_alarm_zones or area.triggered_alarm_zones:
+                if (
+                    area.alarm_event_active
+                    or area.active_alarm_zones
+                    or area.triggered_alarm_zones
+                ):
                     intrusion_changed = True
                 area.active_alarm_zones.clear()
                 area.triggered_alarm_zones.clear()
