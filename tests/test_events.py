@@ -386,3 +386,26 @@ def test_area_mode_event_unknown_area() -> None:
 
     assert changed is False
     assert areas[1].mode == 0
+
+
+def test_intrusion_event_cycle_preserves_latched_alarm() -> None:
+    """A restored detector must not silently acknowledge an intrusion."""
+    from custom_components.spc_flexc.flexc.events import apply_area_intrusion_event
+
+    area = AreaState(area_id=1, mode=3)
+    areas = {1: area}
+    assert apply_area_intrusion_event(areas, {"EV_ID": "1000", "AREA_ID": "1", "ZONE_ID": "5"})
+    assert area.alarm_event_active is True
+    assert area.active_alarm_zones == {5}
+    assert apply_area_intrusion_event(areas, {"EV_ID": "1100", "AREA_ID": "1", "ZONE_ID": "5"})
+    assert area.alarm_event_active is True
+    assert area.active_alarm_zones == set()
+    assert not apply_area_intrusion_event(areas, {"EV_ID": "9999", "AREA_ID": "1", "ZONE_ID": "5"})
+
+
+def test_intrusion_event_ignores_unset_area() -> None:
+    from custom_components.spc_flexc.flexc.events import apply_area_intrusion_event
+
+    area = AreaState(area_id=1, mode=0)
+    assert not apply_area_intrusion_event({1: area}, {"EV_ID": "1000", "AREA_ID": "1", "ZONE_ID": "5"})
+    assert area.alarm_event_active is False
