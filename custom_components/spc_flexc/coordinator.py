@@ -932,13 +932,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         panel_changed = apply_panel_event(self.state.panel, event)
         area_changed = apply_area_event(self.state.areas, event)
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
-        if area_changed:
+        if str(event.get("EV_ID")) == "3501":
             try:
                 area_id = int(str(event.get("AREA_ID")))
             except (TypeError, ValueError):
                 area_id = None
             area = self.state.areas.get(area_id) if area_id is not None else None
             if area is not None and area.mode == 0:
+                if area.alarm_event_active or area.active_alarm_zones or area.triggered_alarm_zones:
+                    intrusion_changed = True
                 area.active_alarm_zones.clear()
                 area.triggered_alarm_zones.clear()
                 area.alarm_event_active = False
