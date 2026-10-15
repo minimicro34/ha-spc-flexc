@@ -315,7 +315,9 @@ def apply_area_intrusion_event(
         zone_id = int(str(event.get("ZONE_ID")))
     except (TypeError, ValueError):
         return False
-    if event_id not in (1000, 1100):
+    # 1001 is also emitted for a zone confirmed in alarm after entry delay.
+    # Keep zone restores distinct from the alarm acknowledgement.
+    if event_id not in (1000, 1001, 1100):
         return False
     area = areas.get(area_id)
     if area is None:
@@ -325,7 +327,7 @@ def apply_area_intrusion_event(
         set(area.active_alarm_zones),
         set(area.triggered_alarm_zones),
     )
-    if event_id == 1000 and area.mode in (1, 2, 3):
+    if event_id in (1000, 1001) and area.mode in (1, 2, 3):
         area.active_alarm_zones.add(zone_id)
         area.triggered_alarm_zones.add(zone_id)
         area.alarm_event_active = True
