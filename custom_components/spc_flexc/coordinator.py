@@ -920,7 +920,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             if 1000 <= numeric_id < 2000 or 3000 <= numeric_id < 4000:
                 _LOGGER.warning(
                     "Temporary FlexC alarm diagnostic: EV_ID=%s AREA_ID=%s ZONE_ID=%s",
-                    event_id, area_id or "-", zone_id or "-",
+                    event_id,
+                    area_id or "-",
+                    zone_id or "-",
                 )
         fault_changed = apply_event(self.state.faults, event)
         if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
