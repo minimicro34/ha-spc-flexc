@@ -342,6 +342,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._area_discovery_complete = False
         self._detected_zone_ids: set[int] = set()
         self._zone_discovery_complete = False
+        self._pending_zone_restores: set[tuple[int, int]] = set()
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
         self._detected_xbus_serials: set[str] = set()
@@ -802,17 +803,19 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             )
                         ):
                             changed = True
-                        # Only a confirmed SPC alarm-state transition (5 -> 0)
-                        # can initiate clearance; a detector returning to rest,
-                        # or RESTORE_ALLOWED toggling, is not sufficient.
+                        # A restore event may arrive after polling already
+                        # observed ALARM_STATE=0. Keep its pending confirmation
+                        # until the next authoritative zone-status response.
                         if (
-                            previous is not None
-                            and previous.alarm_state == 5
-                            and zone.alarm_state == 0
-                            and zone.area_id is not None
+                            zone.area_id is not None
+                            and (zone.area_id, zone.zone_id)
+                            in self._pending_zone_restores
                         ):
                             restored_area_ids.add(zone.area_id)
                         self.state.zones[zone.zone_id] = zone
+                    polled_zone_ids = {
+                        _int_value(raw.get("ZONE_ID")) for raw in raw_zones
+                    }
                     for area_id in restored_area_ids:
                         area = self.state.areas.get(area_id)
                         if (
@@ -831,11 +834,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 is not None
                                 and known_zone.area_id == area_id
                                 and known_zone.alarm_state == 0
+                                and (area_id, zone_id)
+                                in self._pending_zone_restores
+                                and zone_id in polled_zone_ids
                             )
                         }
                         if not restored_zones:
                             continue
                         area.triggered_alarm_zones.difference_update(restored_zones)
+                        self._pending_zone_restores.difference_update(
+                            {(area_id, zone_id) for zone_id in restored_zones}
+                        )
                         # Active intrusion is cleared by FlexC return events, not
                         # by a restored alarm status alone.
                         _LOGGER.debug(
@@ -1059,6 +1068,23 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         panel_changed = apply_panel_event(self.state.panel, event)
         area_changed = apply_area_event(self.state.areas, event)
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
+        if event_id in (1100, 1101) and area_id is not None and zone_id is not None:
+            area = self.state.areas.get(area_id)
+            if (
+                area is not None
+                and area.mode in (1, 2, 3)
+                and zone_id in area.triggered_alarm_zones
+            ):
+                self._pending_zone_restores.add((area_id, zone_id))
+                if zone_id in area.active_alarm_zones:
+                    area.active_alarm_zones.discard(zone_id)
+                    intrusion_changed = True
+        elif event_id in (1000, 1001) and area_id is not None and zone_id is not None:
+            self._pending_zone_restores.discard((area_id, zone_id))
+        elif event_id == 3501 and area_id is not None:
+            self._pending_zone_restores = {
+                key for key in self._pending_zone_restores if key[0] != area_id
+            }
         if str(event.get("EV_ID")) == "3501":
             try:
                 area_id = int(str(event.get("AREA_ID")))
