@@ -918,6 +918,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             return
         if previous is not None and previous.mode == area.mode:
             area.active_alarm_zones = set(previous.active_alarm_zones)
+            area.triggered_alarm_zones = set(previous.triggered_alarm_zones)
             area.alarm_event_active = previous.alarm_event_active
 
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
@@ -939,6 +940,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             area = self.state.areas.get(area_id) if area_id is not None else None
             if area is not None and area.mode == 0:
                 area.active_alarm_zones.clear()
+                area.triggered_alarm_zones.clear()
                 area.alarm_event_active = False
         zone_changed = apply_zone_event(self.state.zones, event)
         xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
