@@ -37,6 +37,7 @@ from .flexc.discovery import (
 )
 from .flexc.events import (
     apply_area_event,
+    apply_area_intrusion_event,
     apply_event,
     apply_panel_event,
     apply_xbus_event,
@@ -444,6 +445,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         area.mode,
                     )
                     changed = True
+                self._reconcile_area_intrusion(area, previous_area)
                 self.state.areas[area.area_id] = area
 
         if self._zone_discovery_complete and self._detected_zone_ids:
@@ -549,6 +551,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 previous.mode,
                                 area.mode,
                             )
+                        self._reconcile_area_intrusion(area, previous)
                         self.state.areas[area.area_id] = area
 
             if self._discovery_requested and not self._discovery_complete:
@@ -908,22 +911,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 await discovery_task
         await self.client.async_close()
 
+    @staticmethod
+    def _reconcile_area_intrusion(area: AreaState, previous: AreaState | None) -> None:
+        """Preserve alarm events across polling; clear them on confirmed unset."""
+        if area.mode == 0:
+            return
+        if previous is not None and previous.mode == area.mode:
+            area.active_alarm_zones = set(previous.active_alarm_zones)
+            area.alarm_event_active = previous.alarm_event_active
+
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
-        # Temporary beta diagnostic: log only non-sensitive routing identifiers.
-        # Do not log the full event: it may include names or user information.
-        event_id = str(event.get("EV_ID", ""))
-        area_id = str(event.get("AREA_ID", ""))
-        zone_id = str(event.get("ZONE_ID", ""))
-        if (area_id or zone_id) and event_id.isdecimal():
-            # Avoid noisy normal zone events; capture alarm/area families.
-            numeric_id = int(event_id)
-            if 1000 <= numeric_id < 2000 or 3000 <= numeric_id < 4000:
-                _LOGGER.warning(
-                    "Temporary FlexC alarm diagnostic: EV_ID=%s AREA_ID=%s ZONE_ID=%s",
-                    event_id,
-                    area_id or "-",
-                    zone_id or "-",
-                )
         fault_changed = apply_event(self.state.faults, event)
         if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
             panel_tamper = self.state.faults.panel_tamper
@@ -933,12 +930,23 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 )
         panel_changed = apply_panel_event(self.state.panel, event)
         area_changed = apply_area_event(self.state.areas, event)
+        intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
+        if area_changed:
+            try:
+                area_id = int(str(event.get("AREA_ID")))
+            except (TypeError, ValueError):
+                area_id = None
+            area = self.state.areas.get(area_id) if area_id is not None else None
+            if area is not None and area.mode == 0:
+                area.active_alarm_zones.clear()
+                area.alarm_event_active = False
         zone_changed = apply_zone_event(self.state.zones, event)
         xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
         if (
             fault_changed
             or panel_changed
             or area_changed
+            or intrusion_changed
             or zone_changed
             or xbus_changed
         ):
