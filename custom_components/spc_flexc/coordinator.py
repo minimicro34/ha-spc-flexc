@@ -819,25 +819,36 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             area is None
                             or area.mode in (None, 0)
                             or not area.alarm_event_active
-                            or not area.triggered_alarm_zones
-                            or area.active_alarm_zones
                         ):
                             continue
-                        if not all(
-                            (known_zone := self.state.zones.get(zone_id)) is not None
-                            and known_zone.area_id == area_id
-                            and known_zone.alarm_state == 0
+                        # Remove only individually confirmed restored zones;
+                        # preserve the area alarm until the last one is cleared.
+                        restored_zones = {
+                            zone_id
                             for zone_id in area.triggered_alarm_zones
-                        ):
+                            if (
+                                (known_zone := self.state.zones.get(zone_id))
+                                is not None
+                                and known_zone.area_id == area_id
+                                and known_zone.alarm_state == 0
+                            )
+                        }
+                        if not restored_zones:
                             continue
+                        area.triggered_alarm_zones.difference_update(restored_zones)
+                        area.active_alarm_zones.difference_update(restored_zones)
                         _LOGGER.debug(
-                            "FlexC area alarm restored from confirmed zone statuses: "
-                            "AREA_ID=%s ZONE_IDS=%s",
+                            "FlexC confirmed zone alarm restoration: "
+                            "AREA_ID=%s RESTORED=%s REMAINING=%s",
                             area_id,
+                            tuple(sorted(restored_zones)),
                             tuple(sorted(area.triggered_alarm_zones)),
                         )
-                        area.triggered_alarm_zones.clear()
-                        area.alarm_event_active = False
+                        if (
+                            not area.triggered_alarm_zones
+                            and not area.active_alarm_zones
+                        ):
+                            area.alarm_event_active = False
                         changed = True
                     if changed:
                         self.async_set_updated_data(self.state)
