@@ -878,3 +878,32 @@ def test_intrusion_event_does_not_affect_other_area() -> None:
     assert coordinator.state.areas[1].triggered_alarm_zones == {5}
     assert coordinator.state.areas[2].alarm_event_active is False
     assert coordinator.state.areas[2].triggered_alarm_zones == set()
+
+
+def test_area_reconciliation_logs_only_changed_fields() -> None:
+    """Unchanged MODE must not masquerade as the cause of reconciliation."""
+    from custom_components.spc_flexc.coordinator import (
+        _area_reconciliation_changes,
+    )
+
+    previous = {"MODE": "0", "INTERNAL_BELLS": "0", "EXTERNAL_BELLS": "0"}
+    current = {"MODE": "0", "INTERNAL_BELLS": "1", "EXTERNAL_BELLS": "0"}
+    assert _area_reconciliation_changes(previous, current) == [
+        "INTERNAL_BELLS='0' -> '1'"
+    ]
+
+
+def test_area_reconciliation_reports_added_and_removed_fields() -> None:
+    """A changing status payload identifies keys added or removed."""
+    from custom_components.spc_flexc.coordinator import (
+        _area_reconciliation_changes,
+    )
+
+    assert _area_reconciliation_changes(
+        {"MODE": "3", "OLD": "yes"},
+        {"MODE": "0", "NEW": "yes"},
+    ) == [
+        "MODE='3' -> '0'",
+        "NEW=None -> 'yes'",
+        "OLD='yes' -> None",
+    ]
