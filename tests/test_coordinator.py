@@ -27,7 +27,12 @@ from custom_components.spc_flexc.coordinator import (
 )
 from custom_components.spc_flexc.flexc.connection import FlexCConnectionError
 from custom_components.spc_flexc.flexc.flexml import FlexMLError
-from custom_components.spc_flexc.models import AreaState, SpcState, XBusDeviceState, ZoneState
+from custom_components.spc_flexc.models import (
+    AreaState,
+    SpcState,
+    XBusDeviceState,
+    ZoneState,
+)
 
 
 class _AsyncLock:
@@ -264,7 +269,9 @@ def test_alarm_diagnostics_capture_unknown_restore_event_without_personal_data(
     area.triggered_alarm_zones.add(1)
     coordinator.state.areas[1] = area
 
-    with caplog.at_level(logging.DEBUG, logger="custom_components.spc_flexc.coordinator"):
+    with caplog.at_level(
+        logging.DEBUG, logger="custom_components.spc_flexc.coordinator"
+    ):
         SpcFlexCCoordinator._handle_flexc_event(
             coordinator,
             {

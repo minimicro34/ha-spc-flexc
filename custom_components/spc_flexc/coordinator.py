@@ -951,7 +951,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         zone_id = _number("ZONE_ID")
         diagnostic_area = self.state.areas.get(area_id) if area_id is not None else None
 
-        def _alarm_snapshot() -> tuple[int, bool, tuple[int, ...], tuple[int, ...]] | None:
+        def _alarm_snapshot() -> (
+            tuple[int | None, bool, tuple[int, ...], tuple[int, ...]] | None
+        ):
             if diagnostic_area is None:
                 return None
             return (
@@ -992,7 +994,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             _LOGGER.debug(
                 "FlexC alarm diagnostic: EV_ID=%s AREA_ID=%s ZONE_ID=%s "
                 "before=%s after=%s",
-                event_id, area_id, zone_id, before, _alarm_snapshot(),
+                event_id,
+                area_id,
+                zone_id,
+                before,
+                _alarm_snapshot(),
             )
         zone_changed = apply_zone_event(self.state.zones, event)
         xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
