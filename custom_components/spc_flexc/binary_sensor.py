@@ -182,9 +182,18 @@ class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEn
         zone = self.coordinator.data.zones.get(self.zone_id)
         if zone is None:
             return {}
+        area = self.coordinator.data.areas.get(zone.area_id)
+        intrusion_active = (
+            zone.zone_id in area.active_alarm_zones if area is not None else False
+        )
+        intrusion_triggered = (
+            zone.zone_id in area.triggered_alarm_zones if area is not None else False
+        )
         return {
             "zone_id": zone.zone_id,
             "area_id": zone.area_id,
+            "intrusion_active": intrusion_active,
+            "intrusion_triggered": intrusion_triggered,
             "spc_zone_type": SPC_ZONE_TYPES.get(zone.zone_type)
             if zone.zone_type is not None
             else None,
