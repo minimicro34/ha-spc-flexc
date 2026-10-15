@@ -303,3 +303,28 @@ def apply_area_event(
     area.mode = mode
 
     return previous != mode
+
+
+def apply_area_intrusion_event(
+    areas: Mapping[int, Any], event: Mapping[str, Any]
+) -> bool:
+    """Track validated intrusion/restore events without confusing zone restore with reset."""
+    try:
+        event_id = int(str(event.get("EV_ID")))
+        area_id = int(str(event.get("AREA_ID")))
+        zone_id = int(str(event.get("ZONE_ID")))
+    except (TypeError, ValueError):
+        return False
+    if event_id not in (1000, 1100):
+        return False
+    area = areas.get(area_id)
+    if area is None:
+        return False
+    previous = (area.alarm_event_active, set(area.active_alarm_zones))
+    if event_id == 1000 and area.mode in (1, 2, 3):
+        area.active_alarm_zones.add(zone_id)
+        area.alarm_event_active = True
+    elif event_id == 1100:
+        area.active_alarm_zones.discard(zone_id)
+        # A zone restore does not acknowledge or silence an active alarm.
+    return previous != (area.alarm_event_active, area.active_alarm_zones)
