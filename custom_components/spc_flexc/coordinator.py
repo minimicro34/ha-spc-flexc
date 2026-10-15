@@ -749,6 +749,28 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
                         event_changed = _reconcile_zone_event_state(zone, previous)
+                        if previous is not None and (
+                            previous.status != zone.status
+                            or previous.alarm_state != zone.alarm_state
+                            or previous.input_state != zone.input_state
+                            or previous.logic_input != zone.logic_input
+                        ):
+                            _LOGGER.debug(
+                                "SPC zone poll transition: zone_id=%s area_id=%s "
+                                "name=%r input=%s->%s logic_input=%s->%s "
+                                "status=%s->%s alarm_state=%s->%s",
+                                zone.zone_id,
+                                zone.area_id,
+                                zone.name,
+                                previous.input_state,
+                                zone.input_state,
+                                previous.logic_input,
+                                zone.logic_input,
+                                previous.status,
+                                zone.status,
+                                previous.alarm_state,
+                                zone.alarm_state,
+                            )
                         if (
                             event_changed
                             or previous is None
@@ -939,6 +961,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             area.alarm_event_active = previous.alarm_event_active
 
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
+        # Diagnostic-only: log event identifiers while an area is in alarm.
+        # Avoid logging the full payload (which can contain unrelated details).
+        if any(area.alarm_event_active for area in self.state.areas.values()):
+            _LOGGER.debug(
+                "SPC event during intrusion: ev_id=%s area_id=%s zone_id=%s",
+                event.get("EV_ID"),
+                event.get("AREA_ID"),
+                event.get("ZONE_ID"),
+            )
         fault_changed = apply_event(self.state.faults, event)
         if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
             panel_tamper = self.state.faults.panel_tamper
