@@ -486,9 +486,7 @@ class SpcPanelAlarmControlPanel(
 
         if any(
             area.mode in (MODE_PARTSET_A, MODE_PARTSET_B, MODE_SET)
-            and (
-                area.alarm_event_active
-            )
+            and (area.alarm_event_active)
             for area in self.coordinator.data.areas.values()
         ):
             return AlarmControlPanelState.TRIGGERED
