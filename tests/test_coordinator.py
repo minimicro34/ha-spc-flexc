@@ -640,11 +640,7 @@ async def test_zone_poll_restores_area_only_when_all_intrusions_confirmed(
             {
                 "ZONE_ID": str(zone_id),
                 "AREA_ID": "1",
-                **(
-                    {"ALARM_STATE": str(status)}
-                    if status is not None
-                    else {}
-                ),
+                **({"ALARM_STATE": str(status)} if status is not None else {}),
             }
             for zone_id, status in zone_statuses.items()
         ]
