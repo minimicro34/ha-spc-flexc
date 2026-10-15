@@ -24,6 +24,7 @@ class AreaState:
     internal_bells: bool | None = None
     external_bells: bool | None = None
     active_alarm_zones: set[int] = field(default_factory=set)
+    triggered_alarm_zones: set[int] = field(default_factory=set)
     alarm_event_active: bool = False
     raw: dict[str, Any] = field(default_factory=dict)
     updated_at: datetime | None = None
