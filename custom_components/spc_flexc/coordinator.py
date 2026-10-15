@@ -745,6 +745,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             raw_zones.extend(batch_zones)
 
                     changed = False
+                    restored_area_ids: set[int] = set()
                     for raw_zone in raw_zones:
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
@@ -801,7 +802,43 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             )
                         ):
                             changed = True
+                        # Only a confirmed SPC alarm-state transition (5 -> 0)
+                        # can initiate clearance; a detector returning to rest,
+                        # or RESTORE_ALLOWED toggling, is not sufficient.
+                        if (
+                            previous is not None
+                            and previous.alarm_state == 5
+                            and zone.alarm_state == 0
+                            and zone.area_id is not None
+                        ):
+                            restored_area_ids.add(zone.area_id)
                         self.state.zones[zone.zone_id] = zone
+                    for area_id in restored_area_ids:
+                        area = self.state.areas.get(area_id)
+                        if (
+                            area is None
+                            or area.mode in (None, 0)
+                            or not area.alarm_event_active
+                            or not area.triggered_alarm_zones
+                            or area.active_alarm_zones
+                        ):
+                            continue
+                        if not all(
+                            (known_zone := self.state.zones.get(zone_id)) is not None
+                            and known_zone.area_id == area_id
+                            and known_zone.alarm_state == 0
+                            for zone_id in area.triggered_alarm_zones
+                        ):
+                            continue
+                        _LOGGER.debug(
+                            "FlexC area alarm restored from confirmed zone statuses: "
+                            "AREA_ID=%s ZONE_IDS=%s",
+                            area_id,
+                            tuple(sorted(area.triggered_alarm_zones)),
+                        )
+                        area.triggered_alarm_zones.clear()
+                        area.alarm_event_active = False
+                        changed = True
                     if changed:
                         self.async_set_updated_data(self.state)
                 except asyncio.CancelledError:
