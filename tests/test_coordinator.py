@@ -608,6 +608,60 @@ async def test_zone_restore_diagnostic_logs_status_changes_without_clearing_alar
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("zone_statuses", "active_zones", "expected_cleared"),
+    [
+        ({1: 0, 2: 0}, set(), True),
+        ({1: 0, 2: 5}, set(), False),
+        ({1: 0, 2: None}, set(), False),
+        ({1: 0, 2: 0}, {2}, False),
+    ],
+)
+async def test_zone_poll_restores_area_only_when_all_intrusions_confirmed(
+    zone_statuses: dict[int, int | None],
+    active_zones: set[int],
+    expected_cleared: bool,
+) -> None:
+    """Clear a latched alarm only after all triggered zones are restored."""
+    coordinator = _coordinator_stub()
+    area = AreaState(area_id=1, mode=3, alarm_event_active=True)
+    area.triggered_alarm_zones = {1, 2}
+    area.active_alarm_zones = set(active_zones)
+    coordinator.state.areas[1] = area
+    for zone_id in (1, 2):
+        coordinator.state.zones[zone_id] = ZoneState(
+            zone_id=zone_id, area_id=1, alarm_state=5
+        )
+    coordinator._zone_discovery_complete = True
+    coordinator._detected_zone_ids = {1, 2}
+    coordinator._zone_poll_task = asyncio.current_task()
+    coordinator.client.async_get_zone_status = AsyncMock(
+        return_value=[
+            {
+                "ZONE_ID": str(zone_id),
+                "AREA_ID": "1",
+                **(
+                    {"ALARM_STATE": str(status)}
+                    if status is not None
+                    else {}
+                ),
+            }
+            for zone_id, status in zone_statuses.items()
+        ]
+    )
+    sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+    with (
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+
+    assert area.mode == 3
+    assert area.alarm_event_active is (not expected_cleared)
+    assert area.triggered_alarm_zones == (set() if expected_cleared else {1, 2})
+
+
+@pytest.mark.asyncio
 async def test_zone_actuation_change_notifies_entities() -> None:
     """Test a missed short activation still produces a coordinator update."""
     coordinator = MagicMock()
