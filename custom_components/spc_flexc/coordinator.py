@@ -162,6 +162,17 @@ def _ats_state_from_status(response: dict[str, Any], timezone: ZoneInfo) -> AtsS
     return ats
 
 
+def _area_reconciliation_changes(
+    previous: dict[str, str], current: dict[str, str]
+) -> list[str]:
+    """Describe only changed area status fields without dumping the full payload."""
+    return [
+        f"{key}={previous.get(key)!r} -> {current.get(key)!r}"
+        for key in sorted(previous.keys() | current.keys())
+        if previous.get(key) != current.get(key)
+    ]
+
+
 def _area_state_from_status(raw_area: dict[str, str], timezone: ZoneInfo) -> AreaState:
     return AreaState(
         area_id=int(raw_area["AREA_ID"]),
@@ -437,13 +448,19 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 area = _area_state_from_status(raw_area, timezone)
                 previous_area = self.state.areas.get(area.area_id)
                 if previous_area is None or previous_area.raw != area.raw:
-                    _LOGGER.info(
-                        "Area %d reconciliation changed state after reconnect: "
-                        "MODE=%s -> %s",
-                        area.area_id,
-                        None if previous_area is None else previous_area.mode,
-                        area.mode,
-                    )
+                    if previous_area is None:
+                        _LOGGER.info(
+                            "Area %d discovered during reconnect", area.area_id
+                        )
+                    else:
+                        changes = _area_reconciliation_changes(
+                            previous_area.raw, area.raw
+                        )
+                        _LOGGER.info(
+                            "Area %d reconciliation after reconnect: %s",
+                            area.area_id,
+                            ", ".join(changes),
+                        )
                     changed = True
                 self._reconcile_area_intrusion(area, previous_area)
                 self.state.areas[area.area_id] = area
