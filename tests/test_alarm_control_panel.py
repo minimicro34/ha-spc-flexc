@@ -419,22 +419,14 @@ def test_intrusion_area_and_panel_state_with_multiple_zones() -> None:
     assert area_entity.extra_state_attributes["alarm_zone_ids"] == []
 
 
-def test_alarm_bell_fallback_and_unknown_zone_name() -> None:
-    """A bell status can signal an alarm without a received intrusion EVENT."""
-    area = AreaState(
-        area_id=1,
-        name="Logis",
-        mode=MODE_PARTSET_A,
-        external_bells=True,
-        triggered_alarm_zones={99},
-    )
+def test_bell_flags_do_not_trigger_without_intrusion_event() -> None:
+    """Siren flags alone are not evidence of a confirmed intrusion."""
+    area = AreaState(area_id=1, mode=MODE_PARTSET_A, external_bells=True)
     coordinator = _coordinator(area)
     area_entity = SpcAreaAlarmControlPanel(coordinator, 1)
     panel_entity = SpcPanelAlarmControlPanel(coordinator)
+    assert area_entity.alarm_state == AlarmControlPanelState.ARMED_HOME
+    assert panel_entity.alarm_state is None
+    area.alarm_event_active = True
     assert area_entity.alarm_state == AlarmControlPanelState.TRIGGERED
     assert panel_entity.alarm_state == AlarmControlPanelState.TRIGGERED
-    assert area_entity.extra_state_attributes["alarm_zones"] == [
-        {"zone_id": 99, "name": "Zone 99"}
-    ]
-    area.external_bells = False
-    assert area_entity.alarm_state == AlarmControlPanelState.ARMED_HOME
