@@ -939,6 +939,29 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             area.alarm_event_active = previous.alarm_event_active
 
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
+        # Diagnostic only: do not log raw EVENT attributes (may contain user data).
+        def _number(key: str) -> int | None:
+            try:
+                return int(str(event.get(key)))
+            except (TypeError, ValueError):
+                return None
+
+        event_id = _number("EV_ID")
+        area_id = _number("AREA_ID")
+        zone_id = _number("ZONE_ID")
+        diagnostic_area = self.state.areas.get(area_id) if area_id is not None else None
+
+        def _alarm_snapshot() -> tuple[int, bool, tuple[int, ...], tuple[int, ...]] | None:
+            if diagnostic_area is None:
+                return None
+            return (
+                diagnostic_area.mode,
+                diagnostic_area.alarm_event_active,
+                tuple(sorted(diagnostic_area.active_alarm_zones)),
+                tuple(sorted(diagnostic_area.triggered_alarm_zones)),
+            )
+
+        before = _alarm_snapshot() if _LOGGER.isEnabledFor(logging.DEBUG) else None
         fault_changed = apply_event(self.state.faults, event)
         if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
             panel_tamper = self.state.faults.panel_tamper
@@ -965,6 +988,12 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 area.active_alarm_zones.clear()
                 area.triggered_alarm_zones.clear()
                 area.alarm_event_active = False
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.debug(
+                "FlexC alarm diagnostic: EV_ID=%s AREA_ID=%s ZONE_ID=%s "
+                "before=%s after=%s",
+                event_id, area_id, zone_id, before, _alarm_snapshot(),
+            )
         zone_changed = apply_zone_event(self.state.zones, event)
         xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
         if (
