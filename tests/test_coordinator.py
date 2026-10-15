@@ -667,9 +667,7 @@ async def test_restore_event_after_zone_poll_already_reports_clear() -> None:
     area.active_alarm_zones = {1}
     area.triggered_alarm_zones = {1}
     coordinator.state.areas[1] = area
-    coordinator.state.zones[1] = ZoneState(
-        zone_id=1, area_id=1, alarm_state=0
-    )
+    coordinator.state.zones[1] = ZoneState(zone_id=1, area_id=1, alarm_state=0)
     SpcFlexCCoordinator._handle_flexc_event(
         coordinator, {"EV_ID": "1101", "AREA_ID": "1", "ZONE_ID": "1"}
     )
