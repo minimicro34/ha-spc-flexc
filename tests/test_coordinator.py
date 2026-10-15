@@ -766,3 +766,58 @@ def test_panel_tamper_event_schedules_persistence(event_id, expected) -> None:
     callback, delay = coordinator._tamper_store.async_delay_save.call_args.args
     assert callback() == {"panel_tamper": expected}
     assert delay == 1
+
+
+def test_intrusion_reconciliation_keeps_latch_until_unset() -> None:
+    """Status polling must not erase a received alarm or its zone attribution."""
+    from custom_components.spc_flexc.models import AreaState
+
+    previous = AreaState(
+        area_id=1,
+        mode=3,
+        alarm_event_active=True,
+        active_alarm_zones={6},
+        triggered_alarm_zones={5, 6},
+    )
+    polled = AreaState(area_id=1, mode=3, internal_bells=False)
+    SpcFlexCCoordinator._reconcile_area_intrusion(polled, previous)
+    assert polled.alarm_event_active is True
+    assert polled.active_alarm_zones == {6}
+    assert polled.triggered_alarm_zones == {5, 6}
+
+    unset = AreaState(area_id=1, mode=0)
+    SpcFlexCCoordinator._reconcile_area_intrusion(unset, previous)
+    assert unset.alarm_event_active is False
+    assert unset.active_alarm_zones == set()
+    assert unset.triggered_alarm_zones == set()
+
+
+def test_intrusion_event_callback_unset_clears_latched_alarm() -> None:
+    """A confirmed unset EVENT clears an alarm even when mode is already zero."""
+    from custom_components.spc_flexc.models import AreaState
+
+    coordinator = _coordinator_stub()
+    coordinator.state.areas[1] = AreaState(
+        area_id=1,
+        mode=3,
+        alarm_event_active=True,
+        active_alarm_zones={5},
+        triggered_alarm_zones={5},
+    )
+    coordinator.async_set_updated_data = MagicMock()
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "3501", "AREA_ID": "1"}
+    )
+    area = coordinator.state.areas[1]
+    assert area.mode == 0
+    assert area.alarm_event_active is False
+    assert area.active_alarm_zones == set()
+    assert area.triggered_alarm_zones == set()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+    # A delayed restore EVENT after disarm must not reactivate the alarm.
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "1100", "AREA_ID": "1", "ZONE_ID": "5"}
+    )
+    assert area.alarm_event_active is False
