@@ -821,3 +821,60 @@ def test_intrusion_event_callback_unset_clears_latched_alarm() -> None:
         coordinator, {"EV_ID": "1100", "AREA_ID": "1", "ZONE_ID": "5"}
     )
     assert area.alarm_event_active is False
+
+
+@pytest.mark.parametrize("mode", [1, 2, 3])
+def test_intrusion_reconnect_same_mode_preserves_alarm(mode: int) -> None:
+    """Reconnecting while armed must retain a previously received intrusion."""
+    from custom_components.spc_flexc.models import AreaState
+
+    before_disconnect = AreaState(
+        area_id=1,
+        mode=mode,
+        alarm_event_active=True,
+        active_alarm_zones={5},
+        triggered_alarm_zones={5, 6},
+    )
+    after_reconnect = AreaState(area_id=1, mode=mode)
+    SpcFlexCCoordinator._reconcile_area_intrusion(
+        after_reconnect, before_disconnect
+    )
+    assert after_reconnect.alarm_event_active is True
+    assert after_reconnect.active_alarm_zones == {5}
+    assert after_reconnect.triggered_alarm_zones == {5, 6}
+
+
+def test_intrusion_reconnect_does_not_transfer_alarm_to_different_mode() -> None:
+    """A mode change must not carry a stale intrusion latch into a new session."""
+    from custom_components.spc_flexc.models import AreaState
+
+    previous = AreaState(
+        area_id=1,
+        mode=3,
+        alarm_event_active=True,
+        active_alarm_zones={5},
+        triggered_alarm_zones={5},
+    )
+    current = AreaState(area_id=1, mode=1)
+    SpcFlexCCoordinator._reconcile_area_intrusion(current, previous)
+    assert current.alarm_event_active is False
+    assert current.active_alarm_zones == set()
+    assert current.triggered_alarm_zones == set()
+
+
+def test_intrusion_event_does_not_affect_other_area() -> None:
+    """An intrusion in Logis must not mark Garage as triggered."""
+    from custom_components.spc_flexc.models import AreaState
+
+    coordinator = _coordinator_stub()
+    coordinator.state.areas[1] = AreaState(area_id=1, mode=3)
+    coordinator.state.areas[2] = AreaState(area_id=2, mode=3)
+    coordinator.async_set_updated_data = MagicMock()
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "1000", "AREA_ID": "1", "ZONE_ID": "5"}
+    )
+    assert coordinator.state.areas[1].alarm_event_active is True
+    assert coordinator.state.areas[1].triggered_alarm_zones == {5}
+    assert coordinator.state.areas[2].alarm_event_active is False
+    assert coordinator.state.areas[2].triggered_alarm_zones == set()
