@@ -658,7 +658,7 @@ async def test_zone_poll_restores_area_only_when_all_intrusions_confirmed(
 
     assert area.mode == 3
     assert area.alarm_event_active is (not expected_cleared)
-    assert area.triggered_alarm_zones == (set() if expected_cleared else {1, 2})
+    assert area.triggered_alarm_zones == (set() if zone_statuses[2] == 0 else {2})
 
 
 @pytest.mark.asyncio
