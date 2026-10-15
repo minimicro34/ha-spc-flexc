@@ -314,7 +314,9 @@ class SpcAreaAlarmControlPanel(
             return None
 
         if area.mode in (MODE_PARTSET_A, MODE_PARTSET_B, MODE_SET) and (
-            area.alarm_event_active or area.internal_bells is True or area.external_bells is True
+            area.alarm_event_active
+            or area.internal_bells is True
+            or area.external_bells is True
         ):
             return AlarmControlPanelState.TRIGGERED
 
@@ -473,7 +475,11 @@ class SpcPanelAlarmControlPanel(
 
         if any(
             area.mode in (MODE_PARTSET_A, MODE_PARTSET_B, MODE_SET)
-            and (area.alarm_event_active or area.internal_bells is True or area.external_bells is True)
+            and (
+                area.alarm_event_active
+                or area.internal_bells is True
+                or area.external_bells is True
+            )
             for area in self.coordinator.data.areas.values()
         ):
             return AlarmControlPanelState.TRIGGERED
