@@ -61,6 +61,7 @@ def _coordinator_stub() -> MagicMock:
     coordinator._discovery_requested = False
     coordinator._discovery_task = None
     coordinator._zone_poll_task = None
+    coordinator._pending_zone_restores = set()
     coordinator._xbus_poll_task = None
     coordinator._last_area_diagnostic_log = 0.0
     coordinator.client.async_ensure_connected = AsyncMock()
@@ -634,6 +635,7 @@ async def test_zone_poll_restores_area_only_when_all_intrusions_confirmed(
         )
     coordinator._zone_discovery_complete = True
     coordinator._detected_zone_ids = {1, 2}
+    coordinator._pending_zone_restores = {(1, 1), (1, 2)}
     coordinator._zone_poll_task = asyncio.current_task()
     coordinator.client.async_get_zone_status = AsyncMock(
         return_value=[
@@ -655,6 +657,39 @@ async def test_zone_poll_restores_area_only_when_all_intrusions_confirmed(
     assert area.mode == 3
     assert area.alarm_event_active is (not expected_cleared)
     assert area.triggered_alarm_zones == (set() if zone_statuses[2] == 0 else {2})
+
+
+@pytest.mark.asyncio
+async def test_restore_event_after_zone_poll_already_reports_clear() -> None:
+    """A late restore event still clears a previously polled normal zone."""
+    coordinator = _coordinator_stub()
+    area = AreaState(area_id=1, mode=3, alarm_event_active=True)
+    area.active_alarm_zones = {1}
+    area.triggered_alarm_zones = {1}
+    coordinator.state.areas[1] = area
+    coordinator.state.zones[1] = ZoneState(
+        zone_id=1, area_id=1, alarm_state=0
+    )
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "1101", "AREA_ID": "1", "ZONE_ID": "1"}
+    )
+    assert coordinator._pending_zone_restores == {(1, 1)}
+    assert area.alarm_event_active is True
+    coordinator._zone_discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._zone_poll_task = asyncio.current_task()
+    coordinator.client.async_get_zone_status = AsyncMock(
+        return_value=[{"ZONE_ID": "1", "AREA_ID": "1", "ALARM_STATE": "0"}]
+    )
+    sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+    with (
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+    assert area.alarm_event_active is False
+    assert area.triggered_alarm_zones == set()
+    assert coordinator._pending_zone_restores == set()
 
 
 @pytest.mark.asyncio
