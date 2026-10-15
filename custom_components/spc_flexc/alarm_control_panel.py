@@ -431,6 +431,19 @@ class SpcAreaAlarmControlPanel(
             "last_unset_user_id": area.last_unset_user_id,
             "last_unset_user_name": area.last_unset_user_name,
             "last_alarm": area.last_alarm,
+            "alarm_event_active": area.alarm_event_active,
+            "alarm_zone_ids": sorted(area.active_alarm_zones),
+            "alarm_zones": [
+                {
+                    "zone_id": zone_id,
+                    "name": (
+                        self.coordinator.data.zones[zone_id].name or f"Zone {zone_id}"
+                    )
+                    if zone_id in self.coordinator.data.zones
+                    else f"Zone {zone_id}",
+                }
+                for zone_id in sorted(area.active_alarm_zones)
+            ],
             "internal_bells": area.internal_bells,
             "external_bells": area.external_bells,
         }
@@ -517,6 +530,20 @@ class SpcPanelAlarmControlPanel(
                 str(area_id): {
                     "name": area.name or f"Area {area_id}",
                     "mode": area.mode,
+                    "alarm_event_active": area.alarm_event_active,
+                    "alarm_zone_ids": sorted(area.active_alarm_zones),
+                    "alarm_zones": [
+                        {
+                            "zone_id": zone_id,
+                            "name": (
+                                self.coordinator.data.zones[zone_id].name
+                                or f"Zone {zone_id}"
+                            )
+                            if zone_id in self.coordinator.data.zones
+                            else f"Zone {zone_id}",
+                        }
+                        for zone_id in sorted(area.active_alarm_zones)
+                    ],
                     "mode_name": (
                         MODE_LABELS.get(area.mode) if area.mode is not None else None
                     ),
