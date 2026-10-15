@@ -564,6 +564,50 @@ async def test_zone_polling_continues_after_malformed_reply() -> None:
 
 
 @pytest.mark.asyncio
+async def test_zone_restore_diagnostic_logs_status_changes_without_clearing_alarm(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Zone status changes are diagnostic only while intrusion remains latched."""
+    coordinator = _coordinator_stub()
+    area = AreaState(area_id=1, mode=3, alarm_event_active=True)
+    area.triggered_alarm_zones.add(1)
+    coordinator.state.areas[1] = area
+    coordinator.state.zones[1] = ZoneState(
+        zone_id=1, area_id=1, alarm_state=1, proc_state=2, restore_allowed=True
+    )
+    coordinator._zone_discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._zone_poll_task = asyncio.current_task()
+    coordinator.client.async_get_zone_status = AsyncMock(
+        return_value=[
+            {
+                "ZONE_ID": "1",
+                "AREA_ID": "1",
+                "ALARM_STATE": "0",
+                "PROC_STATE": "0",
+                "RESTORE_ALLOWED": "0",
+            }
+        ]
+    )
+    sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+
+    with (
+        caplog.at_level(
+            logging.DEBUG, logger="custom_components.spc_flexc.coordinator"
+        ),
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+
+    assert "FlexC zone restore diagnostic: AREA_ID=1 ZONE_ID=1" in caplog.text
+    assert "before=(1, 2, True) after=(0, 0, False)" in caplog.text
+    assert area.alarm_event_active is True
+    assert area.triggered_alarm_zones == {1}
+    assert coordinator.state.zones[1].restore_allowed is False
+
+
+@pytest.mark.asyncio
 async def test_zone_actuation_change_notifies_entities() -> None:
     """Test a missed short activation still produces a coordinator update."""
     coordinator = MagicMock()
