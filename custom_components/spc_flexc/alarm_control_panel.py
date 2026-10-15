@@ -313,6 +313,11 @@ class SpcAreaAlarmControlPanel(
         if area is None or area.mode is None:
             return None
 
+        if area.mode in (MODE_PARTSET_A, MODE_PARTSET_B, MODE_SET) and (
+            area.alarm_event_active or area.internal_bells is True or area.external_bells is True
+        ):
+            return AlarmControlPanelState.TRIGGERED
+
         if area.mode == MODE_UNSET:
             return AlarmControlPanelState.DISARMED
         if area.mode == MODE_PARTSET_A:
@@ -465,6 +470,13 @@ class SpcPanelAlarmControlPanel(
         # panel appear fully disarmed or armed based on the remaining areas.
         if not modes or any(mode not in MODE_LABELS for mode in modes):
             return None
+
+        if any(
+            area.mode in (MODE_PARTSET_A, MODE_PARTSET_B, MODE_SET)
+            and (area.alarm_event_active or area.internal_bells is True or area.external_bells is True)
+            for area in self.coordinator.data.areas.values()
+        ):
+            return AlarmControlPanelState.TRIGGERED
 
         if all(mode == MODE_UNSET for mode in modes):
             return AlarmControlPanelState.DISARMED
