@@ -417,3 +417,36 @@ def test_intrusion_event_ignores_unset_area() -> None:
         {1: area}, {"EV_ID": "1000", "AREA_ID": "1", "ZONE_ID": "5"}
     )
     assert area.alarm_event_active is False
+
+
+def test_confirmed_entry_zone_intrusion_is_tracked_with_other_zones() -> None:
+    """A 1001 zone alarm joins the latched intrusion list without an input-only event."""
+    from custom_components.spc_flexc.flexc.events import apply_area_intrusion_event
+
+    area = AreaState(area_id=1, mode=3)
+    areas = {1: area}
+    event = lambda ev, zone: {"EV_ID": str(ev), "AREA_ID": "1", "ZONE_ID": str(zone)}
+
+    assert apply_area_intrusion_event(areas, event(1000, 1))
+    assert not apply_area_intrusion_event(areas, event(3512, 2))
+    assert area.triggered_alarm_zones == {1}
+    assert apply_area_intrusion_event(areas, event(1001, 2))
+    assert apply_area_intrusion_event(areas, event(1000, 3))
+    assert area.active_alarm_zones == {1, 2, 3}
+    assert area.triggered_alarm_zones == {1, 2, 3}
+    assert not apply_area_intrusion_event(areas, event(1001, 2))
+    assert apply_area_intrusion_event(areas, event(1100, 1))
+    assert area.active_alarm_zones == {2, 3}
+    assert area.triggered_alarm_zones == {1, 2, 3}
+
+
+def test_confirmed_entry_zone_intrusion_ignored_when_disarmed() -> None:
+    """An intrusion event must not create a new alarm on an unset area."""
+    from custom_components.spc_flexc.flexc.events import apply_area_intrusion_event
+
+    area = AreaState(area_id=1, mode=0)
+    assert not apply_area_intrusion_event(
+        {1: area}, {"EV_ID": "1001", "AREA_ID": "1", "ZONE_ID": "2"}
+    )
+    assert not area.alarm_event_active
+    assert not area.triggered_alarm_zones
