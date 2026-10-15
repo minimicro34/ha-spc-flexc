@@ -366,3 +366,75 @@ async def test_setup_entry_adds_new_areas_once() -> None:
     coordinator.data.areas[2] = AreaState(area_id=2, name="Garage")
     listeners[0]()
     assert len(batches[2]) == 1
+
+
+def test_intrusion_area_and_panel_state_with_multiple_zones() -> None:
+    """An intrusion overrides arming mode and identifies every triggering zone."""
+    from custom_components.spc_flexc.flexc.events import apply_area_intrusion_event
+
+    logis = AreaState(area_id=1, name="Logis", mode=MODE_SET)
+    garage = AreaState(area_id=2, name="Garage", mode=MODE_UNSET)
+    coordinator = _coordinator(logis, garage)
+    coordinator.data.zones[5] = ZoneState(zone_id=5, name="Bureau")
+    coordinator.data.zones[6] = ZoneState(zone_id=6, name="Entrée")
+    area_entity = SpcAreaAlarmControlPanel(coordinator, 1)
+    panel_entity = SpcPanelAlarmControlPanel(coordinator)
+
+    assert area_entity.alarm_state == AlarmControlPanelState.ARMED_AWAY
+    assert panel_entity.alarm_state is None  # Mixed arming, no intrusion.
+
+    for zone_id in (5, 6):
+        assert apply_area_intrusion_event(
+            coordinator.data.areas,
+            {"EV_ID": "1000", "AREA_ID": "1", "ZONE_ID": str(zone_id)},
+        )
+
+    assert area_entity.alarm_state == AlarmControlPanelState.TRIGGERED
+    assert panel_entity.alarm_state == AlarmControlPanelState.TRIGGERED
+    assert area_entity.extra_state_attributes["alarm_event_active"] is True
+    assert area_entity.extra_state_attributes["alarm_zone_ids"] == [5, 6]
+    assert area_entity.extra_state_attributes["alarm_zones"] == [
+        {"zone_id": 5, "name": "Bureau"},
+        {"zone_id": 6, "name": "Entrée"},
+    ]
+    assert panel_entity.extra_state_attributes["areas"]["1"]["alarm_zone_ids"] == [
+        5,
+        6,
+    ]
+
+    assert apply_area_intrusion_event(
+        coordinator.data.areas,
+        {"EV_ID": "1100", "AREA_ID": "1", "ZONE_ID": "5"},
+    )
+    assert area_entity.alarm_state == AlarmControlPanelState.TRIGGERED
+    assert area_entity.extra_state_attributes["alarm_zone_ids"] == [5, 6]
+    assert logis.active_alarm_zones == {6}
+
+    logis.mode = MODE_UNSET
+    logis.alarm_event_active = False
+    logis.active_alarm_zones.clear()
+    logis.triggered_alarm_zones.clear()
+    assert area_entity.alarm_state == AlarmControlPanelState.DISARMED
+    assert panel_entity.alarm_state == AlarmControlPanelState.DISARMED
+    assert area_entity.extra_state_attributes["alarm_zone_ids"] == []
+
+
+def test_alarm_bell_fallback_and_unknown_zone_name() -> None:
+    """A bell status can signal an alarm without a received intrusion EVENT."""
+    area = AreaState(
+        area_id=1,
+        name="Logis",
+        mode=MODE_PARTSET_A,
+        external_bells=True,
+        triggered_alarm_zones={99},
+    )
+    coordinator = _coordinator(area)
+    area_entity = SpcAreaAlarmControlPanel(coordinator, 1)
+    panel_entity = SpcPanelAlarmControlPanel(coordinator)
+    assert area_entity.alarm_state == AlarmControlPanelState.TRIGGERED
+    assert panel_entity.alarm_state == AlarmControlPanelState.TRIGGERED
+    assert area_entity.extra_state_attributes["alarm_zones"] == [
+        {"zone_id": 99, "name": "Zone 99"}
+    ]
+    area.external_bells = False
+    assert area_entity.alarm_state == AlarmControlPanelState.ARMED_HOME
