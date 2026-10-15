@@ -836,7 +836,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         if not restored_zones:
                             continue
                         area.triggered_alarm_zones.difference_update(restored_zones)
-                        area.active_alarm_zones.difference_update(restored_zones)
+                        # Active intrusion is cleared by FlexC return events, not
+                        # by a restored alarm status alone.
                         _LOGGER.debug(
                             "FlexC confirmed zone alarm restoration: "
                             "AREA_ID=%s RESTORED=%s REMAINING=%s",
