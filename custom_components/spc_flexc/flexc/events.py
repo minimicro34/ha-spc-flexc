@@ -323,6 +323,7 @@ def apply_area_intrusion_event(
     previous = (area.alarm_event_active, set(area.active_alarm_zones))
     if event_id == 1000 and area.mode in (1, 2, 3):
         area.active_alarm_zones.add(zone_id)
+        area.triggered_alarm_zones.add(zone_id)
         area.alarm_event_active = True
     elif event_id == 1100:
         area.active_alarm_zones.discard(zone_id)
