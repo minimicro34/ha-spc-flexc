@@ -320,7 +320,11 @@ def apply_area_intrusion_event(
     area = areas.get(area_id)
     if area is None:
         return False
-    previous = (area.alarm_event_active, set(area.active_alarm_zones))
+    previous = (
+        area.alarm_event_active,
+        set(area.active_alarm_zones),
+        set(area.triggered_alarm_zones),
+    )
     if event_id == 1000 and area.mode in (1, 2, 3):
         area.active_alarm_zones.add(zone_id)
         area.triggered_alarm_zones.add(zone_id)
@@ -328,4 +332,8 @@ def apply_area_intrusion_event(
     elif event_id == 1100:
         area.active_alarm_zones.discard(zone_id)
         # A zone restore does not acknowledge or silence an active alarm.
-    return previous != (area.alarm_event_active, area.active_alarm_zones)
+    return previous != (
+        area.alarm_event_active,
+        area.active_alarm_zones,
+        area.triggered_alarm_zones,
+    )
