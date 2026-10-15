@@ -983,7 +983,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # Diagnostic-only: distinguish missing successive intrusion events from
         # events received but not associated with an armed area or zone.
         event_id = _int_value(event.get("EV_ID"))
-        if event_id in (1000, 1100):
+        if event_id in (1000, 1001, 1100):
             area_id = _int_value(event.get("AREA_ID"))
             zone_id = _int_value(event.get("ZONE_ID"))
             area = self.state.areas.get(area_id) if area_id is not None else None
