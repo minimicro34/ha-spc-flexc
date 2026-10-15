@@ -949,6 +949,24 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         panel_changed = apply_panel_event(self.state.panel, event)
         area_changed = apply_area_event(self.state.areas, event)
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
+        # Diagnostic-only: distinguish missing successive intrusion events from
+        # events received but not associated with an armed area or zone.
+        event_id = _int_value(event.get("EV_ID"))
+        if event_id in (1000, 1100):
+            area_id = _int_value(event.get("AREA_ID"))
+            zone_id = _int_value(event.get("ZONE_ID"))
+            area = self.state.areas.get(area_id) if area_id is not None else None
+            _LOGGER.debug(
+                "SPC intrusion event: ev_id=%s area_id=%s zone_id=%s "
+                "area_mode=%s tracked=%s active_zones=%s triggered_zones=%s",
+                event_id,
+                area_id,
+                zone_id,
+                area.mode if area is not None else None,
+                intrusion_changed,
+                sorted(area.active_alarm_zones) if area is not None else [],
+                sorted(area.triggered_alarm_zones) if area is not None else [],
+            )
         if str(event.get("EV_ID")) == "3501":
             try:
                 area_id = int(str(event.get("AREA_ID")))
