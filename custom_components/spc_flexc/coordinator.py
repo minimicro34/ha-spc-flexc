@@ -909,6 +909,19 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         await self.client.async_close()
 
     def _handle_flexc_event(self, event: dict[str, str]) -> None:
+        # Temporary beta diagnostic: log only non-sensitive routing identifiers.
+        # Do not log the full event: it may include names or user information.
+        event_id = str(event.get("EV_ID", ""))
+        area_id = str(event.get("AREA_ID", ""))
+        zone_id = str(event.get("ZONE_ID", ""))
+        if (area_id or zone_id) and event_id.isdecimal():
+            # Avoid noisy normal zone events; capture alarm/area families.
+            numeric_id = int(event_id)
+            if 1000 <= numeric_id < 2000 or 3000 <= numeric_id < 4000:
+                _LOGGER.warning(
+                    "Temporary FlexC alarm diagnostic: EV_ID=%s AREA_ID=%s ZONE_ID=%s",
+                    event_id, area_id or "-", zone_id or "-",
+                )
         fault_changed = apply_event(self.state.faults, event)
         if fault_changed and str(event.get("EV_ID")) in ("5206", "5207"):
             panel_tamper = self.state.faults.panel_tamper
