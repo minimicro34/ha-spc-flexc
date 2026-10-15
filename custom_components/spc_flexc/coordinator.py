@@ -749,6 +749,42 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
                         event_changed = _reconcile_zone_event_state(zone, previous)
+                        # Diagnostic only: track SPC zone status while an area
+                        # retains an intrusion. Do not infer alarm clearance here.
+                        area = (
+                            self.state.areas.get(zone.area_id)
+                            if zone.area_id is not None
+                            else None
+                        )
+                        if (
+                            _LOGGER.isEnabledFor(logging.DEBUG)
+                            and area is not None
+                            and area.alarm_event_active
+                        ):
+                            before_status = (
+                                (
+                                    previous.alarm_state,
+                                    previous.proc_state,
+                                    previous.restore_allowed,
+                                )
+                                if previous is not None
+                                else None
+                            )
+                            after_status = (
+                                zone.alarm_state,
+                                zone.proc_state,
+                                zone.restore_allowed,
+                            )
+                            if before_status != after_status:
+                                _LOGGER.debug(
+                                    "FlexC zone restore diagnostic: "
+                                    "AREA_ID=%s ZONE_ID=%s "
+                                    "before=%s after=%s",
+                                    zone.area_id,
+                                    zone.zone_id,
+                                    before_status,
+                                    after_status,
+                                )
                         if (
                             event_changed
                             or previous is None
