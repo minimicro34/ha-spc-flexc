@@ -87,10 +87,13 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - 🚪 Identification of the zone preventing arming when reported by SPC
 - 🛠️ Engineer / Installer mode detection
 - ⚡ Live state updates from supported FlexC events
+- 🚨 Latched `triggered` state for intrusion events (`1000`), cleared on confirmed disarming
+- 🔎 Triggering zone IDs and names exposed on individual area and aggregate alarm entities
 
 ### Zones
 
 - Live zone state monitoring
+- Individual zone binary sensor attributes `intrusion_active` (currently active intrusion) and `intrusion_triggered` (latched until disarming)
 - Zone inhibition and de-inhibition controls when explicitly allowed by SPC
 - Zone isolation and de-isolation controls when explicitly allowed by SPC
 - Zone restoration through a dedicated Home Assistant button when SPC reports `RESTORE_ALLOWED=1`
@@ -153,6 +156,8 @@ Actual feature availability depends on the panel model, firmware, installed modu
 | Mapping Gates / outputs | ✅ |
 | X-BUS discovery | ✅ |
 | FlexC events | ✅ |
+| Intrusion `triggered` state and triggering zone identification | ✅ |
+| Per-zone intrusion attributes | ✅ |
 | Panel diagnostics | ✅ |
 | FlexC ATS / ATP diagnostics | ✅ |
 
@@ -428,6 +433,13 @@ Do not expose the FlexC listener directly to the Internet.
 ---
 
 ## Known limitations
+
+### Intrusion event tracking
+
+FlexC intrusion event `1000` marks an armed area as `triggered` and records the triggering zone. A zone restore event `1100` can clear its active intrusion indication, but the area alarm and the zone's `intrusion_triggered` attribute remain latched until confirmed disarming. Area and aggregate `alarm_control_panel` entities expose `alarm_event_active`, `alarm_zone_ids`, and `alarm_zones` (zone IDs and names). Each individual zone binary sensor exposes `intrusion_active` and `intrusion_triggered` attributes without changing its normal on/off state.
+
+The intrusion latch is retained across normal polling and same-arming-mode reconnections while Home Assistant is running. Intrusions occurring entirely while Home Assistant is disconnected or restarting may not be reconstructed from subsequent status polling.
+
 
 ### Global Full Set is not atomic
 
