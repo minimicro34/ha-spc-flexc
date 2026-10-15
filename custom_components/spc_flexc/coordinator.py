@@ -834,8 +834,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 is not None
                                 and known_zone.area_id == area_id
                                 and known_zone.alarm_state == 0
-                                and (area_id, zone_id)
-                                in self._pending_zone_restores
+                                and (area_id, zone_id) in self._pending_zone_restores
                                 and zone_id in polled_zone_ids
                             )
                         }
