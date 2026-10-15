@@ -340,3 +340,36 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
     )
     callbacks[0]()
     assert [len(batch) for batch in batches[4:]] == [1, 1, 3]
+
+
+def test_zone_intrusion_attributes_follow_area_alarm_lifecycle() -> None:
+    coordinator = _coordinator()
+    area = AreaState(area_id=1, name="Logis", mode=3)
+    coordinator.data.areas[1] = area
+    coordinator.data.zones[1] = ZoneState(zone_id=1, name="TV", area_id=1)
+    coordinator.data.zones[2] = ZoneState(zone_id=2, name="Bureau", area_id=1)
+    tv = SpcZoneBinarySensor(coordinator, 1)
+    bureau = SpcZoneBinarySensor(coordinator, 2)
+
+    assert tv.extra_state_attributes["intrusion_active"] is False
+    assert tv.extra_state_attributes["intrusion_triggered"] is False
+
+    area.active_alarm_zones.add(1)
+    area.triggered_alarm_zones.add(1)
+    assert tv.extra_state_attributes["intrusion_active"] is True
+    assert tv.extra_state_attributes["intrusion_triggered"] is True
+    assert bureau.extra_state_attributes["intrusion_active"] is False
+
+    area.active_alarm_zones.clear()
+    assert tv.extra_state_attributes["intrusion_active"] is False
+    assert tv.extra_state_attributes["intrusion_triggered"] is True
+
+    area.triggered_alarm_zones.clear()
+    assert tv.extra_state_attributes["intrusion_triggered"] is False
+
+
+def test_zone_intrusion_attributes_without_matching_area() -> None:
+    sensor, _ = _zone_sensor()
+    attrs = sensor.extra_state_attributes
+    assert attrs["intrusion_active"] is False
+    assert attrs["intrusion_triggered"] is False
