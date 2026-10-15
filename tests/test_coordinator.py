@@ -1,6 +1,7 @@
 """Tests for the SPC FlexC data update coordinator."""
 
 import asyncio
+import logging
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, call, patch
 from zoneinfo import ZoneInfo
@@ -26,7 +27,7 @@ from custom_components.spc_flexc.coordinator import (
 )
 from custom_components.spc_flexc.flexc.connection import FlexCConnectionError
 from custom_components.spc_flexc.flexc.flexml import FlexMLError
-from custom_components.spc_flexc.models import SpcState, XBusDeviceState, ZoneState
+from custom_components.spc_flexc.models import AreaState, SpcState, XBusDeviceState, ZoneState
 
 
 class _AsyncLock:
@@ -250,6 +251,35 @@ def test_handle_flexc_restore_event() -> None:
 
     assert coordinator.state.faults.xbus_mains_fault is False
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+def test_alarm_diagnostics_capture_unknown_restore_event_without_personal_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Unknown restoration IDs are visible without leaking raw EVENT fields."""
+    coordinator = MagicMock(spec=SpcFlexCCoordinator)
+    coordinator.state = SpcState()
+    area = AreaState(area_id=1, mode=3)
+    area.alarm_event_active = True
+    area.triggered_alarm_zones.add(1)
+    coordinator.state.areas[1] = area
+
+    with caplog.at_level(logging.DEBUG, logger="custom_components.spc_flexc.coordinator"):
+        SpcFlexCCoordinator._handle_flexc_event(
+            coordinator,
+            {
+                "EV_ID": "9876",
+                "AREA_ID": "1",
+                "ZONE_ID": "1",
+                "USER_NAME": "private-user",
+            },
+        )
+
+    assert "EV_ID=9876 AREA_ID=1 ZONE_ID=1" in caplog.text
+    assert "before=(3, True, (), (1,))" in caplog.text
+    assert "after=(3, True, (), (1,))" in caplog.text
+    assert "private-user" not in caplog.text
+    coordinator.async_set_updated_data.assert_not_called()
 
 
 def test_unknown_flexc_event_does_not_notify() -> None:
