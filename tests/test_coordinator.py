@@ -836,9 +836,7 @@ def test_intrusion_reconnect_same_mode_preserves_alarm(mode: int) -> None:
         triggered_alarm_zones={5, 6},
     )
     after_reconnect = AreaState(area_id=1, mode=mode)
-    SpcFlexCCoordinator._reconcile_area_intrusion(
-        after_reconnect, before_disconnect
-    )
+    SpcFlexCCoordinator._reconcile_area_intrusion(after_reconnect, before_disconnect)
     assert after_reconnect.alarm_event_active is True
     assert after_reconnect.active_alarm_zones == {5}
     assert after_reconnect.triggered_alarm_zones == {5, 6}
