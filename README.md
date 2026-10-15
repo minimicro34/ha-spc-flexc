@@ -87,8 +87,9 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - 🚪 Identification of the zone preventing arming when reported by SPC
 - 🛠️ Engineer / Installer mode detection
 - ⚡ Live state updates from supported FlexC events
-- 🚨 Latched `triggered` state for intrusion events (`1000`), cleared on confirmed disarming
+- 🚨 Latched `triggered` state for intrusion events (`1000` and `1001`), cleared on confirmed disarming
 - 🔎 Triggering zone IDs and names exposed on individual area and aggregate alarm entities
+- 🧭 Successive confirmed alarm zones are accumulated; physical input changes during entry delay alone do not mark an intrusion
 
 ### Zones
 
