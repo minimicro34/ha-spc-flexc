@@ -74,8 +74,7 @@ def test_user_name_parser_ignores_missing_name_and_wrong_reply():
     )
     assert (
         parse_user_config_name(
-            '<FLEXML_REPLY><REPLY_GET_PANEL_SUMMARY RESULT="0" />'
-            "</FLEXML_REPLY>"
+            '<FLEXML_REPLY><REPLY_GET_PANEL_SUMMARY RESULT="0" /></FLEXML_REPLY>'
         )
         is None
     )
