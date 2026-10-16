@@ -78,3 +78,51 @@ def test_user_name_parser_ignores_missing_name_and_wrong_reply():
         )
         is None
     )
+
+
+@pytest.mark.asyncio
+async def test_client_user_lookup_returns_name_only():
+    """The client must not retain the raw user config containing credentials."""
+    from unittest.mock import AsyncMock
+
+    from custom_components.spc_flexc.flexc.connection import FlexCClient
+
+    client = object.__new__(FlexCClient)
+    client.command_username = "account"
+    client.command_password = "secret"
+    client.async_send_flexml = AsyncMock(
+        return_value=(
+            '<FLEXML_REPLY><REPLY_GET_USER_CONFIG RESULT="0">'
+            '<USER_CONFIG USER_ID="1" USER_NAME="Nicolas" PIN="private" />'
+            "</REPLY_GET_USER_CONFIG></FLEXML_REPLY>"
+        )
+    )
+    assert await client.async_get_user_name(1) == "Nicolas"
+    client.async_send_flexml.assert_awaited_once()
+    assert 'USER_ID="1"' in client.async_send_flexml.await_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_client_user_lookup_handles_unknown_user():
+    from unittest.mock import AsyncMock
+
+    from custom_components.spc_flexc.flexc.connection import FlexCClient
+
+    client = object.__new__(FlexCClient)
+    client.command_username = "account"
+    client.command_password = "secret"
+    client.async_send_flexml = AsyncMock(
+        return_value=(
+            '<FLEXML_REPLY><REPLY_GET_USER_CONFIG RESULT="102" />'
+            "</FLEXML_REPLY>"
+        )
+    )
+    assert await client.async_get_user_name(9995) is None
+
+
+@pytest.mark.parametrize("user_id", [0, -1, 10000])
+def test_user_config_rejects_out_of_range_ids(user_id):
+    from custom_components.spc_flexc.flexc.flexml import build_user_config_command
+
+    with pytest.raises(ValueError):
+        build_user_config_command(user_id, "account", "secret")
