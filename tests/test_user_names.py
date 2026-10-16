@@ -52,3 +52,30 @@ def test_read_only_user_name_parser_discards_sensitive_fields():
         )
         is None
     )
+
+
+def test_aliases_skip_blank_lines_and_normalize_numeric_ids():
+    assert parse_user_aliases("  \n0001 = Nicolas\n\n9995 = Home Assistant") == {
+        "1": "Nicolas",
+        "9995": "Home Assistant",
+    }
+
+
+def test_user_name_parser_ignores_missing_name_and_wrong_reply():
+    from custom_components.spc_flexc.flexc.flexml import parse_user_config_name
+
+    assert (
+        parse_user_config_name(
+            '<FLEXML_REPLY><REPLY_GET_USER_CONFIG RESULT="0">'
+            '<USER_CONFIG USER_ID="1" PIN="secret" />'
+            "</REPLY_GET_USER_CONFIG></FLEXML_REPLY>"
+        )
+        is None
+    )
+    assert (
+        parse_user_config_name(
+            '<FLEXML_REPLY><REPLY_GET_PANEL_SUMMARY RESULT="0" />'
+            "</FLEXML_REPLY>"
+        )
+        is None
+    )
