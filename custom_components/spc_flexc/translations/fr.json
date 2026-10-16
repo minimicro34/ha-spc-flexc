@@ -27,38 +27,100 @@
   },
   "entity": {
     "binary_sensor": {
-      "xbus_tamper_fault": {"name": "Défaut d’autoprotection"},
-      "xbus_tamper_inhibited": {"name": "Inhibition"},
-      "xbus_tamper_isolated": {"name": "Isolation"}
+      "xbus_tamper_fault": {
+        "name": "Défaut d’autoprotection"
+      },
+      "xbus_tamper_inhibited": {
+        "name": "Inhibition"
+      },
+      "xbus_tamper_isolated": {
+        "name": "Isolation"
+      }
     },
     "sensor": {
-      "xbus_aux_voltage": {"name": "Tension auxiliaire"},
-      "xbus_aux_current": {"name": "Courant auxiliaire"},
-      "xbus_diagnostics": {"name": "Diagnostics X-BUS"},
-      "xbus_device_id": {"name": "ID du périphérique X-BUS"},
-      "xbus_input_count": {"name": "Nombre d’entrées"},
-      "xbus_output_count": {"name": "Nombre de sorties"}
+      "xbus_aux_voltage": {
+        "name": "Tension auxiliaire"
+      },
+      "xbus_aux_current": {
+        "name": "Courant auxiliaire"
+      },
+      "xbus_diagnostics": {
+        "name": "Diagnostics X-BUS"
+      },
+      "xbus_device_id": {
+        "name": "ID du périphérique X-BUS"
+      },
+      "xbus_input_count": {
+        "name": "Nombre d’entrées"
+      },
+      "xbus_output_count": {
+        "name": "Nombre de sorties"
+      }
     },
     "button": {
-      "open_momentarily": {"name": "Mode libre temporaire"},
-      "open_permanently": {"name": "Mode libre"},
-      "set_normal": {"name": "Mode normal"},
-      "lock": {"name": "Mode accès interdit"},
-      "restore": {"name": "Restaurer {zone_name}"}
+      "open_momentarily": {
+        "name": "Mode libre temporaire"
+      },
+      "open_permanently": {
+        "name": "Mode libre"
+      },
+      "set_normal": {
+        "name": "Mode normal"
+      },
+      "lock": {
+        "name": "Mode accès interdit"
+      },
+      "restore": {
+        "name": "Restaurer {zone_name}"
+      }
     },
     "switch": {
-      "inhibition": {"name": "Inhibition {zone_name}"},
-      "isolation": {"name": "Isolation {zone_name}"}
+      "inhibition": {
+        "name": "Inhibition {zone_name}"
+      },
+      "isolation": {
+        "name": "Isolation {zone_name}"
+      }
     }
   },
   "exceptions": {
-    "area_not_ready_engineer": {"message": "Impossible d’armer {area} : le mode Installateur est actif (raison SPC {reason})."},
-    "area_not_ready_zone": {"message": "Impossible d’armer {area} : la zone « {zone} » (ID {zone_id}) n’est pas prête (raison SPC {reason})."},
-    "area_not_ready_faults": {"message": "Impossible de changer le mode de {area} : le secteur n'est pas prêt (raison SPC {reason}). Défauts actifs : {faults}"},
-    "area_not_ready": {"message": "Impossible de changer le mode de {area} : le secteur n’est pas prêt (raison SPC {reason})."},
-    "partset_a_not_supported": {"message": "{area} ne prend pas en charge la mise en service partielle A."},
-    "partset_b_not_supported": {"message": "{area} ne prend pas en charge la mise en service partielle B."},
-    "global_arm_incomplete": {"message": "La mise en service totale SPC est incomplète. Secteurs déjà commandés : {areas}. Erreur : {error}"},
-    "global_disarm_incomplete": {"message": "La mise hors service totale SPC est incomplète. Erreurs : {errors}"}
+    "area_not_ready_engineer": {
+      "message": "Impossible d’armer {area} : le mode Installateur est actif (raison SPC {reason})."
+    },
+    "area_not_ready_zone": {
+      "message": "Impossible d’armer {area} : la zone « {zone} » (ID {zone_id}) n’est pas prête (raison SPC {reason})."
+    },
+    "area_not_ready_faults": {
+      "message": "Impossible de changer le mode de {area} : le secteur n'est pas prêt (raison SPC {reason}). Défauts actifs : {faults}"
+    },
+    "area_not_ready": {
+      "message": "Impossible de changer le mode de {area} : le secteur n’est pas prêt (raison SPC {reason})."
+    },
+    "partset_a_not_supported": {
+      "message": "{area} ne prend pas en charge la mise en service partielle A."
+    },
+    "partset_b_not_supported": {
+      "message": "{area} ne prend pas en charge la mise en service partielle B."
+    },
+    "global_arm_incomplete": {
+      "message": "La mise en service totale SPC est incomplète. Secteurs déjà commandés : {areas}. Erreur : {error}"
+    },
+    "global_disarm_incomplete": {
+      "message": "La mise hors service totale SPC est incomplète. Erreurs : {errors}"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Noms d’affichage des utilisateurs",
+        "description": "Une ligne par utilisateur au format ID=Nom (exemple : 9995=Home Assistant).",
+        "data": {
+          "user_aliases": "Alias des utilisateurs"
+        }
+      }
+    },
+    "error": {
+      "invalid_aliases": "Saisir une ligne ID numérique=Nom par utilisateur."
+    }
   }
 }
