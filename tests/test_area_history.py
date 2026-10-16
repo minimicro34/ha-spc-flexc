@@ -45,9 +45,7 @@ def _event(event_id, timestamp, user_id="9995", user_name="Control Profile"):
 def test_history_tracks_partial_arm_and_disarm_without_overwriting_full_set_fields():
     coordinator = _history_coordinator()
     area = coordinator.state.areas[1]
-    assert coordinator._apply_area_history_event(
-        _event(3502, "21394016102026")
-    )
+    assert coordinator._apply_area_history_event(_event(3502, "21394016102026"))
     assert area.last_arm_user_id == 9995
     assert area.last_arm_user_name == "Control Profile"
     assert area.last_arm_time == datetime(
@@ -106,5 +104,7 @@ async def test_history_restore_keeps_only_valid_aware_timestamps():
     )
     await coordinator.async_restore_area_history()
     assert coordinator._area_history[1]["last_arm_user_id"] == 9995
-    assert coordinator._area_history[1]["last_arm_user_display_name"] == "Control Profile"
+    assert (
+        coordinator._area_history[1]["last_arm_user_display_name"] == "Control Profile"
+    )
     assert 2 not in coordinator._area_history
