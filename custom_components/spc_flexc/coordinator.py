@@ -17,6 +17,7 @@ from .const import (
     AREA_DISCOVERY_MAX_ID,
     ATS_IDS,
     DEFAULT_PANEL_INTERVAL,
+    CONF_USER_ALIASES,
     DOMAIN,
     DOOR_DISCOVERY_MAX_ID,
     XBUS_POLL_INTERVAL,
@@ -46,6 +47,7 @@ from .flexc.events import (
 from .flexc.flexml import FlexMLError
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
+from .user_names import display_user_name
 from .models import (
     AreaState,
     AtpState,
@@ -425,10 +427,20 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 saved[str(area_id)] = item
         return saved
 
+    def _display_user_name(self, user_id: int | None, raw_name: str | None) -> str | None:
+        """Apply user aliases without changing the raw SPC identity."""
+        return display_user_name(
+            user_id, raw_name, self.entry.options.get(CONF_USER_ALIASES, {})
+        )
+
     def _merge_area_history(self, area: AreaState) -> None:
         """Retain event history when area polling rebuilds the state object."""
         history = self._area_history.get(area.area_id, {})
         for kind in ("arm", "disarm"):
+            history[f"last_{kind}_user_display_name"] = self._display_user_name(
+                history.get(f"last_{kind}_user_id"),
+                history.get(f"last_{kind}_user_name"),
+            )
             for suffix in ("time", "user_id", "user_name", "user_display_name"):
                 field = f"last_{kind}_{suffix}"
                 if field in history:
@@ -465,7 +477,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 f"last_{kind}_time": timestamp,
                 f"last_{kind}_user_id": _int_value(event.get("USER_ID")),
                 f"last_{kind}_user_name": user_name,
-                f"last_{kind}_user_display_name": user_name,
+                f"last_{kind}_user_display_name": self._display_user_name(
+                    _int_value(event.get("USER_ID")), user_name
+                ),
             }
         )
         self._merge_area_history(area)
