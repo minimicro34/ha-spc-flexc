@@ -1183,7 +1183,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             if is_mode_event
             else None
         )
-        area_history = self._area_history.get(area_id, {}) if area_id is not None else {}
+        area_history = (
+            self._area_history.get(area_id, {}) if area_id is not None else {}
+        )
         latest_time = max(
             (
                 value
@@ -1199,9 +1201,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             and event_time < latest_time
         )
         area_changed = (
-            False
-            if stale_mode_event
-            else apply_area_event(self.state.areas, event)
+            False if stale_mode_event else apply_area_event(self.state.areas, event)
         )
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
         if event_id in (1100, 1101) and area_id is not None and zone_id is not None:
