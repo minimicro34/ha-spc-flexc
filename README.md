@@ -44,6 +44,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - [Available entities](#available-entities)
 - [SPC FlexC Card](#spc-flexc-card)
 - [Alarm control](#alarm-control)
+- [Area arming history and user aliases](#area-arming-history-and-user-aliases)
 - [Zone inhibition, isolation and restoration](#zone-inhibition-isolation-and-restoration)
 - [Mapping Gates / outputs](#mapping-gates--outputs)
 - [X-BUS](#x-bus)
@@ -331,6 +332,38 @@ Validated SPC reasons in the form `1000 + zone_id` identify a zone preventing ar
 SPC reason `10006` is handled as Engineer / Installer mode preventing the requested arming operation. SPC reason `2007` is handled as an active system fault and known active diagnostic faults are included when available.
 
 Unknown reason codes are preserved and are not assigned guessed meanings.
+
+---
+
+## Area arming history and user aliases
+
+Each individual SPC area `alarm_control_panel` exposes the most recent confirmed arming and disarming events as attributes:
+
+| Arming | Disarming | Meaning |
+| --- | --- | --- |
+| `last_arm_time` | `last_disarm_time` | SPC event timestamp |
+| `last_arm_user_id` | `last_disarm_user_id` | SPC user identifier |
+| `last_arm_user_name` | `last_disarm_user_name` | Original user name reported by SPC |
+| `last_arm_user_display_name` | `last_disarm_user_display_name` | Display name, using a configured alias when available |
+
+This history is stored and restored after Home Assistant restarts. It is populated from received SPC events, not reconstructed retroactively from older panel events. Existing `last_set_*` and `last_unset_*` attributes remain available.
+
+### Configure user display names
+
+Open **Settings → Devices & services → SPC FlexC → Configure** and find the **User aliases** multiline field. Enter **one mapping per line** in the format `ID=Name`, for example:
+
+```text
+1=Nicolas
+2=Orane
+9995=Home Assistant
+9999=Engineer
+```
+
+Press **Enter** after each mapping to start a new line. Do not enter literal `\\n` characters, commas, semicolons, quotes or list markers. No spaces are needed around `=`; spaces **within a display name** are allowed. The ID must be a numeric SPC user ID, and each name must be non-empty. Save the options to apply the aliases, including to previously recorded area history.
+
+Aliases only affect the `*_user_display_name` attributes. The original `*_user_name` and `*_user_id` attributes are preserved. Display names use the configured alias first, then a user name retrieved from SPC when available, then the name supplied by the event.
+
+**Important:** An event attributed to the SPC Command Profile (for example user ID `9995`) identifies the technical command account, not necessarily the individual who initiated the operation in Home Assistant. An alias such as `9995=Home Assistant` is a display label, not proof of a person's identity.
 
 ---
 
