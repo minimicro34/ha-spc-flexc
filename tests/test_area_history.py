@@ -28,6 +28,7 @@ def _history_coordinator():
     coordinator.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris"))
     coordinator.state = SpcState(areas={1: AreaState(area_id=1)})
     coordinator._area_history = {}
+    coordinator._user_names = {}
     coordinator.entry = SimpleNamespace(options={})
     coordinator._area_history_store = MagicMock()
     return coordinator
