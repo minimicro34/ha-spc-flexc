@@ -20,6 +20,15 @@ class AreaState:
     last_unset_time: datetime | None = None
     last_unset_user_id: int | None = None
     last_unset_user_name: str | None = None
+    # Event history, including partial arm, distinct from SPC status fields.
+    last_arm_time: datetime | None = None
+    last_arm_user_id: int | None = None
+    last_arm_user_name: str | None = None
+    last_arm_user_display_name: str | None = None
+    last_disarm_time: datetime | None = None
+    last_disarm_user_id: int | None = None
+    last_disarm_user_name: str | None = None
+    last_disarm_user_display_name: str | None = None
     last_alarm: datetime | None = None
     internal_bells: bool | None = None
     external_bells: bool | None = None
