@@ -113,8 +113,7 @@ async def test_client_user_lookup_handles_unknown_user():
     client.command_password = "secret"
     client.async_send_flexml = AsyncMock(
         return_value=(
-            '<FLEXML_REPLY><REPLY_GET_USER_CONFIG RESULT="102" />'
-            "</FLEXML_REPLY>"
+            '<FLEXML_REPLY><REPLY_GET_USER_CONFIG RESULT="102" /></FLEXML_REPLY>'
         )
     )
     assert await client.async_get_user_name(9995) is None
