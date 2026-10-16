@@ -21,6 +21,7 @@ CONF_PORT = "port"
 CONF_KEY = "encryption_key"
 CONF_COMMAND_USERNAME = "command_username"
 CONF_COMMAND_PASSWORD = "command_password"
+CONF_USER_ALIASES = "user_aliases"
 
 # Live polling
 ZONE_POLL_INTERVAL = 1.0
