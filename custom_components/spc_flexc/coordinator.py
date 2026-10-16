@@ -16,8 +16,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     AREA_DISCOVERY_MAX_ID,
     ATS_IDS,
-    DEFAULT_PANEL_INTERVAL,
     CONF_USER_ALIASES,
+    DEFAULT_PANEL_INTERVAL,
     DOMAIN,
     DOOR_DISCOVERY_MAX_ID,
     XBUS_POLL_INTERVAL,
@@ -47,7 +47,6 @@ from .flexc.events import (
 from .flexc.flexml import FlexMLError
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
-from .user_names import display_user_name
 from .models import (
     AreaState,
     AtpState,
@@ -58,6 +57,7 @@ from .models import (
     XBusDeviceState,
     ZoneState,
 )
+from .user_names import display_user_name
 
 _LOGGER = logging.getLogger(__name__)
 
