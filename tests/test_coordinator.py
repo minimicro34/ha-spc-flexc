@@ -1069,3 +1069,28 @@ def test_area_reconciliation_reports_added_and_removed_fields() -> None:
         "NEW=None -> 'yes'",
         "OLD='yes' -> None",
     ]
+
+
+def test_untimestamped_unset_event_still_clears_latched_alarm() -> None:
+    """Live unset events without a timestamp must not be blocked by history."""
+    coordinator = _coordinator_stub()
+    coordinator._area_history = {}
+    coordinator.state.areas[1] = AreaState(
+        area_id=1,
+        mode=3,
+        alarm_event_active=True,
+        active_alarm_zones={5},
+        triggered_alarm_zones={5},
+    )
+    coordinator.async_set_updated_data = MagicMock()
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "3501", "AREA_ID": "1"}
+    )
+
+    area = coordinator.state.areas[1]
+    assert area.mode == 0
+    assert not area.alarm_event_active
+    assert not area.active_alarm_zones
+    assert not area.triggered_alarm_zones
+    coordinator.async_set_updated_data.assert_called_once()
