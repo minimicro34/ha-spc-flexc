@@ -41,8 +41,10 @@ PANEL_EVENT_STATE_MAP: dict[int, tuple[str, bool]] = {
 }
 
 AREA_EVENT_MODE_MAP: dict[int, int] = {
-    3501: 0,  # MHS / Unset
-    3504: 3,  # MES Totale / Full Set
+    3501: 0,  # Unset
+    3502: 1,  # PartSet A (observed on SPC4300)
+    3503: 2,  # PartSet B (pending hardware validation)
+    3504: 3,  # Full Set
 }
 
 
