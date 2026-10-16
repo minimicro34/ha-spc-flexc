@@ -27,8 +27,4 @@ def display_user_name(
     """Prefer an explicit alias, then the panel user name, then event text."""
     if user_id is None:
         return raw_name
-    return (
-        aliases.get(str(user_id))
-        or (discovered or {}).get(user_id)
-        or raw_name
-    )
+    return aliases.get(str(user_id)) or (discovered or {}).get(user_id) or raw_name
