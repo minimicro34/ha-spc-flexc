@@ -1,5 +1,7 @@
 """Config flow for SPC FlexC."""
 
+from __future__ import annotations
+
 from typing import Any
 
 import voluptuous as vol
@@ -8,11 +10,11 @@ from homeassistant.const import CONF_HOST
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_USER_ALIASES,
     CONF_COMMAND_PASSWORD,
     CONF_COMMAND_USERNAME,
     CONF_KEY,
     CONF_PORT,
+    CONF_USER_ALIASES,
     DEFAULT_PORT,
     DOMAIN,
 )
