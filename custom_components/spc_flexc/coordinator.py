@@ -1176,10 +1176,32 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         history_changed = SpcFlexCCoordinator._apply_area_history_event(self, event)
         # Ignore duplicate/out-of-order mode events; preserve the current mode.
         is_mode_event = event_id in (3501, 3502, 3503, 3504)
+        # Events without timestamps still carry valid live state transitions.
+        # Only reject a mode event when its timestamp is provably stale.
+        event_time = (
+            _spc_datetime(event.get("TIMESTAMP"), ZoneInfo(self.hass.config.time_zone))
+            if is_mode_event
+            else None
+        )
+        area_history = self._area_history.get(area_id, {}) if area_id is not None else {}
+        latest_time = max(
+            (
+                value
+                for key in ("last_arm_time", "last_disarm_time")
+                if isinstance((value := area_history.get(key)), datetime)
+            ),
+            default=None,
+        )
+        stale_mode_event = (
+            is_mode_event
+            and event_time is not None
+            and latest_time is not None
+            and event_time < latest_time
+        )
         area_changed = (
-            apply_area_event(self.state.areas, event)
-            if not is_mode_event or history_changed
-            else False
+            False
+            if stale_mode_event
+            else apply_area_event(self.state.areas, event)
         )
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
         if event_id in (1100, 1101) and area_id is not None and zone_id is not None:
