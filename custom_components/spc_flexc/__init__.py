@@ -30,6 +30,9 @@ async def async_setup_entry(
 
     entry.runtime_data = coordinator
 
+    # Apply alias changes after saving integration options.
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
     await hass.config_entries.async_forward_entry_setups(
         entry,
         PLATFORMS,
@@ -56,3 +59,8 @@ async def async_unload_entry(
         await entry.runtime_data.async_shutdown()
 
     return ok
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload when user display aliases are changed."""
+    await hass.config_entries.async_reload(entry.entry_id)
