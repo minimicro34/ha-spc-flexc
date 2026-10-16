@@ -353,8 +353,8 @@ This history is stored and restored after Home Assistant restarts. It is populat
 Open **Settings → Devices & services → SPC FlexC → Configure** and find the **User aliases** multiline field. Enter **one mapping per line** in the format `ID=Name`, for example:
 
 ```text
-1=Nicolas
-2=Orane
+1=Alice
+2=Bob
 9995=Home Assistant
 9999=Engineer
 ```
