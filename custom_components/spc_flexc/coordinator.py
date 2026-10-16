@@ -460,12 +460,14 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             return False
         kind = "disarm" if event_id == 3501 else "arm"
         user_name = event.get("USER_NAME") or None
-        history.update({
-            f"last_{kind}_time": timestamp,
-            f"last_{kind}_user_id": _int_value(event.get("USER_ID")),
-            f"last_{kind}_user_name": user_name,
-            f"last_{kind}_user_display_name": user_name,
-        })
+        history.update(
+            {
+                f"last_{kind}_time": timestamp,
+                f"last_{kind}_user_id": _int_value(event.get("USER_ID")),
+                f"last_{kind}_user_name": user_name,
+                f"last_{kind}_user_display_name": user_name,
+            }
+        )
         self._merge_area_history(area)
         self._area_history_store.async_delay_save(self._save_area_history, 1)
         return True
@@ -1171,12 +1173,13 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     lambda: {"panel_tamper": panel_tamper}, 1
                 )
         panel_changed = apply_panel_event(self.state.panel, event)
-        history_changed = self._apply_area_history_event(event)
+        history_changed = SpcFlexCCoordinator._apply_area_history_event(self, event)
         # Ignore duplicate/out-of-order mode events; preserve the current mode.
         is_mode_event = event_id in (3501, 3502, 3503, 3504)
         area_changed = (
             apply_area_event(self.state.areas, event)
-            if not is_mode_event or history_changed else False
+            if not is_mode_event or history_changed
+            else False
         )
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
         if event_id in (1100, 1101) and area_id is not None and zone_id is not None:
