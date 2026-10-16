@@ -142,3 +142,80 @@ def test_history_display_name_prefers_alias_without_mutating_raw_identity():
     coordinator._merge_area_history(rebuilt)
     assert rebuilt.last_arm_user_display_name == "Automatisation"
     assert rebuilt.last_arm_user_name == "Utilis.Profil Co"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lookup_failure", [None, "flexml", "value"])
+async def test_discovery_resolves_known_users_without_exposing_private_data(
+    lookup_failure, caplog
+):
+    """Discovery resolves restored identities, ignoring missing or invalid users."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.spc_flexc.flexc.flexml import FlexMLError
+
+    coordinator = _history_coordinator()
+    coordinator._area_history = {
+        1: {
+            "last_arm_user_id": 1,
+            "last_arm_user_name": "Event Nicolas",
+            "last_disarm_user_id": 9995,
+            "last_disarm_user_name": "Control Profile",
+        }
+    }
+    coordinator._client_operation_lock = asyncio.Lock()
+    coordinator.client = SimpleNamespace(
+        async_ensure_connected=AsyncMock(),
+        async_get_user_name=AsyncMock(return_value="Panel Nicolas"),
+    )
+    if lookup_failure == "flexml":
+        coordinator.client.async_get_user_name.side_effect = FlexMLError("unavailable")
+    elif lookup_failure == "value":
+        coordinator.client.async_get_user_name.side_effect = ValueError("unavailable")
+    coordinator._detected_ats_ids = set()
+    coordinator._detected_area_ids = set()
+    coordinator._detected_zone_ids = set()
+    coordinator._detected_door_ids = set()
+    coordinator._detected_xbus_serials = set()
+    coordinator._discovery_task = None
+    coordinator._schedule_zone_polling = MagicMock()
+    coordinator._schedule_xbus_polling = MagicMock()
+    coordinator.async_set_updated_data = MagicMock()
+
+    with (
+        patch("custom_components.spc_flexc.coordinator.ATS_IDS", ()),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_discover_areas",
+            new_callable=AsyncMock,
+            return_value=[{"AREA_ID": "1", "AREA_NAME": "Home", "MODE": "0"}],
+        ),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_discover_zones",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_discover_doors",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "custom_components.spc_flexc.coordinator.async_get_xbus_status",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+    ):
+        await coordinator._async_discover_panel_objects()
+
+    assert coordinator.client.async_get_user_name.await_count == 2
+    assert {
+        call.args[0] for call in coordinator.client.async_get_user_name.await_args_list
+    } == {1, 9995}
+    area = coordinator.state.areas[1]
+    assert area.last_arm_user_name == "Event Nicolas"
+    assert area.last_arm_user_display_name == (
+        "Panel Nicolas" if lookup_failure is None else "Event Nicolas"
+    )
+    assert "Panel Nicolas" not in caplog.text
+    coordinator.async_set_updated_data.assert_called_once()
