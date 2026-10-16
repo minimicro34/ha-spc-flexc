@@ -339,6 +339,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             hass, 1, f"{DOMAIN}.area_history.{entry.entry_id}"
         )
         self._area_history: dict[int, dict[str, Any]] = {}
+        self._user_names: dict[int, str] = {}
         self.client = FlexCClient(entry.data)
         self.client.set_event_callback(self._handle_flexc_event)
         self.client.set_session_ready_callback(self._handle_session_ready)
@@ -430,7 +431,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     def _display_user_name(self, user_id: int | None, raw_name: str | None) -> str | None:
         """Apply user aliases without changing the raw SPC identity."""
         return display_user_name(
-            user_id, raw_name, self.entry.options.get(CONF_USER_ALIASES, {})
+            user_id,
+            raw_name,
+            self.entry.options.get(CONF_USER_ALIASES, {}),
+            self._user_names,
         )
 
     def _merge_area_history(self, area: AreaState) -> None:
@@ -801,6 +805,27 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     detected_xbus_serials.add(serial)
                 self._detected_xbus_serials = detected_xbus_serials
                 self._xbus_discovery_complete = True
+                # Resolve only users referenced by restored events; do not scan
+                # the whole user database or persist sensitive user configuration.
+                known_user_ids = {
+                    user_id
+                    for history in self._area_history.values()
+                    for kind in ("arm", "disarm")
+                    if isinstance(
+                        (user_id := history.get(f"last_{kind}_user_id")), int
+                    )
+                    and 1 <= user_id <= 9999
+                }
+                for user_id in sorted(known_user_ids):
+                    try:
+                        name = await self.client.async_get_user_name(user_id)
+                    except (FlexCError, FlexMLError, ValueError):
+                        # Responses may contain private fields: never log them.
+                        continue
+                    if name:
+                        self._user_names[user_id] = name
+                for area in self.state.areas.values():
+                    self._merge_area_history(area)
             _LOGGER.info(
                 "FlexC discovery completed: ATS=%s areas=%s zones=%s doors=%s X-BUS=%s",
                 sorted(self._detected_ats_ids),
