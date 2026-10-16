@@ -189,6 +189,11 @@ async def test_options_user_aliases(hass: HomeAssistant) -> None:
     }
     assert entry.data == OLD_DATA
 
+    reopened = await hass.config_entries.options.async_init(entry.entry_id)
+    assert reopened["type"] is FlowResultType.FORM
+    alias_field = next(iter(reopened["data_schema"].schema))
+    assert alias_field.default() == "1=Nicolas\n9995=Home Assistant"
+
 
 @pytest.mark.usefixtures("enable_custom_integrations")
 async def test_options_reject_invalid_aliases(hass: HomeAssistant) -> None:
