@@ -14,6 +14,7 @@ async def async_setup_entry(
     """Set up SPC FlexC."""
     coordinator = SpcFlexCMappingGateCoordinator(hass, entry)
     await coordinator.async_restore_panel_tamper()
+    await coordinator.async_restore_area_history()
 
     # Fast first refresh:
     # connection + PANEL_SUMMARY only.
