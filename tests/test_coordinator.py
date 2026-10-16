@@ -265,6 +265,7 @@ def test_alarm_diagnostics_capture_unknown_restore_event_without_personal_data(
     """Unknown restoration IDs are visible without leaking raw EVENT fields."""
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
     coordinator.state = SpcState()
+    coordinator._area_history = {}
     area = AreaState(area_id=1, mode=3)
     area.alarm_event_active = True
     area.triggered_alarm_zones.add(1)
