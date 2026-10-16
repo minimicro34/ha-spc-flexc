@@ -164,3 +164,27 @@ async def test_reconfigure_duplicate_host_aborts(
     assert result["reason"] == "already_configured"
     assert first_entry.data == OLD_DATA
     assert first_entry.unique_id == "SPC12345678"
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
+async def test_options_user_aliases(hass: HomeAssistant) -> None:
+    """User aliases are saved independently of SPC connection credentials."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="SPC",
+        data=OLD_DATA,
+        options={},
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"user_aliases": "9995=Home Assistant\n1=Nicolas"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["user_aliases"] == {
+        "9995": "Home Assistant",
+        "1": "Nicolas",
+    }
+    assert entry.data == OLD_DATA
