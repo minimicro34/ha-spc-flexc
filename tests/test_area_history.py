@@ -110,3 +110,35 @@ async def test_history_restore_keeps_only_valid_aware_timestamps():
         coordinator._area_history[1]["last_arm_user_display_name"] == "Control Profile"
     )
     assert 2 not in coordinator._area_history
+
+
+def test_history_display_name_prefers_alias_without_mutating_raw_identity():
+    coordinator = _history_coordinator()
+    coordinator.entry.options["user_aliases"] = {"9995": "Home Assistant"}
+    coordinator._user_names[1] = "Panel Nicolas"
+
+    assert coordinator._apply_area_history_event(
+        _event(3502, "21394016102026", "9995", "Utilis.Profil Co")
+    )
+    area = coordinator.state.areas[1]
+    assert area.last_arm_user_name == "Utilis.Profil Co"
+    assert area.last_arm_user_display_name == "Home Assistant"
+
+    assert coordinator._apply_area_history_event(
+        _event(3501, "21394916102026", "1", "Event Nicolas")
+    )
+    assert area.last_disarm_user_name == "Event Nicolas"
+    assert area.last_disarm_user_display_name == "Panel Nicolas"
+
+    # The saved data contains only the panel/event identity, never an alias.
+    saved = coordinator._save_area_history()["1"]
+    assert saved["last_arm_user_name"] == "Utilis.Profil Co"
+    assert saved["last_disarm_user_name"] == "Event Nicolas"
+    assert "last_arm_user_display_name" not in saved
+
+    # Alias edits must take effect when the area is rebuilt.
+    coordinator.entry.options["user_aliases"]["9995"] = "Automatisation"
+    rebuilt = AreaState(area_id=1)
+    coordinator._merge_area_history(rebuilt)
+    assert rebuilt.last_arm_user_display_name == "Automatisation"
+    assert rebuilt.last_arm_user_name == "Utilis.Profil Co"
