@@ -154,7 +154,7 @@ class SpcFlexCOptionsFlow(config_entries.OptionsFlow):
                 data={CONF_USER_ALIASES: aliases},
             )
         existing = self.config_entry.options.get(CONF_USER_ALIASES, {})
-        default = "\\n".join(
+        default = "\n".join(
             f"{user_id}={name}" for user_id, name in sorted(existing.items())
         )
         return self.async_show_form(step_id="init", data_schema=self._schema(default))
