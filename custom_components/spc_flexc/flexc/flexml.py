@@ -314,3 +314,26 @@ def parse_xbus_status(response: str) -> list[dict[str, str]]:
         raise FlexMLError("REPLY_STATUS_XBUS not found")
     _validate_reply(reply, "REPLY_STATUS_XBUS")
     return [dict(node.attrib) for node in reply.findall("ENETNODE")]
+
+
+def build_user_config_command(user_id: int, username: str, password: str) -> str:
+    """Build a read-only user config request."""
+    if user_id < 1 or user_id > 9999:
+        raise ValueError("Invalid SPC user ID")
+    return _build_command_envelope(
+        f'<CMD_GET_USER_CONFIG USER_ID="{user_id}" />', username, password
+    )
+
+
+def parse_user_config_name(response: str) -> str | None:
+    """Extract only the user's name, never PIN, card or other credentials."""
+    root = _parse_reply_root(response)
+    reply = root.find("REPLY_GET_USER_CONFIG")
+    if reply is None or reply.get("RESULT") != "0":
+        return None
+    for element in reply.iter():
+        if element.tag in ("USER_CONFIG", "USER"):
+            name = element.get("USER_NAME") or element.get("NAME")
+            if name:
+                return name[:100]
+    return None
