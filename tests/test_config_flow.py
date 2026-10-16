@@ -188,3 +188,22 @@ async def test_options_user_aliases(hass: HomeAssistant) -> None:
         "1": "Nicolas",
     }
     assert entry.data == OLD_DATA
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
+async def test_options_reject_invalid_aliases(hass: HomeAssistant) -> None:
+    """Reject invalid user IDs without saving any options."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="SPC",
+        data=OLD_DATA,
+        options={},
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"user_aliases": "invalid=Home Assistant"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_aliases"}
+    assert entry.options == {}
