@@ -28,11 +28,13 @@ from .flexml import (
     build_area_status_batch,
     build_flexc_ats_status_command,
     build_panel_summary_command,
+    build_user_config_command,
     build_zone_status_batch,
     parse_alert_status,
     parse_area_status,
     parse_flexc_ats_status,
     parse_panel_summary,
+    parse_user_config_name,
     parse_zone_status,
 )
 
@@ -1066,6 +1068,14 @@ class FlexCClient:
         response = await self.async_send_flexml(command)
 
         return parse_panel_summary(response)
+
+    async def async_get_user_name(self, user_id: int) -> str | None:
+        """Read only the name from SPC user configuration; discard raw response."""
+        command = build_user_config_command(
+            user_id, self.command_username, self.command_password
+        )
+        response = await self.async_send_flexml(command)
+        return parse_user_config_name(response)
 
     def set_event_callback(
         self,
