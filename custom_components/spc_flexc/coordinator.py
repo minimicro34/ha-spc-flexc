@@ -333,6 +333,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._tamper_store: Store[dict[str, bool]] = Store(
             hass, 1, f"{DOMAIN}.panel_tamper.{entry.entry_id}"
         )
+        self._area_history_store: Store[dict[str, Any]] = Store(
+            hass, 1, f"{DOMAIN}.area_history.{entry.entry_id}"
+        )
+        self._area_history: dict[int, dict[str, Any]] = {}
         self.client = FlexCClient(entry.data)
         self.client.set_event_callback(self._handle_flexc_event)
         self.client.set_session_ready_callback(self._handle_session_ready)
@@ -366,6 +370,105 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         if isinstance(saved, dict) and type(saved.get("panel_tamper")) is bool:
             self.state.faults.panel_tamper = saved["panel_tamper"]
             _LOGGER.debug("Restored last known panel tamper state")
+
+    async def async_restore_area_history(self) -> None:
+        """Restore persisted area history, never stale operating modes."""
+        try:
+            saved = await self._area_history_store.async_load()
+        except Exception:
+            _LOGGER.exception("Could not restore SPC area history")
+            return
+        if not isinstance(saved, dict):
+            return
+        for raw_id, value in saved.items():
+            area_id = _int_value(raw_id)
+            if area_id is None or not isinstance(value, dict):
+                continue
+            history: dict[str, Any] = {}
+            for kind in ("arm", "disarm"):
+                raw_time = value.get(f"last_{kind}_time")
+                if not isinstance(raw_time, str):
+                    continue
+                try:
+                    timestamp = datetime.fromisoformat(raw_time)
+                except ValueError:
+                    continue
+                if timestamp.tzinfo is None:
+                    continue
+                history[f"last_{kind}_time"] = timestamp
+                history[f"last_{kind}_user_id"] = _int_value(
+                    value.get(f"last_{kind}_user_id")
+                )
+                name = value.get(f"last_{kind}_user_name")
+                history[f"last_{kind}_user_name"] = (
+                    name if isinstance(name, str) else None
+                )
+                history[f"last_{kind}_user_display_name"] = history[
+                    f"last_{kind}_user_name"
+                ]
+            if history:
+                self._area_history[area_id] = history
+
+    def _save_area_history(self) -> dict[str, Any]:
+        """Persist timestamps and identities only, never raw event data."""
+        saved: dict[str, Any] = {}
+        for area_id, history in self._area_history.items():
+            item: dict[str, Any] = {}
+            for kind in ("arm", "disarm"):
+                timestamp = history.get(f"last_{kind}_time")
+                if not isinstance(timestamp, datetime):
+                    continue
+                item[f"last_{kind}_time"] = timestamp.isoformat()
+                item[f"last_{kind}_user_id"] = history.get(f"last_{kind}_user_id")
+                item[f"last_{kind}_user_name"] = history.get(f"last_{kind}_user_name")
+            if item:
+                saved[str(area_id)] = item
+        return saved
+
+    def _merge_area_history(self, area: AreaState) -> None:
+        """Retain event history when area polling rebuilds the state object."""
+        history = self._area_history.get(area.area_id, {})
+        for kind in ("arm", "disarm"):
+            for suffix in ("time", "user_id", "user_name", "user_display_name"):
+                field = f"last_{kind}_{suffix}"
+                if field in history:
+                    setattr(area, field, history[field])
+
+    def _apply_area_history_event(self, event: dict[str, str]) -> bool:
+        """Track arm/disarm events without accepting duplicates or stale events."""
+        event_id = _int_value(event.get("EV_ID"))
+        area_id = _int_value(event.get("AREA_ID"))
+        if event_id not in (3501, 3502, 3503, 3504) or area_id is None:
+            return False
+        area = self.state.areas.get(area_id)
+        if area is None:
+            return False
+        timestamp = _spc_datetime(
+            event.get("TIMESTAMP"), ZoneInfo(self.hass.config.time_zone)
+        )
+        if timestamp is None:
+            return False
+        history = self._area_history.setdefault(area_id, {})
+        timestamps = [
+            history.get(field) for field in ("last_arm_time", "last_disarm_time")
+        ]
+        newest = max(
+            (value for value in timestamps if isinstance(value, datetime)),
+            default=None,
+        )
+        if newest is not None and timestamp <= newest:
+            return False
+        kind = "disarm" if event_id == 3501 else "arm"
+        user_name = event.get("USER_NAME") or None
+        history.update({
+            f"last_{kind}_time": timestamp,
+            f"last_{kind}_user_id": _int_value(event.get("USER_ID")),
+            f"last_{kind}_user_name": user_name,
+            f"last_{kind}_user_display_name": user_name,
+        })
+        self._merge_area_history(area)
+        self._area_history_store.async_delay_save(self._save_area_history, 1)
+        return True
 
     def _handle_session_ready(self, generation: int) -> None:
         """Schedule state reconciliation after a replacement FlexC session."""
@@ -464,6 +567,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         )
                     changed = True
                 self._reconcile_area_intrusion(area, previous_area)
+                self._merge_area_history(area)
                 self.state.areas[area.area_id] = area
 
         if self._zone_discovery_complete and self._detected_zone_ids:
@@ -570,6 +674,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 area.mode,
                             )
                         self._reconcile_area_intrusion(area, previous)
+                        self._merge_area_history(area)
                         self.state.areas[area.area_id] = area
 
             if self._discovery_requested and not self._discovery_complete:
@@ -632,6 +737,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 )
                 for raw_area in raw_areas:
                     area = _area_state_from_status(raw_area, timezone)
+                    self._merge_area_history(area)
                     self.state.areas[area.area_id] = area
                     detected_area_ids.add(area.area_id)
                 self._detected_area_ids.update(detected_area_ids)
@@ -1065,7 +1171,13 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     lambda: {"panel_tamper": panel_tamper}, 1
                 )
         panel_changed = apply_panel_event(self.state.panel, event)
-        area_changed = apply_area_event(self.state.areas, event)
+        history_changed = self._apply_area_history_event(event)
+        # Ignore duplicate/out-of-order mode events; preserve the current mode.
+        is_mode_event = event_id in (3501, 3502, 3503, 3504)
+        area_changed = (
+            apply_area_event(self.state.areas, event)
+            if not is_mode_event or history_changed else False
+        )
         intrusion_changed = apply_area_intrusion_event(self.state.areas, event)
         if event_id in (1100, 1101) and area_id is not None and zone_id is not None:
             area = self.state.areas.get(area_id)
@@ -1116,6 +1228,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             fault_changed
             or panel_changed
             or area_changed
+            or history_changed
             or intrusion_changed
             or zone_changed
             or xbus_changed
