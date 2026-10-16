@@ -428,7 +428,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 saved[str(area_id)] = item
         return saved
 
-    def _display_user_name(self, user_id: int | None, raw_name: str | None) -> str | None:
+    def _display_user_name(
+        self, user_id: int | None, raw_name: str | None
+    ) -> str | None:
         """Apply user aliases without changing the raw SPC identity."""
         return display_user_name(
             user_id,
@@ -811,9 +813,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     user_id
                     for history in self._area_history.values()
                     for kind in ("arm", "disarm")
-                    if isinstance(
-                        (user_id := history.get(f"last_{kind}_user_id")), int
-                    )
+                    if isinstance((user_id := history.get(f"last_{kind}_user_id")), int)
                     and 1 <= user_id <= 9999
                 }
                 for user_id in sorted(known_user_ids):
