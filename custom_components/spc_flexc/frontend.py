@@ -56,12 +56,10 @@ async def async_register_card(hass: HomeAssistant) -> None:
 
         existing = resources.async_items()
         bundled = [
-            item for item in existing
-            if urlsplit(item["url"]).path == _CARD_PATH
+            item for item in existing if urlsplit(item["url"]).path == _CARD_PATH
         ]
         legacy = [
-            item for item in existing
-            if urlsplit(item["url"]).path in _LEGACY_PATHS
+            item for item in existing if urlsplit(item["url"]).path in _LEGACY_PATHS
         ]
 
         if bundled:
