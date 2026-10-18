@@ -23,7 +23,9 @@ async def test_setup_entry_initializes_and_starts_discovery() -> None:
     coordinator.data.panel.serial_number = "SPC12345678"
 
     with (
-        patch("custom_components.spc_flexc.async_register_card", new_callable=AsyncMock),
+        patch(
+            "custom_components.spc_flexc.async_register_card", new_callable=AsyncMock
+        ),
         patch(
             "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
             return_value=coordinator,
