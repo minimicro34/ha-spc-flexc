@@ -4,26 +4,43 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.1.2] - 2026-10-19
+## [1.1.2] - Unreleased
 
 ### Added
 
-- Bundle SPC FlexC Card v1.0.18 directly in the integration, including its canonical frontend sources, build tooling and compiled JavaScript.
-- Serve the card from the integration's HTTP path and register it automatically as a Lovelace module in storage mode.
-- Migrate an existing single standalone HACS card resource to the bundled resource without changing dashboard card configuration.
-- Preserve YAML resource mode with documented manual registration.
+- Bundled **SPC FlexC Card v1.0.18** in the integration repository, including canonical JavaScript sources, Node.js build scripts and the generated Lovelace module.
+- Automatic registration of the bundled card as a Lovelace resource in storage mode, with migration of a single legacy standalone HACS card resource; YAML-managed resource instructions are documented.
+- Latched intrusion **triggered** state on area and aggregate alarm entities for validated SPC intrusion events `1000` and `1001`, with triggering zone identifiers and names.
+- Per-zone `intrusion_active` and `intrusion_triggered` attributes to distinguish current activity from a confirmed, latched alarm.
+- Zone restoration button when SPC explicitly reports `RESTORE_ALLOWED=1`.
+- Access-control door actions for temporary open, permanent open/free access, normal mode and forced lock, with door-mode verification.
+- Area arm/disarm history and user display aliases, with Home Assistant options to customize user names.
+- FlexC command trace diagnostics and regression tests covering command timeouts, session recovery, EVENT/POLL resynchronization and polling shutdown.
 
 ### Changed
 
-- Consolidate integration and card distribution in the main repository, following HACS policy for tightly coupled dashboard cards.
-- Prepare the stable v1.1.2 release after the extended beta cycle, retaining the FlexC command tracing, event/polling reconciliation, area history, user aliases and multi-panel improvements developed during the 1.1.2 betas.
-- Keep state-changing commands non-retriable after uncertain communication outcomes.
+- Improved command-timeout recovery by invalidating uncertain communication sessions and reconnecting with a fresh SPC handshake and POLL synchronization before further commands.
+- Improved event-driven state handling and reconciliation with authoritative SPC status, including multi-panel and background-discovery behaviour.
+- Improved door-mode verification and bounded recovery after uncertain communication outcomes.
+- Updated integration and card documentation for the consolidated HACS distribution model.
+
+### Fixed
+
+- Corrected handling of intrusion states so entry-delay input activity alone does not mark an intrusion, while successive confirmed triggering zones are retained until confirmed disarming.
+- Addressed event/poll synchronization and connection-lifecycle edge cases covered by the 1.1.2 regression suite.
+- Incorporated the validated card v1.0.18 editor selection and horizontal-tab scrollbar fixes into the bundled frontend.
+
+### Safety
+
+- State-changing commands remain non-retriable after an uncertain timeout or connection failure.
+- Zone restoration is exposed only when SPC reports the required capability.
+- SPC panel state remains authoritative for alarm, zone and door status.
 
 ### Validation
 
-- SPC FlexC Card v1.0.18 was tested on macOS (Firefox, Chrome) and Windows (Firefox, Chrome, Edge), with no spontaneous horizontal tab scrollbar flicker.
-- Mapping Gate and arm/disarm controls were tested, and the external card tester confirmed the v1.0.18 fix.
-- Integration and frontend regression tests and real Home Assistant upgrade validation are required before publishing this stable release.
+- Extended beta-cycle testing on real SPC hardware and external tester installations.
+- Added targeted tests for alarm history, user aliases, command tracing, EVENT/POLL reconciliation, door timeout recovery and zone restoration.
+- Bundled frontend v1.0.18 was previously validated in Firefox, Chrome and Edge; fresh integration installs, upgrades, CI and real-panel validation are still required before the stable release.
 
 **Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.1...v1.1.2
 
