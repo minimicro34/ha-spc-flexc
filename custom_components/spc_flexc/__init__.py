@@ -19,7 +19,7 @@ async def async_setup_entry(
     """Set up SPC FlexC."""
     try:
         await async_register_card(hass)
-    except Exception:  # noqa: BLE001
+    except Exception:
         _LOGGER.exception("Could not register SPC FlexC dashboard card")
 
     coordinator = SpcFlexCMappingGateCoordinator(hass, entry)
