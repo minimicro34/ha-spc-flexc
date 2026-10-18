@@ -292,15 +292,53 @@ Availability is hardware- and firmware-dependent.
 
 ## SPC FlexC Card
 
-The companion **SPC FlexC Card** provides a dedicated Lovelace interface for the integration and is maintained as a separate project:
+Starting with **SPC FlexC v1.1.2**, the validated **SPC FlexC Card v1.0.18**
+is bundled with this integration. It is no longer distributed as a separate
+HACS Dashboard plugin.
 
-https://github.com/minimicro34/ha-spc-flexc-card
+The integration serves the bundled card at
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.18` and automatically registers it as a
+Lovelace JavaScript module when resources are managed in storage mode.
+The card supports alarm control, areas, detectors, doors, Mapping Gates,
+X-BUS and system diagnostics. Use the custom card type
+`custom:spc-flexc-card` in your dashboard.
 
-The backend integration and dashboard card are intentionally distributed separately so they can evolve independently.
+### Migrating from the standalone HACS card
 
-For **screenshots, installation, dashboard configuration, responsive layout and the current visual feature set**, see the README of the SPC FlexC Card repository. Screenshots are intentionally not duplicated here.
+1. Update the SPC FlexC integration and restart Home Assistant.
+2. In **Settings → Dashboards → Resources**, verify that the bundled
+   `/spc_flexc/ha-spc-flexc-card.js?v=1.0.18` resource is registered.
+   If a single legacy HACS resource exists, the integration migrates its
+   resource URL automatically.
+3. Uninstall the old **SPC FlexC Card** Dashboard repository from HACS.
+   Remove any leftover legacy resource entries pointing to
+   `/hacsfiles/ha-spc-flexc-card/` or `/local/community/ha-spc-flexc-card/`.
+   Avoid loading two copies of the card, which register the same custom element.
+4. Reload the browser with a hard refresh. Your existing card configuration
+   does not need to be recreated.
 
-The card can be installed through HACS as a custom repository of type **Dashboard**.
+If Lovelace uses **YAML-managed resources**, automatic registration is not
+possible. Add the bundled URL as a `module` under
+`lovelace: resources:` in `configuration.yaml` and remove the old URL.
+Do not edit Home Assistant's `.storage` files manually.
+
+### Frontend development
+
+The canonical JavaScript sources and build tooling now live in
+[`frontend/`](frontend/). With Node.js 20 or later:
+
+```bash
+cd frontend
+npm run build
+npm run check
+```
+
+The build generates
+`custom_components/spc_flexc/www/ha-spc-flexc-card.js`. Commit the
+generated file with any frontend source changes. The former
+[standalone card repository](https://github.com/minimicro34/ha-spc-flexc-card)
+is retained as development history.
+
 
 ---
 
