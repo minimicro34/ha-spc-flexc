@@ -305,10 +305,25 @@ X-BUS and system diagnostics. Use the custom card type
 
 ### Screenshots
 
-Screenshots of the bundled SPC FlexC Card are maintained in
-[`docs/screenshots/`](docs/screenshots/) alongside this integration.
-They illustrate the Lovelace dashboard; the card itself is installed
-automatically with SPC FlexC.
+**General view**
+
+![SPC FlexC Card - General view](docs/screenshots/general.png)
+
+**Areas**
+
+![SPC FlexC Card - Areas view](docs/screenshots/areas.png)
+
+**Detectors**
+
+![SPC FlexC Card - Detectors view](docs/screenshots/detectors.png)
+
+**Outputs**
+
+![SPC FlexC Card - Outputs view](docs/screenshots/outputs.png)
+
+**System**
+
+![SPC FlexC Card - System view](docs/screenshots/system.png)
 
 ### Migrating from the standalone HACS card
 
