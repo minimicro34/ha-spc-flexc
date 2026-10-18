@@ -77,9 +77,7 @@ async def test_load_resources_before_migration(hass: MagicMock) -> None:
 async def test_yaml_resources_are_not_modified(hass: MagicMock) -> None:
     """YAML mode must not be modified through storage collection APIs."""
     resources = MagicMock()
-    hass.data["lovelace"] = SimpleNamespace(
-        resource_mode="yaml", resources=resources
-    )
+    hass.data["lovelace"] = SimpleNamespace(resource_mode="yaml", resources=resources)
 
     await async_register_card(hass)
 
