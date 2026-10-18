@@ -4,6 +4,31 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.2] - 2026-10-19
+
+### Added
+
+- Bundle SPC FlexC Card v1.0.18 directly in the integration, including its canonical frontend sources, build tooling and compiled JavaScript.
+- Serve the card from the integration's HTTP path and register it automatically as a Lovelace module in storage mode.
+- Migrate an existing single standalone HACS card resource to the bundled resource without changing dashboard card configuration.
+- Preserve YAML resource mode with documented manual registration.
+
+### Changed
+
+- Consolidate integration and card distribution in the main repository, following HACS policy for tightly coupled dashboard cards.
+- Prepare the stable v1.1.2 release after the extended beta cycle, retaining the FlexC command tracing, event/polling reconciliation, area history, user aliases and multi-panel improvements developed during the 1.1.2 betas.
+- Keep state-changing commands non-retriable after uncertain communication outcomes.
+
+### Validation
+
+- SPC FlexC Card v1.0.18 was tested on macOS (Firefox, Chrome) and Windows (Firefox, Chrome, Edge), with no spontaneous horizontal tab scrollbar flicker.
+- Mapping Gate and arm/disarm controls were tested, and the external card tester confirmed the v1.0.18 fix.
+- Integration and frontend regression tests and real Home Assistant upgrade validation are required before publishing this stable release.
+
+**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.1...v1.1.2
+
+---
+
 ## [1.1.1] - 2026-09-19
 
 ### Fixed
