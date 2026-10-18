@@ -303,6 +303,13 @@ The card supports alarm control, areas, detectors, doors, Mapping Gates,
 X-BUS and system diagnostics. Use the custom card type
 `custom:spc-flexc-card` in your dashboard.
 
+### Screenshots
+
+Screenshots of the bundled SPC FlexC Card are maintained in
+[`docs/screenshots/`](docs/screenshots/) alongside this integration.
+They illustrate the Lovelace dashboard; the card itself is installed
+automatically with SPC FlexC.
+
 ### Migrating from the standalone HACS card
 
 1. Update the SPC FlexC integration and restart Home Assistant.
