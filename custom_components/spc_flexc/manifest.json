@@ -3,11 +3,13 @@
   "name": "SPC FlexC",
   "codeowners": ["@minimicro34"],
   "config_flow": true,
+  "dependencies": ["http"],
+  "after_dependencies": ["lovelace"],
   "documentation": "https://github.com/minimicro34/ha-spc-flexc",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/minimicro34/ha-spc-flexc/issues",
   "requirements": [
     "pycryptodome>=3.20.0"
   ],
-  "version": "1.1.1"
+  "version": "1.1.2"
 }
