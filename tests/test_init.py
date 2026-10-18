@@ -22,9 +22,12 @@ async def test_setup_entry_initializes_and_starts_discovery() -> None:
     coordinator.async_config_entry_first_refresh = AsyncMock()
     coordinator.data.panel.serial_number = "SPC12345678"
 
-    with patch(
-        "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
-        return_value=coordinator,
+    with (
+        patch("custom_components.spc_flexc.async_register_card", new_callable=AsyncMock),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
     ):
         assert await async_setup_entry(hass, entry) is True
 
