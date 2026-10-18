@@ -5,7 +5,7 @@ Thank you for your interest in contributing to SPC FlexC.
 SPC FlexC is a custom Home Assistant integration for Siemens / Vanderbilt /
 Comelit SPC alarm panels using the native FlexC protocol. Contributions are
 welcome, including bug fixes, additional hardware support, FlexC diagnostics,
-event decoding, FLEXML commands, translations, documentation and tests.
+event decoding, FLEXML commands, translations, documentation, tests and the\nbundled Lovelace dashboard card.
 
 Because the integration communicates with a security system and can perform
 state-changing operations, protocol and control changes require particular
@@ -22,7 +22,7 @@ git clone https://github.com/minimicro34/ha-spc-flexc.git
 cd ha-spc-flexc
 ```
 
-The project currently targets Python 3.14 for its development commands.
+The project currently targets Python 3.14 for its development commands.\nThe bundled dashboard card uses Node.js 20 or later; its canonical sources\nand build scripts live in `frontend/`.
 
 The Makefile provides the standard workflow:
 
@@ -68,6 +68,87 @@ All checks, coverage validation, CI and Hassfest must pass.
 
 Coverage data such as `.coverage` and generated HTML coverage reports are
 local development artifacts and must not be committed.
+
+---
+
+## Bundled SPC FlexC Card development
+
+SPC FlexC Card is distributed **with the integration**, not as an independent
+HACS Dashboard plugin. Its canonical sources, build scripts and package metadata
+are maintained under `frontend/` in this repository. The previous
+`ha-spc-flexc-card` repository is retained for historical reference.
+
+The frontend source modules are in `frontend/src/`. The build concatenates them
+in the order specified by `frontend/scripts/build.mjs` and writes the generated
+distribution to:
+
+```text
+custom_components/spc_flexc/www/ha-spc-flexc-card.js
+```
+
+**Never edit the generated distribution directly.** Edit the appropriate
+`frontend/src/` module, then rebuild from the repository root:
+
+```bash
+cd frontend
+npm run build
+npm run check
+cd ..
+git diff --check
+```
+
+`npm run check` checks JavaScript syntax and verifies that the bundled
+distribution exactly matches the source modules and the version declared in
+`frontend/package.json`. Commit source changes and the generated JavaScript
+together. When adding or removing a module, update `frontend/scripts/build.mjs`,
+`frontend/scripts/check-dist.mjs` and the check script in
+`frontend/package.json`.
+
+### Frontend conventions
+
+- Put responsive and Sections-layout behaviour in
+  `frontend/src/spc-flexc-responsive.js`, using the card's available container
+  width rather than fixed viewport assumptions.
+- Keep technical collections collapsible without hiding fault indications.
+- Translate all user-facing card text through
+  `frontend/src/spc-flexc-i18n.js`; maintain English and French keys together.
+- Keep SPC and Home Assistant entities authoritative for card state. Do not
+  automatically retry arm/disarm, door, inhibition, isolation or Mapping Gate
+  actions after uncertain outcomes.
+- Preserve the existing tabs DOM node and horizontal scroll position across
+  state updates; test Firefox and Chromium at narrow widths and high zoom.
+- Test the graphical card editor, alarm actions, area history, Mapping Gates,
+  doors, X-BUS and responsive layouts when affected by a change.
+
+### Resource registration and migration
+
+The integration serves the bundled file as a Home Assistant HTTP static path
+and registers its Lovelace JavaScript module in storage resource mode.
+Frontend or integration changes must preserve:
+
+- idempotent registration when multiple SPC panels are configured or entries
+  are reloaded;
+- the existing Lovelace resource collection and unrelated resources;
+- migration from a single legacy standalone HACS card resource without
+  duplicating the custom element;
+- clear documentation for YAML-managed Lovelace resources, which require
+  manual resource configuration;
+- browser cache busting when the bundled card version changes.
+
+Test both fresh installations and upgrades from the former standalone card.
+Never directly edit Home Assistant `.storage` files.
+
+### Combined release checklist
+
+Before a stable release, run the Python checks (`make check`,
+`make coverage`) and frontend checks (`cd frontend && npm run build &&
+npm run check`). Review the generated file diff and update
+`frontend/package.json`, `frontend/package-lock.json`, the integration
+`manifest.json`, `README.md` and `CHANGELOG.md` as appropriate.
+
+There is **one integration release** containing the frontend; do not publish
+an independent card release. Verify the resource registration and real-panel
+behaviour before merging or tagging.
 
 ---
 
@@ -301,7 +382,7 @@ Before opening a Pull Request:
 4. update documentation for user-visible behaviour;
 5. run `make check`;
 6. run `make coverage`;
-7. run `git diff --check`;
+7. run `git diff --check` and, for frontend changes, `cd frontend && npm run build && npm run check`;
 8. make sure no credentials, captures or generated coverage data are present.
 
 Keep Pull Requests focused on one logical change whenever possible.
