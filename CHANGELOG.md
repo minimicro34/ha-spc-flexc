@@ -28,7 +28,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
-## [1.1.2] - Unreleased
+## [1.1.2] - 2026-10-19
 
 ### Added
 
@@ -64,7 +64,10 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 - Extended beta-cycle testing on real SPC hardware and external tester installations.
 - Added targeted tests for alarm history, user aliases, command tracing, EVENT/POLL reconciliation, door timeout recovery and zone restoration.
-- Bundled frontend v1.0.18 was previously validated in Firefox, Chrome and Edge; fresh integration installs, upgrades, CI and real-panel validation are still required before the stable release.
+- Bundled frontend v1.0.18 was validated in Firefox, Chrome and Edge during its standalone development cycle.
+- Home Assistant upgrade from the standalone HACS card was validated on a real installation: the Lovelace resource migrated automatically, the dashboard rendered correctly, several commands were tested successfully, and the standalone card was removed.
+- Arm/disarm was not retested as part of the bundled-card migration; fresh installs and YAML-managed resource migration remain unverified.
+- HACS, Hassfest and GitHub CI passed for beta25, with **309 automated tests** and **91.35% CI coverage**.
 
 **Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.1...v1.1.2
 
