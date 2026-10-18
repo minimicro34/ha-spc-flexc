@@ -1,10 +1,15 @@
 """Home Assistant setup for the SPC FlexC integration."""
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import PLATFORMS
+from .frontend import async_register_card
 from .mapping_gate_coordinator import SpcFlexCMappingGateCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -12,6 +17,11 @@ async def async_setup_entry(
     entry: ConfigEntry,
 ) -> bool:
     """Set up SPC FlexC."""
+    try:
+        await async_register_card(hass)
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Could not register SPC FlexC dashboard card")
+
     coordinator = SpcFlexCMappingGateCoordinator(hass, entry)
     await coordinator.async_restore_panel_tamper()
     await coordinator.async_restore_area_history()
