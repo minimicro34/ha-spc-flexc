@@ -1,10 +1,16 @@
 {
   "domain": "spc_flexc",
   "name": "SPC FlexC",
-  "codeowners": ["@minimicro34"],
+  "after_dependencies": [
+    "lovelace"
+  ],
+  "codeowners": [
+    "@minimicro34"
+  ],
   "config_flow": true,
-  "dependencies": ["http"],
-  "after_dependencies": ["lovelace"],
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/minimicro34/ha-spc-flexc",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/minimicro34/ha-spc-flexc/issues",
