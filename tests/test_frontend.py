@@ -30,7 +30,11 @@ async def test_register_card_once_with_multiple_panels(hass: MagicMock) -> None:
 
     await async_register_card(hass)
     resources.async_items.return_value = [
-        {"id": "card", "url": "/spc_flexc/ha-spc-flexc-card.js?v=1.0.18", "res_type": "module"}
+        {
+            "id": "card",
+            "url": "/spc_flexc/ha-spc-flexc-card.js?v=1.0.18",
+            "res_type": "module",
+        }
     ]
     await async_register_card(hass)
 
@@ -84,7 +88,9 @@ async def test_yaml_resources_are_not_modified(hass: MagicMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_duplicate_legacy_resources_require_manual_cleanup(hass: MagicMock) -> None:
+async def test_duplicate_legacy_resources_require_manual_cleanup(
+    hass: MagicMock,
+) -> None:
     """Avoid registering a third copy when two legacy resources exist."""
     resources = MagicMock()
     resources.loaded = True
