@@ -9,9 +9,8 @@ from custom_components.spc_flexc.button import DOOR_BUTTONS, SpcDoorActionButton
 from custom_components.spc_flexc.entity_action import async_entity_action
 from custom_components.spc_flexc.flexc.connection import FlexCError
 from custom_components.spc_flexc.flexc.flexml import FlexMLError
-from custom_components.spc_flexc.models import DoorState, SpcState
+from custom_components.spc_flexc.models import DoorState, SpcState, ZoneState
 from custom_components.spc_flexc.switch import SpcZoneInhibitionSwitch
-from custom_components.spc_flexc.models import ZoneState
 
 
 @pytest.mark.asyncio
