@@ -91,7 +91,9 @@ async def test_unload_entry_shutdown_only_after_success(unload_ok: bool) -> None
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failure", [RuntimeError("panel unavailable"), asyncio.CancelledError()])
+@pytest.mark.parametrize(
+    "failure", [RuntimeError("panel unavailable"), asyncio.CancelledError()]
+)
 async def test_failed_first_refresh_closes_listener(failure: BaseException) -> None:
     """A failed or cancelled first refresh must release the TCP listener."""
     hass = MagicMock()
@@ -103,8 +105,13 @@ async def test_failed_first_refresh_closes_listener(failure: BaseException) -> N
     coordinator.async_shutdown = AsyncMock()
 
     with (
-        patch("custom_components.spc_flexc.async_register_card", new_callable=AsyncMock),
-        patch("custom_components.spc_flexc.SpcFlexCMappingGateCoordinator", return_value=coordinator),
+        patch(
+            "custom_components.spc_flexc.async_register_card", new_callable=AsyncMock
+        ),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
         pytest.raises(type(failure)),
     ):
         await async_setup_entry(hass, entry)
