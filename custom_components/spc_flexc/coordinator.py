@@ -3,10 +3,9 @@
 import asyncio
 import logging
 from contextlib import suppress
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from functools import partial
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant
@@ -105,7 +104,7 @@ def _bool_value(value: Any) -> bool | None:
     return None
 
 
-def _spc_datetime(value: Any, timezone: ZoneInfo) -> datetime | None:
+def _spc_datetime(value: Any, timezone: tzinfo) -> datetime | None:
     if value is None:
         return None
     try:
@@ -138,7 +137,7 @@ def _panel_state_from_summary(summary: dict[str, str]) -> PanelState:
     )
 
 
-def _ats_state_from_status(response: dict[str, Any], timezone: ZoneInfo) -> AtsState:
+def _ats_state_from_status(response: dict[str, Any], timezone: tzinfo) -> AtsState:
     raw_ats = response["ats"]
     ats = AtsState(
         ats_id=int(raw_ats["ATS_ID"]),
@@ -176,7 +175,7 @@ def _area_reconciliation_changes(
     ]
 
 
-def _area_state_from_status(raw_area: dict[str, str], timezone: ZoneInfo) -> AreaState:
+def _area_state_from_status(raw_area: dict[str, str], timezone: tzinfo) -> AreaState:
     return AreaState(
         area_id=int(raw_area["AREA_ID"]),
         name=raw_area.get("AREA_NAME"),
