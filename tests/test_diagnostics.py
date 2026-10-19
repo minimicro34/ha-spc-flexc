@@ -60,7 +60,12 @@ async def test_diagnostics_do_not_expose_private_names_or_events() -> None:
         "last_event": {"USER_NAME": "PRIVATE_EVENT_USER"},
     }
     coordinator.data.zones[2] = ZoneState(zone_id=2, name="PRIVATE_ZONE")
-    coordinator.data.faults.last_event = {\n        "USER_NAME": "PRIVATE_FAULT_EVENT_USER",\n        "ZONE_NAME": "PRIVATE_FAULT_ZONE",\n        "AREA_NAME": "PRIVATE_FAULT_AREA",\n    }\n    entry = MagicMock(runtime_data=coordinator)
+    coordinator.data.faults.last_event = {
+        "USER_NAME": "PRIVATE_FAULT_EVENT_USER",
+        "ZONE_NAME": "PRIVATE_FAULT_ZONE",
+        "AREA_NAME": "PRIVATE_FAULT_AREA",
+    }
+    entry = MagicMock(runtime_data=coordinator)
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
     serialized = str(result)
@@ -76,4 +81,5 @@ async def test_diagnostics_do_not_expose_private_names_or_events() -> None:
         "PRIVATE_FAULT_AREA",
     ):
         assert secret not in serialized
-\n    assert "last_event" not in result["faults"]\n
+
+    assert "last_event" not in result["faults"]
