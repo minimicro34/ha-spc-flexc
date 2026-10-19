@@ -4,6 +4,31 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.3] - 2026-10-19
+
+### Fixed
+
+- Avoided blocking timezone loading in Home Assistant's async execution path.
+- Ensured FlexC event listeners are cleaned up when the initial coordinator refresh fails.
+- Improved handling of failures raised by Home Assistant entity actions.
+- Removed potentially sensitive raw `faults.last_event` data from downloadable diagnostics while retaining other fault indicators.
+- Fixed the bundled card's detector **Restore** button layout so its label fits without overflowing.
+
+### Changed
+
+- Updated the bundled **SPC FlexC Card to v1.0.19**.
+
+### Validation
+
+- Home Assistant SPC4300 live testing validated reload/restart, connection, zone inhibition/isolation, garage arming, timezone and last-disarm state during the 1.1.3 beta cycle.
+- Beta2 diagnostics confirmed `faults.last_event` is absent and no integration issues were reported.
+- 319 automated Python tests passed with **91.71% CI coverage** during beta validation.
+- Bundled card v1.0.19 passed frontend build and distribution consistency checks. Visual verification of the Restore button remains pending.
+
+**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.2...v1.1.3
+
+---
+
 ## [1.1.2-beta25] - 2026-10-19
 
 ### Added
