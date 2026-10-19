@@ -612,6 +612,19 @@ class FlexCClient:
     ) -> None:
         """Process one validated incoming FlexC message."""
         message_id = int(message["message_id"])
+        # Temporary beta diagnostic: only unusual message types are logged.
+        # Do not log raw application data or credentials.
+        if message_id not in {
+            MSG_CONNECTION_REQUEST_LEGACY,
+            MSG_CONNECTION_REQUEST,
+            MSG_POLL,
+            MSG_EVENT,
+            MSG_EVENT_ACK,
+            MSG_DATA_ACK,
+            MSG_DATA,
+            MSG_ERROR,
+        }:
+            _LOGGER.warning("FlexC RX diagnostic: MSG_ID=0x%02X", message_id)
         trace = self._active_trace
         if trace is not None:
             now = asyncio.get_running_loop().time()
@@ -744,6 +757,21 @@ class FlexCClient:
             event = parse_event_payload(bytes(message["app_data"]))
 
             if event is not None:
+                # Diagnostic only: report identifiers, never raw EVENT attributes.
+                def _event_identifier(key: str) -> int | None:
+                    try:
+                        return int(str(event.get(key)))
+                    except (TypeError, ValueError):
+                        return None
+
+                _LOGGER.warning(
+                    "FlexC EVENT diagnostic: MSG_ID=0x%02X EV_ID=%s "
+                    "ZONE_ID=%s AREA_ID=%s",
+                    message_id,
+                    _event_identifier("EV_ID"),
+                    _event_identifier("ZONE_ID"),
+                    _event_identifier("AREA_ID"),
+                )
                 event_callback = self._event_callback
 
                 if event_callback is not None:
