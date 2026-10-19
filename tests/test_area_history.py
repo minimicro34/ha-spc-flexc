@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -47,7 +47,11 @@ def _event(event_id, timestamp, user_id="9995", user_name="Control Profile"):
 def test_history_tracks_partial_arm_and_disarm_without_overwriting_full_set_fields():
     coordinator = _history_coordinator()
     area = coordinator.state.areas[1]
-    assert coordinator._apply_area_history_event(_event(3502, "21394016102026"))
+    with patch(
+        "custom_components.spc_flexc.coordinator.dt_util.get_default_time_zone",
+        return_value=ZoneInfo("Europe/Paris"),
+    ):
+        assert coordinator._apply_area_history_event(_event(3502, "21394016102026"))
     assert area.last_arm_user_id == 9995
     assert area.last_arm_user_name == "Control Profile"
     assert area.last_arm_time == datetime(
