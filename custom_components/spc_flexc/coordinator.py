@@ -870,6 +870,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     async def _async_zone_poll_loop(self) -> None:
         """Poll zones without allowing one malformed reply to stop live updates."""
         _LOGGER.debug("SPC zone polling started")
+        previous_poll_started: float | None = None
         try:
             while True:
                 await asyncio.sleep(
@@ -881,16 +882,47 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 if not zone_ids:
                     continue
                 try:
+                    # Temporary beta timing diagnostics; no scheduling changes.
+                    clock = asyncio.get_running_loop()
+                    poll_started = clock.time()
+                    interval_ms = (
+                        (poll_started - previous_poll_started) * 1000
+                        if previous_poll_started is not None
+                        else None
+                    )
+                    previous_poll_started = poll_started
                     raw_zones: list[dict[str, str]] = []
+                    batch_timings: list[tuple[int, int, float]] = []
                     async with self._client_operation_lock:
+                        lock_acquired = clock.time()
                         await self.client.async_ensure_connected()
                         for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
                             batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                            request_started = clock.time()
                             batch_zones = await async_retry_read_once(
                                 partial(self.client.async_get_zone_status, batch),
                                 description=f"polling zones {batch[0]}..{batch[-1]}",
                             )
+                            batch_timings.append(
+                                (batch[0], batch[-1], (clock.time() - request_started) * 1000)
+                            )
                             raw_zones.extend(batch_zones)
+                    read_finished = clock.time()
+                    lock_wait_ms = (lock_acquired - poll_started) * 1000
+                    read_ms = (read_finished - lock_acquired) * 1000
+                    if (
+                        lock_wait_ms >= 1000
+                        or read_ms >= 1000
+                        or (interval_ms is not None and interval_ms >= 2000)
+                    ):
+                        _LOGGER.warning(
+                            "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
+                            "read_ms=%.1f batches=%s",
+                            round(interval_ms, 1) if interval_ms is not None else None,
+                            lock_wait_ms,
+                            read_ms,
+                            batch_timings,
+                        )
 
                     changed = False
                     restored_area_ids: set[int] = set()
@@ -908,14 +940,20 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 != zone.actuations_since_last_read
                             )
                             if input_changed or actuations_changed:
-                                _LOGGER.warning(
+                                _LOGGER.info(
                                     "FlexC PIR diagnostic: ZONE_ID=%s "
-                                    "LOGIC_INPUT=%s->%s ACTUATIONS=%s->%s",
+                                    "LOGIC_INPUT=%s->%s ACTUATIONS=%s->%s "
+                                    "interval_ms=%s lock_wait_ms=%.1f read_ms=%.1f "
+                                    "batches=%s",
                                     zone.zone_id,
                                     previous.logic_input,
                                     zone.logic_input,
                                     previous.actuations_since_last_read,
                                     zone.actuations_since_last_read,
+                                    round(interval_ms, 1) if interval_ms is not None else None,
+                                    lock_wait_ms,
+                                    read_ms,
+                                    batch_timings,
                                 )
                         # Diagnostic only: track SPC zone status while an area
                         # retains an intrusion. Do not infer alarm clearance here.
@@ -1026,7 +1064,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             area.alarm_event_active = False
                         changed = True
                     if changed:
+                        publish_started = clock.time()
                         self.async_set_updated_data(self.state)
+                        _LOGGER.info(
+                            "FlexC PIR publish diagnostic: processing_ms=%.1f "
+                            "publish_call_ms=%.1f total_ms=%.1f",
+                            (publish_started - read_finished) * 1000,
+                            (clock.time() - publish_started) * 1000,
+                            (clock.time() - poll_started) * 1000,
+                        )
                 except asyncio.CancelledError:
                     raise
                 except (FlexCError, FlexMLError) as err:
