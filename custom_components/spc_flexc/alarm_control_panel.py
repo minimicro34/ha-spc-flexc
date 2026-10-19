@@ -375,7 +375,7 @@ class SpcAreaAlarmControlPanel(
                     username,
                     password,
                 )
-    
+
             await self.coordinator.async_request_refresh()
         except (FlexCError, FlexMLError) as err:
             raise HomeAssistantError("SPC communication failed") from err
