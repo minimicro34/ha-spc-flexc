@@ -146,10 +146,14 @@ class SpcMappingGateSwitch(
         }
 
     async def async_turn_on(self, **kwargs: object) -> None:
-        await async_entity_action(self.coordinator.async_set_mapping_gate(self.mg_id, True))
+        await async_entity_action(
+            self.coordinator.async_set_mapping_gate(self.mg_id, True)
+        )
 
     async def async_turn_off(self, **kwargs: object) -> None:
-        await async_entity_action(self.coordinator.async_set_mapping_gate(self.mg_id, False))
+        await async_entity_action(
+            self.coordinator.async_set_mapping_gate(self.mg_id, False)
+        )
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
