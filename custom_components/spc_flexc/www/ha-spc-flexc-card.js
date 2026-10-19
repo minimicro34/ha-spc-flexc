@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.18";
+const CARD_VERSION = "1.0.19";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -3883,7 +3883,13 @@ SpcFlexCCard.prototype._styles = function () {
       .zone-row-inhibited {
         box-shadow:inset 3px 0 0 color-mix(in srgb,currentColor 55%,transparent);
       }
+      .zone-row:has(> .zone-restore-button) {
+        grid-template-columns:46px minmax(0,1fr) auto auto;
+      }
       .zone-restore-button {
+        min-width:max-content;
+        white-space:nowrap;
+        justify-self:end;
         appearance:none;
         padding:7px 10px;
         border:1px solid var(--warning-color,#ff9800);
