@@ -64,7 +64,11 @@ async def test_diagnostics_do_not_expose_private_names_or_events() -> None:
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
     serialized = str(result)
     for secret in (
-        "PRIVATE_INSTALLATION", "PRIVATE_SERIAL", "PRIVATE_AREA",
-        "PRIVATE_USER", "PRIVATE_EVENT_USER", "PRIVATE_ZONE",
+        "PRIVATE_INSTALLATION",
+        "PRIVATE_SERIAL",
+        "PRIVATE_AREA",
+        "PRIVATE_USER",
+        "PRIVATE_EVENT_USER",
+        "PRIVATE_ZONE",
     ):
         assert secret not in serialized
