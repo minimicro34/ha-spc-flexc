@@ -10,8 +10,8 @@ from custom_components.spc_flexc.entity_action import async_entity_action
 from custom_components.spc_flexc.flexc.connection import FlexCError
 from custom_components.spc_flexc.flexc.flexml import FlexMLError
 from custom_components.spc_flexc.models import DoorState, SpcState
-from custom_components.spc_flexc.switch import SpcMappingGateSwitch
-from custom_components.spc_flexc.models import MappingGateState
+from custom_components.spc_flexc.switch import SpcZoneInhibitionSwitch
+from custom_components.spc_flexc.models import ZoneState
 
 
 @pytest.mark.asyncio
@@ -60,9 +60,9 @@ async def test_mapping_gate_switch_exposes_connection_failure() -> None:
     coordinator.entry.entry_id = "test"
     coordinator.entry.data = {"host": "192.0.2.1"}
     coordinator.data = SpcState()
-    coordinator.data.mapping_gates[1] = MappingGateState(mg_id=1, name="Gate")
-    coordinator.async_set_mapping_gate = AsyncMock(side_effect=FlexCError("disconnected"))
-    entity = SpcMappingGateSwitch(coordinator, 1)
+    coordinator.data.zones[1] = ZoneState(zone_id=1, name="PIR")
+    coordinator.async_inhibit_zone = AsyncMock(side_effect=FlexCError("disconnected"))
+    entity = SpcZoneInhibitionSwitch(coordinator, 1)
 
     with pytest.raises(HomeAssistantError, match="SPC communication failed"):
         await entity.async_turn_on()
