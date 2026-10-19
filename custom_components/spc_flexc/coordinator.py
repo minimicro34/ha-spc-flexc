@@ -8,12 +8,11 @@ from functools import partial
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from homeassistant.util import dt as dt_util
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     AREA_DISCOVERY_MAX_ID,
