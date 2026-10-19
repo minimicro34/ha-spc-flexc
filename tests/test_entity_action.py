@@ -47,7 +47,9 @@ async def test_door_button_exposes_validation_failure() -> None:
     coordinator.entry.data = {"host": "192.0.2.1"}
     coordinator.data = SpcState()
     coordinator.data.doors[3] = DoorState(door_id=3, name="Garage")
-    coordinator.async_control_door = AsyncMock(side_effect=ValueError("door action denied"))
+    coordinator.async_control_door = AsyncMock(
+        side_effect=ValueError("door action denied")
+    )
     button = SpcDoorActionButton(coordinator, 3, DOOR_BUTTONS[0])
 
     with pytest.raises(ServiceValidationError, match="door action denied"):
