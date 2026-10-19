@@ -22,8 +22,8 @@ from .const import (
 )
 from .coordinator import SpcFlexCCoordinator
 from .flexc.connection import FlexCError
-from .flexc.flexml import FlexMLError
 from .flexc.device import build_area_device_info
+from .flexc.flexml import FlexMLError
 
 MODE_LABELS: dict[int, str] = {
     0: "Unset",
