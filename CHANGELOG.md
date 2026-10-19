@@ -4,27 +4,28 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.1.2-beta25] - 2026-10-19
+## [1.1.3] - 2026-10-19
 
-### Added
+### Fixed
 
-- Bundled **SPC FlexC Card v1.0.18** directly into the SPC FlexC integration, replacing the need for a separate HACS frontend installation.
-- Included canonical frontend sources, reproducible Node.js build/check scripts and the generated Lovelace JavaScript module.
-- Added automatic Lovelace resource registration for storage-managed dashboards and migration of a single legacy standalone card resource.
-- Added five card screenshots to the integration README.
+- Avoided blocking timezone loading in Home Assistant's async execution path.
+- Ensured FlexC event listeners are cleaned up when the initial coordinator refresh fails.
+- Improved handling of failures raised by Home Assistant entity actions.
+- Removed potentially sensitive raw `faults.last_event` data from downloadable diagnostics while retaining other fault indicators.
+- Fixed the bundled card's detector **Restore** button layout so its label fits without overflowing.
 
 ### Changed
 
-- Updated installation, migration and contributor documentation for the unified integration/card repository.
-- Added frontend build checks to GitHub Actions and integration tests for resource registration, migration and YAML-managed dashboards.
+- Updated the bundled **SPC FlexC Card to v1.0.19**.
 
 ### Validation
 
-- HACS, Hassfest and GitHub CI checks passed on the integration branch before release preparation.
-- GitHub CI reported **91.35%** Python coverage; local tests passed (**309 tests**, **91.81%** coverage).
-- Real Home Assistant upgrade and legacy card migration remain to be validated with this prerelease.
+- Home Assistant SPC4300 live testing validated reload/restart, connection, zone inhibition/isolation, garage arming, timezone and last-disarm state during the 1.1.3 beta cycle.
+- Beta2 diagnostics confirmed `faults.last_event` is absent and no integration issues were reported.
+- 319 automated Python tests passed with **91.71% CI coverage** during beta validation.
+- Bundled card v1.0.19 passed frontend build and distribution consistency checks. Visual verification of the Restore button remains pending.
 
-**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.2-beta24...v1.1.2-beta25
+**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.2...v1.1.3
 
 ---
 
