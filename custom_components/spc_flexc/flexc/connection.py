@@ -764,7 +764,7 @@ class FlexCClient:
                     except (TypeError, ValueError):
                         return None
 
-                _LOGGER.warning(
+                _LOGGER.info(
                     "FlexC EVENT diagnostic: MSG_ID=0x%02X EV_ID=%s "
                     "ZONE_ID=%s AREA_ID=%s",
                     message_id,
