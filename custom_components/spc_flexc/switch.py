@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .entity_action import async_entity_action
 from .flexc.device import build_area_device_info, build_panel_device_info
 from .mapping_gate_coordinator import SpcFlexCMappingGateCoordinator
 
@@ -53,10 +54,10 @@ class SpcZoneInhibitionSwitch(
         }
 
     async def async_turn_on(self, **kwargs: object) -> None:
-        await self.coordinator.async_inhibit_zone(self.zone_id)
+        await async_entity_action(self.coordinator.async_inhibit_zone(self.zone_id))
 
     async def async_turn_off(self, **kwargs: object) -> None:
-        await self.coordinator.async_deinhibit_zone(self.zone_id)
+        await async_entity_action(self.coordinator.async_deinhibit_zone(self.zone_id))
 
 
 class SpcZoneIsolationSwitch(
@@ -103,10 +104,10 @@ class SpcZoneIsolationSwitch(
         }
 
     async def async_turn_on(self, **kwargs: object) -> None:
-        await self.coordinator.async_isolate_zone(self.zone_id)
+        await async_entity_action(self.coordinator.async_isolate_zone(self.zone_id))
 
     async def async_turn_off(self, **kwargs: object) -> None:
-        await self.coordinator.async_deisolate_zone(self.zone_id)
+        await async_entity_action(self.coordinator.async_deisolate_zone(self.zone_id))
 
 
 class SpcMappingGateSwitch(
@@ -145,10 +146,14 @@ class SpcMappingGateSwitch(
         }
 
     async def async_turn_on(self, **kwargs: object) -> None:
-        await self.coordinator.async_set_mapping_gate(self.mg_id, True)
+        await async_entity_action(
+            self.coordinator.async_set_mapping_gate(self.mg_id, True)
+        )
 
     async def async_turn_off(self, **kwargs: object) -> None:
-        await self.coordinator.async_set_mapping_gate(self.mg_id, False)
+        await async_entity_action(
+            self.coordinator.async_set_mapping_gate(self.mg_id, False)
+        )
 
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:

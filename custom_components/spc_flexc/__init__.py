@@ -28,7 +28,11 @@ async def async_setup_entry(
 
     # Fast first refresh:
     # connection + PANEL_SUMMARY only.
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except BaseException:
+        await coordinator.async_shutdown()
+        raise
 
     serial = coordinator.data.panel.serial_number
 

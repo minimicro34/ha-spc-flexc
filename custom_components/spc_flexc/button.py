@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .entity_action import async_entity_action
 from .flexc.device import (
     build_area_device_info,
     build_door_device_info,
@@ -74,7 +75,7 @@ class SpcZoneRestoreButton(
 
     async def async_press(self) -> None:
         """Restore the zone using validated FlexC action 4."""
-        await self.coordinator.async_restore_zone(self.zone_id)
+        await async_entity_action(self.coordinator.async_restore_zone(self.zone_id))
 
 
 class SpcDoorActionButton(
@@ -107,8 +108,10 @@ class SpcDoorActionButton(
 
     async def async_press(self) -> None:
         """Send the Vanderbilt SPCLink-proven door action."""
-        await self.coordinator.async_control_door(
-            self.door_id, self.entity_description.action
+        await async_entity_action(
+            self.coordinator.async_control_door(
+                self.door_id, self.entity_description.action
+            )
         )
 
 

@@ -23,6 +23,7 @@ from .const import (
 from .coordinator import SpcFlexCCoordinator
 from .flexc.connection import FlexCError
 from .flexc.device import build_area_device_info
+from .flexc.flexml import FlexMLError
 
 MODE_LABELS: dict[int, str] = {
     0: "Unset",
@@ -357,24 +358,29 @@ class SpcAreaAlarmControlPanel(
         username = self.coordinator.entry.data[CONF_COMMAND_USERNAME]
         password = self.coordinator.entry.data[CONF_COMMAND_PASSWORD]
 
-        async with self.coordinator._client_operation_lock:
-            await self.coordinator.client.async_ensure_connected()
-            await _async_precheck_area_mode(
-                self.coordinator,
-                self.area_id,
-                mode,
-                username,
-                password,
-            )
-            await _async_send_area_mode_once(
-                self.coordinator,
-                self.area_id,
-                mode,
-                username,
-                password,
-            )
+        try:
+            async with self.coordinator._client_operation_lock:
+                await self.coordinator.client.async_ensure_connected()
+                await _async_precheck_area_mode(
+                    self.coordinator,
+                    self.area_id,
+                    mode,
+                    username,
+                    password,
+                )
+                await _async_send_area_mode_once(
+                    self.coordinator,
+                    self.area_id,
+                    mode,
+                    username,
+                    password,
+                )
 
-        await self.coordinator.async_request_refresh()
+            await self.coordinator.async_request_refresh()
+        except (FlexCError, FlexMLError) as err:
+            raise HomeAssistantError("SPC communication failed") from err
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
 
     async def async_alarm_disarm(
         self,

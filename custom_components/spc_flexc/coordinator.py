@@ -3,15 +3,15 @@
 import asyncio
 import logging
 from contextlib import suppress
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from functools import partial
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     AREA_DISCOVERY_MAX_ID,
@@ -104,7 +104,7 @@ def _bool_value(value: Any) -> bool | None:
     return None
 
 
-def _spc_datetime(value: Any, timezone: ZoneInfo) -> datetime | None:
+def _spc_datetime(value: Any, timezone: tzinfo) -> datetime | None:
     if value is None:
         return None
     try:
@@ -137,7 +137,7 @@ def _panel_state_from_summary(summary: dict[str, str]) -> PanelState:
     )
 
 
-def _ats_state_from_status(response: dict[str, Any], timezone: ZoneInfo) -> AtsState:
+def _ats_state_from_status(response: dict[str, Any], timezone: tzinfo) -> AtsState:
     raw_ats = response["ats"]
     ats = AtsState(
         ats_id=int(raw_ats["ATS_ID"]),
@@ -175,7 +175,7 @@ def _area_reconciliation_changes(
     ]
 
 
-def _area_state_from_status(raw_area: dict[str, str], timezone: ZoneInfo) -> AreaState:
+def _area_state_from_status(raw_area: dict[str, str], timezone: tzinfo) -> AreaState:
     return AreaState(
         area_id=int(raw_area["AREA_ID"]),
         name=raw_area.get("AREA_NAME"),
@@ -462,7 +462,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         if area is None:
             return False
         timestamp = _spc_datetime(
-            event.get("TIMESTAMP"), ZoneInfo(self.hass.config.time_zone)
+            event.get("TIMESTAMP"), dt_util.get_default_time_zone()
         )
         if timestamp is None:
             return False
@@ -562,7 +562,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     async def _async_reconcile_known_state_locked(self) -> bool:
         """Refresh known base states while the shared operation lock is held."""
         changed = False
-        timezone = ZoneInfo(self.hass.config.time_zone)
+        timezone = dt_util.get_default_time_zone()
 
         if self._area_discovery_complete and self._detected_area_ids:
             area_ids = sorted(self._detected_area_ids)
@@ -660,7 +660,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     self.state.faults.rf_jamming = False
                     self.state.faults.xbus_battery_fault = False
                     self.state.faults.xbus_mains_fault = False
-                timezone = ZoneInfo(self.hass.config.time_zone)
+                timezone = dt_util.get_default_time_zone()
                 if self._ats_discovery_complete:
                     for ats_id in sorted(self._detected_ats_ids):
                         try:
@@ -733,7 +733,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
 
     async def _async_discover_panel_objects(self) -> None:
         try:
-            timezone = ZoneInfo(self.hass.config.time_zone)
+            timezone = dt_util.get_default_time_zone()
             async with self._client_operation_lock:
                 await self.client.async_ensure_connected()
                 detected_ats_ids: set[int] = set()
@@ -1218,7 +1218,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # Events without timestamps still carry valid live state transitions.
         # Only reject a mode event when its timestamp is provably stale.
         event_time = (
-            _spc_datetime(event.get("TIMESTAMP"), ZoneInfo(self.hass.config.time_zone))
+            _spc_datetime(event.get("TIMESTAMP"), dt_util.get_default_time_zone())
             if is_mode_event
             else None
         )

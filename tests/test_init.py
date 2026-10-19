@@ -1,5 +1,6 @@
 """Tests for SPC FlexC integration setup and unload."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -87,3 +88,33 @@ async def test_unload_entry_shutdown_only_after_success(unload_ok: bool) -> None
         entry.runtime_data.async_shutdown.assert_awaited_once_with()
     else:
         entry.runtime_data.async_shutdown.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure", [RuntimeError("panel unavailable"), asyncio.CancelledError()]
+)
+async def test_failed_first_refresh_closes_listener(failure: BaseException) -> None:
+    """A failed or cancelled first refresh must release the TCP listener."""
+    hass = MagicMock()
+    entry = MagicMock()
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=failure)
+    coordinator.async_shutdown = AsyncMock()
+
+    with (
+        patch(
+            "custom_components.spc_flexc.async_register_card", new_callable=AsyncMock
+        ),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        pytest.raises(type(failure)),
+    ):
+        await async_setup_entry(hass, entry)
+
+    coordinator.async_shutdown.assert_awaited_once_with()
+    assert entry.runtime_data is not coordinator
