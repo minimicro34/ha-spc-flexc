@@ -898,6 +898,27 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
                         event_changed = _reconcile_zone_event_state(zone, previous)
+                        # Temporary beta diagnostic: log motion-zone changes only.
+                        # A nonzero actuation counter may reveal motion that
+                        # returned to idle before the status read completed.
+                        if zone.zone_type in (0, 2) and previous is not None:
+                            input_changed = (
+                                previous.logic_input != zone.logic_input
+                            )
+                            actuations_changed = (
+                                previous.actuations_since_last_read
+                                != zone.actuations_since_last_read
+                            )
+                            if input_changed or actuations_changed:
+                                _LOGGER.warning(
+                                    "FlexC PIR diagnostic: ZONE_ID=%s "
+                                    "LOGIC_INPUT=%s->%s ACTUATIONS=%s->%s",
+                                    zone.zone_id,
+                                    previous.logic_input,
+                                    zone.logic_input,
+                                    previous.actuations_since_last_read,
+                                    zone.actuations_since_last_read,
+                                )
                         # Diagnostic only: track SPC zone status while an area
                         # retains an intrusion. Do not infer alarm clearance here.
                         area = (
