@@ -51,6 +51,10 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "ats": len(c.data.ats),
             "xbus_devices": len(c.data.xbus_devices),
         },
-        "faults": vars(c.data.faults),
+        "faults": {
+            key: value
+            for key, value in vars(c.data.faults).items()
+            if key != "last_event"
+        },
     }
     return async_redact_data(data, TO_REDACT)
