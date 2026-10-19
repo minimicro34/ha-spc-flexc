@@ -904,12 +904,19 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 description=f"polling zones {batch[0]}..{batch[-1]}",
                             )
                             batch_timings.append(
-                                (batch[0], batch[-1], (clock.time() - request_started) * 1000)
+                                (
+                                    batch[0],
+                                    batch[-1],
+                                    (clock.time() - request_started) * 1000,
+                                )
                             )
                             raw_zones.extend(batch_zones)
                     read_finished = clock.time()
                     lock_wait_ms = (lock_acquired - poll_started) * 1000
                     read_ms = (read_finished - lock_acquired) * 1000
+                    interval_display = (
+                        round(interval_ms, 1) if interval_ms is not None else None
+                    )
                     if (
                         lock_wait_ms >= 1000
                         or read_ms >= 1000
@@ -918,7 +925,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         _LOGGER.warning(
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
                             "read_ms=%.1f batches=%s",
-                            round(interval_ms, 1) if interval_ms is not None else None,
+                            interval_display,
                             lock_wait_ms,
                             read_ms,
                             batch_timings,
@@ -950,7 +957,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                     zone.logic_input,
                                     previous.actuations_since_last_read,
                                     zone.actuations_since_last_read,
-                                    round(interval_ms, 1) if interval_ms is not None else None,
+                                    interval_display,
                                     lock_wait_ms,
                                     read_ms,
                                     batch_timings,
