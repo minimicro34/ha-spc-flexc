@@ -902,9 +902,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         # A nonzero actuation counter may reveal motion that
                         # returned to idle before the status read completed.
                         if zone.zone_type in (0, 2) and previous is not None:
-                            input_changed = (
-                                previous.logic_input != zone.logic_input
-                            )
+                            input_changed = previous.logic_input != zone.logic_input
                             actuations_changed = (
                                 previous.actuations_since_last_read
                                 != zone.actuations_since_last_read
