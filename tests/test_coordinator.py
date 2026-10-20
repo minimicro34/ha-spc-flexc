@@ -258,11 +258,31 @@ def test_pir_event_publishes_immediately(event_id: int, expected: int) -> None:
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
-def test_pir_event_does_not_change_other_zone_types() -> None:
-    """PIR event identifiers cannot overwrite an opening sensor state."""
+@pytest.mark.parametrize("zone_type", [1, 30])
+@pytest.mark.parametrize(("event_id", "expected"), [(2100, 1), (2101, 0)])
+def test_entry_exit_event_publishes_immediately(
+    zone_type: int, event_id: int, expected: int
+) -> None:
+    """Entry/exit zones follow live input events regardless of entry delay."""
     coordinator = _coordinator_stub()
     coordinator.state.zones[3] = ZoneState(
-        zone_id=3, area_id=1, zone_type=1, logic_input=0
+        zone_id=3, area_id=1, zone_type=zone_type, logic_input=1 - expected
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": str(event_id), "ZONE_ID": "3", "AREA_ID": "1"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == expected
+    assert coordinator._pir_event_generation[3] == 1
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+def test_pir_event_does_not_change_other_zone_types() -> None:
+    """Live input events must not overwrite unsupported zone types."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=4, logic_input=0
     )
 
     SpcFlexCCoordinator._handle_flexc_event(
