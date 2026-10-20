@@ -905,9 +905,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
                         waiting_since = clock.time()
                         async with self._client_operation_lock:
-                            lock_wait_total_ms += (
-                                clock.time() - waiting_since
-                            ) * 1000
+                            lock_wait_total_ms += (clock.time() - waiting_since) * 1000
                             await self.client.async_ensure_connected()
                             request_started = clock.time()
                             generations_before_read = {
