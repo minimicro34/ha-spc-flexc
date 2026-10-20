@@ -704,7 +704,10 @@ class FlexCClient:
                 self._context_event.set()
                 if was_waiting_for_poll:
                     elapsed_ms = (
-                        (asyncio.get_running_loop().time() - self._event_resync_started_at)
+                        (
+                            asyncio.get_running_loop().time()
+                            - self._event_resync_started_at
+                        )
                         * 1000
                         if self._event_resync_started_at is not None
                         else None
