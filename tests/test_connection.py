@@ -647,3 +647,34 @@ def test_handle_incoming_data_propagates_malformed_reply() -> None:
     )
 
     assert isinstance(pending.exception(), FlexCProtocolError)
+
+
+@pytest.mark.asyncio
+async def test_repeated_events_keep_first_resync_start_until_poll() -> None:
+    """Repeated unsolicited EVENTs must not restart the POLL wait timer."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._command_context = _message()
+    client._context_event.set()
+    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
+
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=None,
+    ):
+        await client._handle_message(event)
+        started_at = client._event_resync_started_at
+        assert started_at is not None
+        await client._handle_message(event)
+
+    assert client._event_resync_started_at == started_at
+    assert client._awaiting_poll_after_event is True
+    assert client._command_context is None
+
+    poll = {**_message(), "message_id": MSG_POLL}
+    await client._handle_message(poll)
+
+    assert client._event_resync_started_at is None
+    assert client._awaiting_poll_after_event is False
+    assert client._context_event.is_set()
