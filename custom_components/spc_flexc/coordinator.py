@@ -350,6 +350,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._detected_zone_ids: set[int] = set()
         self._zone_discovery_complete = False
         self._pending_zone_restores: set[tuple[int, int]] = set()
+        # Monotonic generation for PIR EVENT transitions; used to reject
+        # in-flight polling snapshots older than a received live EVENT.
+        self._pir_event_generation: dict[int, int] = {}
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
         self._detected_xbus_serials: set[str] = set()
@@ -892,6 +895,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     )
                     previous_poll_started = poll_started
                     raw_zones: list[dict[str, str]] = []
+                    batch_event_generations: dict[int, int] = {}
                     batch_timings: list[tuple[int, int, float]] = []
                     async with self._client_operation_lock:
                         lock_acquired = clock.time()
@@ -899,6 +903,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
                             batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
                             request_started = clock.time()
+                            generations_before_read = {
+                                zone_id: self._pir_event_generation.get(zone_id, 0)
+                                for zone_id in batch
+                            }
                             batch_zones = await async_retry_read_once(
                                 partial(self.client.async_get_zone_status, batch),
                                 description=f"polling zones {batch[0]}..{batch[-1]}",
@@ -911,6 +919,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 )
                             )
                             raw_zones.extend(batch_zones)
+                            for zone_id in batch:
+                                if self._pir_event_generation.get(zone_id, 0) != generations_before_read[zone_id]:
+                                    batch_event_generations[zone_id] = self._pir_event_generation[zone_id]
                     read_finished = clock.time()
                     lock_wait_ms = (lock_acquired - poll_started) * 1000
                     read_ms = (read_finished - lock_acquired) * 1000
@@ -936,6 +947,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     for raw_zone in raw_zones:
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
+                        if (
+                            previous is not None
+                            and zone.zone_id in batch_event_generations
+                            and previous.zone_type in (0, 2)
+                        ):
+                            # The response may predate a live EVENT received
+                            # during this request. Keep the newer PIR state;
+                            # a subsequent poll will reconcile it.
+                            zone.logic_input = previous.logic_input
                         event_changed = _reconcile_zone_event_state(zone, previous)
                         # Temporary beta diagnostic: log motion-zone changes only.
                         # A nonzero actuation counter may reveal motion that
@@ -1359,6 +1379,26 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 _alarm_snapshot(),
             )
         zone_changed = apply_zone_event(self.state.zones, event)
+        if event_id in (2100, 2101) and zone_id is not None:
+            zone = self.state.zones.get(zone_id)
+            if (
+                zone is not None
+                and zone.zone_type in (0, 2)
+                and (area_id is None or zone.area_id == area_id)
+            ):
+                new_logic_input = 1 if event_id == 2100 else 0
+                self._pir_event_generation[zone_id] = (
+                    self._pir_event_generation.get(zone_id, 0) + 1
+                )
+                zone_changed = zone.logic_input != new_logic_input or zone_changed
+                zone.logic_input = new_logic_input
+                zone.updated_at = datetime.now(UTC)
+                _LOGGER.info(
+                    "FlexC PIR EVENT state: EV_ID=%s ZONE_ID=%s active=%s",
+                    event_id,
+                    zone_id,
+                    bool(new_logic_input),
+                )
         xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
         if (
             fault_changed
