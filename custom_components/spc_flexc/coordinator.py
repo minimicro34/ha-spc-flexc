@@ -970,7 +970,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         previous = self.state.zones.get(zone.zone_id)
                         if (
                             previous is not None
-                            and previous.zone_type in (0, 2)
+                            and previous.zone_type in (0, 1, 2, 30)
                             and self._pir_event_generation.get(zone.zone_id, 0)
                             != poll_event_generations.get(zone.zone_id, 0)
                         ):
@@ -982,7 +982,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         # Temporary beta diagnostic: log motion-zone changes only.
                         # A nonzero actuation counter may reveal motion that
                         # returned to idle before the status read completed.
-                        if zone.zone_type in (0, 2) and previous is not None:
+                        if zone.zone_type in (0, 1, 2, 30) and previous is not None:
                             input_changed = previous.logic_input != zone.logic_input
                             actuations_changed = (
                                 previous.actuations_since_last_read
@@ -1405,7 +1405,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             zone = self.state.zones.get(zone_id)
             if (
                 zone is not None
-                and zone.zone_type in (0, 2)
+                and zone.zone_type in (0, 1, 2, 30)
                 and (area_id is None or zone.area_id == area_id)
             ):
                 new_logic_input = 1 if event_id == 2100 else 0
@@ -1416,7 +1416,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 zone.logic_input = new_logic_input
                 zone.updated_at = datetime.now(UTC)
                 _LOGGER.info(
-                    "FlexC PIR EVENT state: EV_ID=%s ZONE_ID=%s active=%s",
+                    "FlexC zone EVENT state: EV_ID=%s ZONE_ID=%s active=%s",
                     event_id,
                     zone_id,
                     bool(new_logic_input),
