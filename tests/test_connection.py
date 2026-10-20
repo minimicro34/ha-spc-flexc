@@ -713,3 +713,47 @@ async def test_data_reply_restores_context_after_unsolicited_event() -> None:
     assert client._context_event.is_set()
     assert client._awaiting_poll_after_event is False
     client._handle_incoming_data.assert_called_once_with(data)
+
+
+@pytest.mark.asyncio
+async def test_command_wait_after_event_resumes_on_poll(caplog) -> None:
+    """A command waiting after an EVENT resumes only after a fresh POLL."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._send_wire = AsyncMock()
+    client._build_outbound_data = MagicMock(return_value=b"command")
+    client._command_context = None
+    client._awaiting_poll_after_event = True
+    client._context_event.clear()
+
+    task = asyncio.create_task(client.async_send_flexml("<FLEXML/>"))
+    await asyncio.sleep(0)
+    assert not task.done()
+    poll = {**_message(), "message_id": MSG_POLL}
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    await client._handle_message(poll)
+    await asyncio.sleep(0)
+    assert client._pending_reply is not None
+    client._pending_reply.set_result("<REPLY/>")
+    assert await task == "<REPLY/>"
+    assert "FlexC command context wait after EVENT" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_command_wait_after_event_timeout(caplog) -> None:
+    """A missing POLL fails the command without sending stale-context DATA."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._send_wire = AsyncMock()
+    client._command_context = None
+    client._awaiting_poll_after_event = True
+    client._context_event.clear()
+
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.COMMAND_TIMEOUT", 0.001
+    ):
+        with pytest.raises(FlexCConnectionError, match="fresh FlexC POLL"):
+            await client.async_send_flexml("<FLEXML/>")
+
+    client._send_wire.assert_not_awaited()
+    assert "FlexC command context wait after EVENT" in caplog.text
