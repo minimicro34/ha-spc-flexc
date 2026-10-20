@@ -995,8 +995,7 @@ class FlexCClient:
                     if waiting_after_event:
                         _LOGGER.info(
                             "FlexC command context wait after EVENT: wait_ms=%.1f",
-                            (asyncio.get_running_loop().time() - wait_started)
-                            * 1000,
+                            (asyncio.get_running_loop().time() - wait_started) * 1000,
                         )
 
             context = self._command_context
