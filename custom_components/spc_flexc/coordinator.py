@@ -951,9 +951,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             resync_wait_total_ms,
                             batch_timings,
                         )
-                    elif (
-                        resync_wait_total_ms >= 1000
-                        or (interval_ms is not None and interval_ms >= 2000)
+                    elif resync_wait_total_ms >= 1000 or (
+                        interval_ms is not None and interval_ms >= 2000
                     ):
                         _LOGGER.debug(
                             "FlexC PIR poll delayed: interval_ms=%s "
