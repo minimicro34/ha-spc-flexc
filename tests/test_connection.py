@@ -481,6 +481,61 @@ async def test_handle_message_poll_does_not_replace_active_command_context() -> 
 
 
 @pytest.mark.asyncio
+async def test_unsolicited_event_waits_for_fresh_poll_before_commands() -> None:
+    """An EVENT invalidates idle command context until a validated POLL."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    original = _message()
+    client._command_context = original
+    client._context_event.set()
+
+    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=None,
+    ):
+        await client._handle_message(event)
+
+    assert client._command_context is None
+    assert not client._context_event.is_set()
+    assert client._awaiting_poll_after_event is True
+
+    poll = {**_message(), "message_id": MSG_POLL, "rct_sequence": 42}
+    await client._handle_message(poll)
+
+    assert client._command_context == poll
+    assert client._rct_sequence == 42
+    assert client._context_event.is_set()
+    assert client._awaiting_poll_after_event is False
+
+
+@pytest.mark.asyncio
+async def test_event_during_pending_command_preserves_reply_context() -> None:
+    """An EVENT must not invalidate a command awaiting its DATA reply."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    original = _message()
+    client._command_context = original
+    client._context_event.set()
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+
+    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=None,
+    ):
+        await client._handle_message(event)
+
+    assert client._command_context is original
+    assert client._context_event.is_set()
+    assert client._awaiting_poll_after_event is False
+    pending.cancel()
+
+
+@pytest.mark.asyncio
 async def test_handle_message_event_and_data() -> None:
     """EVENT invokes its callback and DATA promotes the next command context."""
     client = _client()
