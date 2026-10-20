@@ -901,8 +901,18 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     # so area/door/user commands are not queued behind an
                     # entire zone scan. Each individual batch remains atomic.
                     lock_wait_total_ms = 0.0
+                    resync_wait_total_ms = 0.0
                     for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
                         batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                        # A spontaneous EVENT invalidates the command context.
+                        # Wait for the next SPC POLL *before* taking the shared
+                        # coordinator lock, so other tasks are not blocked by
+                        # this zone poll while the transport resynchronizes.
+                        # The command layer rechecks the context under its own
+                        # lock to handle races with newer EVENTs.
+                        resync_wait_total_ms += (
+                            await self.client.async_wait_for_event_resync()
+                        )
                         waiting_since = clock.time()
                         async with self._client_operation_lock:
                             lock_wait_total_ms += (clock.time() - waiting_since) * 1000
@@ -927,22 +937,31 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             poll_event_generations.update(generations_before_read)
                     read_finished = clock.time()
                     lock_wait_ms = lock_wait_total_ms
-                    read_ms = (read_finished - poll_started) * 1000 - lock_wait_ms
+                    read_ms = sum(batch_ms for _, _, batch_ms in batch_timings)
                     interval_display = (
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
-                    if (
-                        lock_wait_ms >= 1000
-                        or read_ms >= 1000
-                        or (interval_ms is not None and interval_ms >= 2000)
-                    ):
+                    if lock_wait_ms >= 1000 or read_ms >= 1000:
                         _LOGGER.warning(
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
-                            "read_ms=%.1f batches=%s",
+                            "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
                             interval_display,
                             lock_wait_ms,
                             read_ms,
+                            resync_wait_total_ms,
                             batch_timings,
+                        )
+                    elif (
+                        resync_wait_total_ms >= 1000
+                        or (interval_ms is not None and interval_ms >= 2000)
+                    ):
+                        _LOGGER.debug(
+                            "FlexC PIR poll delayed: interval_ms=%s "
+                            "resync_wait_ms=%.1f lock_wait_ms=%.1f read_ms=%.1f",
+                            interval_display,
+                            resync_wait_total_ms,
+                            lock_wait_ms,
+                            read_ms,
                         )
 
                     changed = False
