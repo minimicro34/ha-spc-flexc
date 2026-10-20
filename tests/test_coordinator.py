@@ -66,6 +66,7 @@ def _coordinator_stub() -> MagicMock:
     coordinator._xbus_poll_task = None
     coordinator._last_area_diagnostic_log = 0.0
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     return coordinator
 
 
@@ -298,6 +299,32 @@ def test_handle_flexc_event() -> None:
 
     assert coordinator.state.faults.rf_jamming is True
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+@pytest.mark.parametrize(
+    ("event_id", "expected"),
+    [("7003", True), ("7004", False)],
+)
+def test_engineer_mode_event_updates_panel_immediately(
+    event_id: str, expected: bool
+) -> None:
+    """Engineer mode events publish the new panel state without polling."""
+    coordinator = MagicMock(spec=SpcFlexCCoordinator)
+    coordinator.state = SpcState()
+    coordinator.state.panel.engineer_mode = not expected
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": event_id}
+    )
+
+    assert coordinator.state.panel.engineer_mode is expected
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+    coordinator.async_set_updated_data.reset_mock()
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": event_id}
+    )
+    coordinator.async_set_updated_data.assert_not_called()
 
 
 def test_handle_flexc_restore_event() -> None:
@@ -599,6 +626,7 @@ async def test_zone_polling_continues_after_malformed_reply() -> None:
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.client.async_get_zone_status = AsyncMock(
         side_effect=[[{"INPUT": "0"}], [{"ZONE_ID": "1", "INPUT": "1"}]]
     )
@@ -757,6 +785,7 @@ async def test_zone_actuation_change_notifies_entities() -> None:
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.client.async_get_zone_status = AsyncMock(
         return_value=[
             {
@@ -792,6 +821,7 @@ async def test_zone_polling_uses_bounded_batches() -> None:
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.client.async_get_zone_status = AsyncMock(
         side_effect=[
             [{"ZONE_ID": str(zone_id)} for zone_id in range(1, 17)],
@@ -912,6 +942,7 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.async_set_updated_data = MagicMock()
     coordinator._xbus_poll_task = asyncio.current_task()
     sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
