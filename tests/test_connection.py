@@ -717,6 +717,30 @@ async def test_data_reply_restores_context_after_unsolicited_event() -> None:
 
 
 @pytest.mark.asyncio
+async def test_precommand_event_resync_waits_until_fresh_poll() -> None:
+    """Pre-command wait does not consume or manufacture command context."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._command_context = None
+    client._awaiting_poll_after_event = True
+    client._context_event.clear()
+
+    waiting = asyncio.create_task(client.async_wait_for_event_resync())
+    await asyncio.sleep(0)
+    assert not waiting.done()
+    assert client._command_context is None
+
+    poll = {**_message(), "message_id": MSG_POLL}
+    await client._handle_message(poll)
+
+    assert await waiting >= 0.0
+    assert client._command_context == poll
+    assert client._awaiting_poll_after_event is False
+    assert await client.async_wait_for_event_resync() == 0.0
+
+
+@pytest.mark.asyncio
 async def test_command_wait_after_event_resumes_on_poll(caplog) -> None:
     """A command waiting after an EVENT resumes only after a fresh POLL."""
     caplog.set_level(logging.INFO)
