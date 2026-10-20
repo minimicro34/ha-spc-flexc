@@ -927,7 +927,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             poll_event_generations.update(generations_before_read)
                     read_finished = clock.time()
                     lock_wait_ms = lock_wait_total_ms
-                    read_ms = (read_finished - lock_acquired) * 1000
+                    read_ms = (read_finished - poll_started) * 1000 - lock_wait_ms
                     interval_display = (
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
