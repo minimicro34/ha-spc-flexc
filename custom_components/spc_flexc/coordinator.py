@@ -897,11 +897,18 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     raw_zones: list[dict[str, str]] = []
                     poll_event_generations: dict[int, int] = {}
                     batch_timings: list[tuple[int, int, float]] = []
-                    async with self._client_operation_lock:
-                        lock_acquired = clock.time()
-                        await self.client.async_ensure_connected()
-                        for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
-                            batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                    # Release the coordinator operation lock between batches
+                    # so area/door/user commands are not queued behind an
+                    # entire zone scan. Each individual batch remains atomic.
+                    lock_wait_total_ms = 0.0
+                    for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
+                        batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                        waiting_since = clock.time()
+                        async with self._client_operation_lock:
+                            lock_wait_total_ms += (
+                                clock.time() - waiting_since
+                            ) * 1000
+                            await self.client.async_ensure_connected()
                             request_started = clock.time()
                             generations_before_read = {
                                 zone_id: self._pir_event_generation.get(zone_id, 0)
@@ -919,13 +926,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 )
                             )
                             raw_zones.extend(batch_zones)
-                            # Keep the generation from *before* each request.
-                            # An EVENT can arrive while reading a later batch
-                            # or after the lock is released, before results
-                            # are applied to coordinator state.
                             poll_event_generations.update(generations_before_read)
                     read_finished = clock.time()
-                    lock_wait_ms = (lock_acquired - poll_started) * 1000
+                    lock_wait_ms = lock_wait_total_ms
                     read_ms = (read_finished - lock_acquired) * 1000
                     interval_display = (
                         round(interval_ms, 1) if interval_ms is not None else None
