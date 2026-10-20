@@ -349,6 +349,7 @@ class FlexCClient:
                 self._command_context = None
                 self._context_event.clear()
                 self._awaiting_poll_after_event = False
+                self._event_resync_started_at = None
 
                 if self._pending_reply is not None and not self._pending_reply.done():
                     self._pending_reply.set_exception(
