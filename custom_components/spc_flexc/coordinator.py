@@ -920,8 +920,13 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             )
                             raw_zones.extend(batch_zones)
                             for zone_id in batch:
-                                if self._pir_event_generation.get(zone_id, 0) != generations_before_read[zone_id]:
-                                    batch_event_generations[zone_id] = self._pir_event_generation[zone_id]
+                                if (
+                                    self._pir_event_generation.get(zone_id, 0)
+                                    != generations_before_read[zone_id]
+                                ):
+                                    batch_event_generations[zone_id] = (
+                                        self._pir_event_generation[zone_id]
+                                    )
                     read_finished = clock.time()
                     lock_wait_ms = (lock_acquired - poll_started) * 1000
                     read_ms = (read_finished - lock_acquired) * 1000
