@@ -236,6 +236,7 @@ def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
     assert _reconcile_zone_event_state(active, previous) is False
     assert active.event_tamper is True
 
+
 @pytest.mark.parametrize(
     ("event_id", "expected"),
     [(2100, 1), (2101, 0)],
@@ -286,6 +287,7 @@ def test_pir_event_rejects_wrong_area() -> None:
     assert coordinator.state.zones[3].logic_input == 0
     assert coordinator._pir_event_generation == {}
     coordinator.async_set_updated_data.assert_not_called()
+
 
 def test_handle_flexc_event() -> None:
     """Test applying a FlexC EVENT to coordinator state."""
