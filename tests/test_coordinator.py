@@ -236,8 +236,6 @@ def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
     assert _reconcile_zone_event_state(active, previous) is False
     assert active.event_tamper is True
 
-
-
 @pytest.mark.parametrize(
     ("event_id", "expected"),
     [(2100, 1), (2101, 0)],
