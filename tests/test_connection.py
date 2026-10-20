@@ -678,3 +678,38 @@ async def test_repeated_events_keep_first_resync_start_until_poll() -> None:
     assert client._event_resync_started_at is None
     assert client._awaiting_poll_after_event is False
     assert client._context_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_data_reply_restores_context_after_unsolicited_event() -> None:
+    """A validated DATA reply may restore command context after an EVENT."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._command_context = _message()
+    client._context_event.set()
+
+    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=None,
+    ):
+        await client._handle_message(event)
+
+    assert client._awaiting_poll_after_event is True
+
+    data = {
+        **_message(),
+        "message_id": MSG_DATA,
+        "rct_sequence": 53,
+        "new_application_message": True,
+        "application_length": 0,
+        "app_data": b"",
+    }
+    client._handle_incoming_data = MagicMock()
+    await client._handle_message(data)
+
+    assert client._command_context == data
+    assert client._context_event.is_set()
+    assert client._awaiting_poll_after_event is False
+    client._handle_incoming_data.assert_called_once_with(data)
