@@ -199,6 +199,7 @@ class FlexCClient:
         # An unsolicited EVENT between commands invalidates the DATA chain.
         # Wait for the next SPC POLL before sending another command.
         self._awaiting_poll_after_event = False
+        self._event_resync_started_at: float | None = None
 
     def set_session_ready_callback(self, callback: Callable[[int], None]) -> None:
         """Register a callback invoked when a fresh session context is ready."""
@@ -280,6 +281,7 @@ class FlexCClient:
         self._command_context = None
         self._context_event.clear()
         self._awaiting_poll_after_event = False
+        self._event_resync_started_at = None
 
         _LOGGER.info(
             "SPC FlexC TCP connection #%d accepted from %s", generation, peer_host
@@ -701,10 +703,18 @@ class FlexCClient:
                 self._awaiting_poll_after_event = False
                 self._context_event.set()
                 if was_waiting_for_poll:
+                    elapsed_ms = (
+                        (asyncio.get_running_loop().time() - self._event_resync_started_at)
+                        * 1000
+                        if self._event_resync_started_at is not None
+                        else None
+                    )
+                    self._event_resync_started_at = None
                     _LOGGER.info(
                         "FlexC context resynchronized from SPC POLL after "
-                        "unsolicited EVENT (session #%d)",
+                        "unsolicited EVENT (session #%d, wait_ms=%s)",
                         self._session_generation,
+                        round(elapsed_ms, 1) if elapsed_ms is not None else None,
                     )
 
                 if self._recovery_started_at is not None:
@@ -748,6 +758,7 @@ class FlexCClient:
                 self._command_context = None
                 self._context_event.clear()
                 self._awaiting_poll_after_event = True
+                self._event_resync_started_at = asyncio.get_running_loop().time()
                 _LOGGER.info(
                     "FlexC unsolicited EVENT between commands: waiting for "
                     "fresh SPC POLL before next command (session #%d)",
