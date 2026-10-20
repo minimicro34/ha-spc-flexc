@@ -752,9 +752,7 @@ async def test_command_wait_after_event_timeout(caplog) -> None:
     client._awaiting_poll_after_event = True
     client._context_event.clear()
 
-    with patch(
-        "custom_components.spc_flexc.flexc.connection.COMMAND_TIMEOUT", 0.001
-    ):
+    with patch("custom_components.spc_flexc.flexc.connection.COMMAND_TIMEOUT", 0.001):
         with pytest.raises(FlexCConnectionError, match="fresh FlexC POLL"):
             await client.async_send_flexml("<FLEXML/>")
 
