@@ -313,17 +313,13 @@ def test_engineer_mode_event_updates_panel_immediately(
     coordinator.state = SpcState()
     coordinator.state.panel.engineer_mode = not expected
 
-    SpcFlexCCoordinator._handle_flexc_event(
-        coordinator, {"EV_ID": event_id}
-    )
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
 
     assert coordinator.state.panel.engineer_mode is expected
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
     coordinator.async_set_updated_data.reset_mock()
-    SpcFlexCCoordinator._handle_flexc_event(
-        coordinator, {"EV_ID": event_id}
-    )
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
     coordinator.async_set_updated_data.assert_not_called()
 
 
