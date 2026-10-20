@@ -545,7 +545,7 @@ Zone polling remains enabled to reconcile state. If an EVENT arrives while a zon
 
 A slow zone polling cycle emits `FlexC PIR poll slow` at `WARNING`, with `interval_ms`, `lock_wait_ms`, `read_ms` and per-batch durations. Command timeouts and connection/protocol errors retain their existing warning diagnostics.
 
-**Protocol safety:** An unsolicited EVENT between commands invalidates the existing command context. The next command waits for a fresh SPC POLL before proceeding. These beta diagnostics measure the resulting delay; they do **not** claim that the wait has been eliminated or optimized. EVENTs received while a command is in flight do not replace its reply context.
+**Protocol safety:** An unsolicited EVENT between commands invalidates the existing command context. The next command waits for a fresh SPC POLL before proceeding. These beta diagnostics measure the remaining EVENT-to-POLL wait; the transport still requires a validated fresh POLL before the next command. Zone polling now releases the coordinator operation lock between batches, allowing other operations to run between batches rather than waiting for the full scan. This improves scheduling opportunities but does **not** shorten the panel's EVENT-to-POLL protocol interval. The `FlexC command context wait after EVENT` diagnostic measures how long an actual command was blocked; `lock_wait_ms` now sums lock acquisition delays across zone batches. EVENTs received while a command is in flight do not replace its reply context.
 
 For a hardware test, compare `2100` / `2101` timestamps with the Home Assistant motion entity transitions, then inspect `wait_ms` and `FlexC PIR poll slow` warnings. Do not share credentials, encryption keys or raw sensitive protocol payloads in logs or issues.
 
