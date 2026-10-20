@@ -895,7 +895,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     )
                     previous_poll_started = poll_started
                     raw_zones: list[dict[str, str]] = []
-                    batch_event_generations: dict[int, int] = {}
+                    poll_event_generations: dict[int, int] = {}
                     batch_timings: list[tuple[int, int, float]] = []
                     async with self._client_operation_lock:
                         lock_acquired = clock.time()
@@ -919,14 +919,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 )
                             )
                             raw_zones.extend(batch_zones)
-                            for zone_id in batch:
-                                if (
-                                    self._pir_event_generation.get(zone_id, 0)
-                                    != generations_before_read[zone_id]
-                                ):
-                                    batch_event_generations[zone_id] = (
-                                        self._pir_event_generation[zone_id]
-                                    )
+                            # Keep the generation from *before* each request.
+                            # An EVENT can arrive while reading a later batch
+                            # or after the lock is released, before results
+                            # are applied to coordinator state.
+                            poll_event_generations.update(generations_before_read)
                     read_finished = clock.time()
                     lock_wait_ms = (lock_acquired - poll_started) * 1000
                     read_ms = (read_finished - lock_acquired) * 1000
@@ -954,8 +951,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         previous = self.state.zones.get(zone.zone_id)
                         if (
                             previous is not None
-                            and zone.zone_id in batch_event_generations
                             and previous.zone_type in (0, 2)
+                            and self._pir_event_generation.get(zone.zone_id, 0)
+                            != poll_event_generations.get(zone.zone_id, 0)
                         ):
                             # The response may predate a live EVENT received
                             # during this request. Keep the newer PIR state;
