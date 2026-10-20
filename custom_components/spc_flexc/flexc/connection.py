@@ -973,6 +973,29 @@ class FlexCClient:
             ",".join(trace.timeline),
         )
 
+    async def async_wait_for_event_resync(self) -> float:
+        """Wait for an unsolicited EVENT's next POLL without holding caller locks.
+
+        This is an optimization only. async_send_flexml still validates context
+        under the command lock, including when another EVENT races this wait.
+        """
+        if not self._awaiting_poll_after_event:
+            return 0.0
+        started = asyncio.get_running_loop().time()
+        try:
+            async with asyncio.timeout(COMMAND_TIMEOUT):
+                await self._context_event.wait()
+        except TimeoutError as err:
+            raise FlexCConnectionError(
+                "Timeout waiting for fresh FlexC POLL 0x20 after EVENT"
+            ) from err
+        elapsed_ms = (asyncio.get_running_loop().time() - started) * 1000
+        _LOGGER.debug(
+            "FlexC pre-command EVENT resync wait: wait_ms=%.1f",
+            elapsed_ms,
+        )
+        return elapsed_ms
+
     async def async_send_flexml(self, command: str) -> str:
         """Send one FLEXML command and return FLEXML_REPLY."""
         await self.async_ensure_connected()
