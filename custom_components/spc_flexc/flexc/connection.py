@@ -982,13 +982,22 @@ class FlexCClient:
             # resynchronization needs to wait for a POLL. Subsequent commands
             # chain directly from the previous validated DATA reply.
             if self._command_context is None:
+                waiting_after_event = self._awaiting_poll_after_event
+                wait_started = asyncio.get_running_loop().time()
                 try:
                     async with asyncio.timeout(COMMAND_TIMEOUT):
                         await self._context_event.wait()
                 except TimeoutError as err:
                     raise FlexCConnectionError(
-                        "Timeout waiting for initial FlexC POLL 0x20"
+                        "Timeout waiting for fresh FlexC POLL 0x20"
                     ) from err
+                finally:
+                    if waiting_after_event:
+                        _LOGGER.info(
+                            "FlexC command context wait after EVENT: wait_ms=%.1f",
+                            (asyncio.get_running_loop().time() - wait_started)
+                            * 1000,
+                        )
 
             context = self._command_context
 
