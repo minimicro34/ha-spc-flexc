@@ -35,6 +35,7 @@ def _coordinator() -> MagicMock:
     coordinator.entry.entry_id = "test"
     coordinator.entry.data = {"host": "192.0.2.1"}
     coordinator.data = SpcState()
+    coordinator._pir_event_generation = {}
     coordinator.last_update_success = True
     coordinator.client.connected = True
     return coordinator
@@ -180,6 +181,51 @@ def test_missed_motion_starts_two_second_local_pulse() -> None:
         ZONE_ACTIVITY_PULSE_SECONDS,
         sensor._end_activity_pulse,
     )
+
+
+def test_live_event_does_not_replay_motion_counter() -> None:
+    """A 2101 restore must not generate a second motion from old counts."""
+    sensor, coordinator = _zone_sensor(logic_input=0, actuations=2)
+    coordinator._pir_event_generation[1] = 2
+    with (
+        patch(
+            "custom_components.spc_flexc.binary_sensor.asyncio.get_running_loop"
+        ) as get_loop,
+        patch.object(CoordinatorEntity, "_handle_coordinator_update"),
+    ):
+        sensor._handle_coordinator_update()
+        sensor._handle_coordinator_update()
+    assert sensor.is_on is False
+    get_loop.assert_not_called()
+
+
+def test_repeated_counter_does_not_restart_motion_pulse() -> None:
+    """Unchanged status snapshots must not replay a missed-motion pulse."""
+    sensor, _ = _zone_sensor(logic_input=0, actuations=2)
+    loop = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.binary_sensor.asyncio.get_running_loop",
+            return_value=loop,
+        ),
+        patch.object(CoordinatorEntity, "_handle_coordinator_update"),
+    ):
+        sensor._handle_coordinator_update()
+        sensor._handle_coordinator_update()
+    loop.call_later.assert_called_once()
+
+
+def test_live_event_cancels_stale_activity_pulse() -> None:
+    """A live restore overrides a pending counter-based fallback pulse."""
+    sensor, coordinator = _zone_sensor(logic_input=0, actuations=1)
+    handle = MagicMock()
+    sensor._activity_pulse_active = True
+    sensor._activity_pulse_handle = handle
+    coordinator._pir_event_generation[1] = 1
+    with patch.object(CoordinatorEntity, "_handle_coordinator_update"):
+        sensor._handle_coordinator_update()
+    handle.cancel.assert_called_once_with()
+    assert sensor.is_on is False
 
 
 def test_new_actuation_restarts_existing_activity_pulse() -> None:
