@@ -62,6 +62,7 @@ def _coordinator_stub() -> MagicMock:
     coordinator._discovery_task = None
     coordinator._zone_poll_task = None
     coordinator._pending_zone_restores = set()
+    coordinator._pir_event_generation = {}
     coordinator._xbus_poll_task = None
     coordinator._last_area_diagnostic_log = 0.0
     coordinator.client.async_ensure_connected = AsyncMock()
@@ -235,6 +236,58 @@ def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
     assert _reconcile_zone_event_state(active, previous) is False
     assert active.event_tamper is True
 
+
+
+@pytest.mark.parametrize(
+    ("event_id", "expected"),
+    [(2100, 1), (2101, 0)],
+)
+def test_pir_event_publishes_immediately(event_id: int, expected: int) -> None:
+    """PIR transitions publish without waiting for a zone status poll."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=0, logic_input=1 - expected
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": str(event_id), "ZONE_ID": "3", "AREA_ID": "1"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == expected
+    assert coordinator._pir_event_generation[3] == 1
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+def test_pir_event_does_not_change_other_zone_types() -> None:
+    """PIR event identifiers cannot overwrite an opening sensor state."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=1, logic_input=0
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "2100", "ZONE_ID": "3", "AREA_ID": "1"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == 0
+    assert coordinator._pir_event_generation == {}
+    coordinator.async_set_updated_data.assert_not_called()
+
+
+def test_pir_event_rejects_wrong_area() -> None:
+    """A zone EVENT must match the discovered area when supplied."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=0, logic_input=0
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "2100", "ZONE_ID": "3", "AREA_ID": "2"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == 0
+    assert coordinator._pir_event_generation == {}
+    coordinator.async_set_updated_data.assert_not_called()
 
 def test_handle_flexc_event() -> None:
     """Test applying a FlexC EVENT to coordinator state."""
