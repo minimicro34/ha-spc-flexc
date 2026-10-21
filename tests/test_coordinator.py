@@ -477,7 +477,9 @@ async def test_reconnect_preserves_missing_area_history_and_respects_explicit_va
 
 
 @pytest.mark.asyncio
-async def test_reconnect_preserves_history_across_successive_partial_responses() -> None:
+async def test_reconnect_preserves_history_across_successive_partial_responses() -> (
+    None
+):
     """Missing history survives multiple reconnects; explicit values win."""
     coordinator = _coordinator_stub()
     coordinator._area_discovery_complete = True
