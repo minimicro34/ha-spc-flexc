@@ -1303,6 +1303,18 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         event_id = _number("EV_ID")
         area_id = _number("AREA_ID")
         zone_id = _number("ZONE_ID")
+        if event_id is not None:
+            # Identifiers only: never retain raw EVENT data or user details.
+            self._last_event_identifiers = {
+                "event_id": event_id,
+                "area_id": area_id,
+                "zone_id": zone_id,
+            }
+            self._recent_event_identifiers = (
+                getattr(self, "_recent_event_identifiers", [])
+                + [self._last_event_identifiers]
+            )[-20:]
+
         diagnostic_area = self.state.areas.get(area_id) if area_id is not None else None
 
         def _alarm_snapshot() -> (
@@ -1430,5 +1442,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             or intrusion_changed
             or zone_changed
             or xbus_changed
+            or event_id is not None
         ):
             self.async_set_updated_data(self.state)
