@@ -550,7 +550,7 @@ Do not expose the FlexC listener directly to the Internet.
 
 On supported motion zones (SPC zone types `0` and `2`), FlexC event `2100` updates the Home Assistant motion state immediately, while event `2101` restores it. The event must identify a known zone and match its area. This event-driven path does not wait for the next zone status poll.
 
-Zone polling remains enabled to reconcile state. If an EVENT arrives while a zone-status batch is being read, the integration preserves the newer event-driven motion state rather than overwriting it with a potentially stale poll result. This behavior is being validated on physical SPC hardware for the v1.1.4 beta series.
+Zone polling remains enabled to reconcile state. If an EVENT arrives while a zone-status batch is being read, the integration preserves the newer event-driven motion state rather than overwriting it with a potentially stale poll result. This behavior was validated through live PIR testing and regression tests for v1.1.4.
 
 **Diagnostic logging:** Detailed PIR, EVENT and POLL context traces are emitted at `DEBUG` (not `INFO`). Enable `custom_components.spc_flexc` DEBUG logging temporarily when investigating a problem:
 
