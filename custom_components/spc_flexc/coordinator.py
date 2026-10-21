@@ -167,9 +167,9 @@ def _ats_state_from_status(response: dict[str, Any], timezone: tzinfo) -> AtsSta
 def _area_reconciliation_changes(
     previous: dict[str, str], current: dict[str, str]
 ) -> list[str]:
-    """Describe only changed area status fields without dumping the full payload."""
+    """List changed area status keys without exposing values or user names."""
     return [
-        f"{key}={previous.get(key)!r} -> {current.get(key)!r}"
+        key
         for key in sorted(previous.keys() | current.keys())
         if previous.get(key) != current.get(key)
     ]
