@@ -288,6 +288,24 @@ Diagnostic entities are associated with the appropriate SPC devices and can incl
 
 Availability is hardware- and firmware-dependent.
 
+### FlexC event ID diagnostics (optional)
+
+For testing unknown FlexC event IDs (for example WPAN, WRMT or WKP-SIM),
+enable the **Last FlexC event ID** diagnostic sensor in Home Assistant under
+**Settings → Devices & services → SPC FlexC → Entities**. This sensor is
+**disabled by default** to avoid unnecessary state recording.
+
+Its state is the most recent numeric `EV_ID`; attributes expose the matching
+`area_id`, `zone_id`, and the **20 most recent** sets of these numeric
+identifiers. No raw EVENT XML, user names, passwords or device payloads are
+retained in this diagnostic history. The history is in memory only and resets
+when the integration reloads. It is intended for event discovery, not a
+permanent audit log or an implementation of additional devices.
+
+Routine PIR, EVENT and POLL resynchronization traces are logged at
+`DEBUG`, not `INFO`. To capture detailed timing, enable DEBUG logging for
+`custom_components.spc_flexc` temporarily.
+
 ---
 
 ## SPC FlexC Card
