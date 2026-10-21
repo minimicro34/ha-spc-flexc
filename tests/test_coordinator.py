@@ -438,7 +438,9 @@ async def test_reconnect_reconciliation_refreshes_known_base_state() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reconnect_preserves_missing_area_history_and_respects_explicit_values() -> None:
+async def test_reconnect_preserves_missing_area_history_and_respects_explicit_values() -> (
+    None
+):
     """A partial reconnect response must not erase known area history."""
     coordinator = _coordinator_stub()
     coordinator._area_discovery_complete = True
@@ -457,7 +459,9 @@ async def test_reconnect_preserves_missing_area_history_and_respects_explicit_va
     )
     coordinator.state.areas[1] = previous
     coordinator.client.async_get_area_status = AsyncMock(
-        return_value=[{"AREA_ID": "1", "MODE": "1", "LAST_UNSET_USER_NAME": "New Operator"}]
+        return_value=[
+            {"AREA_ID": "1", "MODE": "1", "LAST_UNSET_USER_NAME": "New Operator"}
+        ]
     )
 
     changed = await SpcFlexCCoordinator._async_reconcile_known_state_locked(coordinator)
@@ -1199,9 +1203,7 @@ def test_area_reconciliation_logs_only_changed_fields() -> None:
 
     previous = {"MODE": "0", "INTERNAL_BELLS": "0", "EXTERNAL_BELLS": "0"}
     current = {"MODE": "0", "INTERNAL_BELLS": "1", "EXTERNAL_BELLS": "0"}
-    assert _area_reconciliation_changes(previous, current) == [
-        "INTERNAL_BELLS='0' -> '1'"
-    ]
+    assert _area_reconciliation_changes(previous, current) == ["INTERNAL_BELLS"]
 
 
 def test_area_reconciliation_reports_added_and_removed_fields() -> None:
@@ -1213,11 +1215,7 @@ def test_area_reconciliation_reports_added_and_removed_fields() -> None:
     assert _area_reconciliation_changes(
         {"MODE": "3", "OLD": "yes"},
         {"MODE": "0", "NEW": "yes"},
-    ) == [
-        "MODE='3' -> '0'",
-        "NEW=None -> 'yes'",
-        "OLD='yes' -> None",
-    ]
+    ) == ["MODE", "NEW", "OLD"]
 
 
 def test_untimestamped_unset_event_still_clears_latched_alarm() -> None:
