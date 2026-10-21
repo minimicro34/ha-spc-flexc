@@ -167,9 +167,9 @@ def _ats_state_from_status(response: dict[str, Any], timezone: tzinfo) -> AtsSta
 def _area_reconciliation_changes(
     previous: dict[str, str], current: dict[str, str]
 ) -> list[str]:
-    """Describe only changed area status fields without dumping the full payload."""
+    """List changed area status keys without exposing values or user names."""
     return [
-        f"{key}={previous.get(key)!r} -> {current.get(key)!r}"
+        key
         for key in sorted(previous.keys() | current.keys())
         if previous.get(key) != current.get(key)
     ]
@@ -350,6 +350,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._detected_zone_ids: set[int] = set()
         self._zone_discovery_complete = False
         self._pending_zone_restores: set[tuple[int, int]] = set()
+        # Monotonic generation for PIR EVENT transitions; used to reject
+        # in-flight polling snapshots older than a received live EVENT.
+        self._pir_event_generation: dict[int, int] = {}
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
         self._detected_xbus_serials: set[str] = set()
@@ -573,6 +576,24 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             for raw_area in raw_areas:
                 area = _area_state_from_status(raw_area, timezone)
                 previous_area = self.state.areas.get(area.area_id)
+                if previous_area is not None:
+                    # Some reconnect responses omit history attributes. Absence
+                    # does not mean the panel cleared its previous history.
+                    history_fields = {
+                        "LAST_SET_TIME": "last_set_time",
+                        "LAST_SET_USER_ID": "last_set_user_id",
+                        "LAST_SET_USER_NAME": "last_set_user_name",
+                        "LAST_UNSET_TIME": "last_unset_time",
+                        "LAST_UNSET_USER_ID": "last_unset_user_id",
+                        "LAST_UNSET_USER_NAME": "last_unset_user_name",
+                        "LAST_ALARM": "last_alarm",
+                    }
+                    for raw_key, field_name in history_fields.items():
+                        if raw_key not in raw_area and raw_key in previous_area.raw:
+                            area.raw[raw_key] = previous_area.raw[raw_key]
+                            setattr(
+                                area, field_name, getattr(previous_area, field_name)
+                            )
                 if previous_area is None or previous_area.raw != area.raw:
                     if previous_area is None:
                         _LOGGER.info(
@@ -870,6 +891,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     async def _async_zone_poll_loop(self) -> None:
         """Poll zones without allowing one malformed reply to stop live updates."""
         _LOGGER.debug("SPC zone polling started")
+        previous_poll_started: float | None = None
         try:
             while True:
                 await asyncio.sleep(
@@ -881,23 +903,125 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 if not zone_ids:
                     continue
                 try:
+                    # Temporary beta timing diagnostics; no scheduling changes.
+                    clock = asyncio.get_running_loop()
+                    poll_started = clock.time()
+                    interval_ms = (
+                        (poll_started - previous_poll_started) * 1000
+                        if previous_poll_started is not None
+                        else None
+                    )
+                    previous_poll_started = poll_started
                     raw_zones: list[dict[str, str]] = []
-                    async with self._client_operation_lock:
-                        await self.client.async_ensure_connected()
-                        for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
-                            batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                    poll_event_generations: dict[int, int] = {}
+                    batch_timings: list[tuple[int, int, float]] = []
+                    # Release the coordinator operation lock between batches
+                    # so area/door/user commands are not queued behind an
+                    # entire zone scan. Each individual batch remains atomic.
+                    lock_wait_total_ms = 0.0
+                    resync_wait_total_ms = 0.0
+                    for index in range(0, len(zone_ids), ZONE_POLL_BATCH_SIZE):
+                        batch = zone_ids[index : index + ZONE_POLL_BATCH_SIZE]
+                        # A spontaneous EVENT invalidates the command context.
+                        # Wait for the next SPC POLL *before* taking the shared
+                        # coordinator lock, so other tasks are not blocked by
+                        # this zone poll while the transport resynchronizes.
+                        # The command layer rechecks the context under its own
+                        # lock to handle races with newer EVENTs.
+                        resync_wait_total_ms += (
+                            await self.client.async_wait_for_event_resync()
+                        )
+                        waiting_since = clock.time()
+                        async with self._client_operation_lock:
+                            lock_wait_total_ms += (clock.time() - waiting_since) * 1000
+                            await self.client.async_ensure_connected()
+                            request_started = clock.time()
+                            generations_before_read = {
+                                zone_id: self._pir_event_generation.get(zone_id, 0)
+                                for zone_id in batch
+                            }
                             batch_zones = await async_retry_read_once(
                                 partial(self.client.async_get_zone_status, batch),
                                 description=f"polling zones {batch[0]}..{batch[-1]}",
                             )
+                            batch_timings.append(
+                                (
+                                    batch[0],
+                                    batch[-1],
+                                    (clock.time() - request_started) * 1000,
+                                )
+                            )
                             raw_zones.extend(batch_zones)
+                            poll_event_generations.update(generations_before_read)
+                    read_finished = clock.time()
+                    lock_wait_ms = lock_wait_total_ms
+                    read_ms = sum(batch_ms for _, _, batch_ms in batch_timings)
+                    interval_display = (
+                        round(interval_ms, 1) if interval_ms is not None else None
+                    )
+                    if lock_wait_ms >= 1000 or read_ms >= 1000:
+                        _LOGGER.warning(
+                            "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
+                            "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
+                            interval_display,
+                            lock_wait_ms,
+                            read_ms,
+                            resync_wait_total_ms,
+                            batch_timings,
+                        )
+                    elif resync_wait_total_ms >= 1000 or (
+                        interval_ms is not None and interval_ms >= 2000
+                    ):
+                        _LOGGER.debug(
+                            "FlexC PIR poll delayed: interval_ms=%s "
+                            "resync_wait_ms=%.1f lock_wait_ms=%.1f read_ms=%.1f",
+                            interval_display,
+                            resync_wait_total_ms,
+                            lock_wait_ms,
+                            read_ms,
+                        )
 
                     changed = False
                     restored_area_ids: set[int] = set()
                     for raw_zone in raw_zones:
                         zone = _zone_state_from_status(raw_zone)
                         previous = self.state.zones.get(zone.zone_id)
+                        if (
+                            previous is not None
+                            and previous.zone_type in (0, 1, 2, 30)
+                            and self._pir_event_generation.get(zone.zone_id, 0)
+                            != poll_event_generations.get(zone.zone_id, 0)
+                        ):
+                            # The response may predate a live EVENT received
+                            # during this request. Keep the newer PIR state;
+                            # a subsequent poll will reconcile it.
+                            zone.logic_input = previous.logic_input
                         event_changed = _reconcile_zone_event_state(zone, previous)
+                        # Temporary beta diagnostic: log motion-zone changes only.
+                        # A nonzero actuation counter may reveal motion that
+                        # returned to idle before the status read completed.
+                        if zone.zone_type in (0, 1, 2, 30) and previous is not None:
+                            input_changed = previous.logic_input != zone.logic_input
+                            actuations_changed = (
+                                previous.actuations_since_last_read
+                                != zone.actuations_since_last_read
+                            )
+                            if input_changed or actuations_changed:
+                                _LOGGER.debug(
+                                    "FlexC PIR diagnostic: ZONE_ID=%s "
+                                    "LOGIC_INPUT=%s->%s ACTUATIONS=%s->%s "
+                                    "interval_ms=%s lock_wait_ms=%.1f read_ms=%.1f "
+                                    "batches=%s",
+                                    zone.zone_id,
+                                    previous.logic_input,
+                                    zone.logic_input,
+                                    previous.actuations_since_last_read,
+                                    zone.actuations_since_last_read,
+                                    interval_display,
+                                    lock_wait_ms,
+                                    read_ms,
+                                    batch_timings,
+                                )
                         # Diagnostic only: track SPC zone status while an area
                         # retains an intrusion. Do not infer alarm clearance here.
                         area = (
@@ -1007,7 +1131,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             area.alarm_event_active = False
                         changed = True
                     if changed:
+                        publish_started = clock.time()
                         self.async_set_updated_data(self.state)
+                        _LOGGER.debug(
+                            "FlexC PIR publish diagnostic: processing_ms=%.1f "
+                            "publish_call_ms=%.1f total_ms=%.1f",
+                            (publish_started - read_finished) * 1000,
+                            (clock.time() - publish_started) * 1000,
+                            (clock.time() - poll_started) * 1000,
+                        )
                 except asyncio.CancelledError:
                     raise
                 except (FlexCError, FlexMLError) as err:
@@ -1189,6 +1321,18 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         event_id = _number("EV_ID")
         area_id = _number("AREA_ID")
         zone_id = _number("ZONE_ID")
+        if event_id is not None:
+            # Identifiers only: never retain raw EVENT data or user details.
+            self._last_event_identifiers = {
+                "event_id": event_id,
+                "area_id": area_id,
+                "zone_id": zone_id,
+            }
+            self._recent_event_identifiers = (
+                getattr(self, "_recent_event_identifiers", [])
+                + [self._last_event_identifiers]
+            )[-20:]
+
         diagnostic_area = self.state.areas.get(area_id) if area_id is not None else None
 
         def _alarm_snapshot() -> (
@@ -1287,6 +1431,26 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 _alarm_snapshot(),
             )
         zone_changed = apply_zone_event(self.state.zones, event)
+        if event_id in (2100, 2101) and zone_id is not None:
+            zone = self.state.zones.get(zone_id)
+            if (
+                zone is not None
+                and zone.zone_type in (0, 1, 2, 30)
+                and (area_id is None or zone.area_id == area_id)
+            ):
+                new_logic_input = 1 if event_id == 2100 else 0
+                self._pir_event_generation[zone_id] = (
+                    self._pir_event_generation.get(zone_id, 0) + 1
+                )
+                zone_changed = zone.logic_input != new_logic_input or zone_changed
+                zone.logic_input = new_logic_input
+                zone.updated_at = datetime.now(UTC)
+                _LOGGER.debug(
+                    "FlexC zone EVENT state: EV_ID=%s ZONE_ID=%s active=%s",
+                    event_id,
+                    zone_id,
+                    bool(new_logic_input),
+                )
         xbus_changed = apply_xbus_event(self.state.xbus_devices, event)
         if (
             fault_changed
@@ -1296,5 +1460,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             or intrusion_changed
             or zone_changed
             or xbus_changed
+            or event_id is not None
         ):
             self.async_set_updated_data(self.state)

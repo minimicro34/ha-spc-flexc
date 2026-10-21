@@ -4,6 +4,35 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.4] - 2026-10-21
+
+### Fixed
+
+- Apply validated FlexC zone input events `2100` (active) and `2101` (restore) immediately to PIR, `entry_exit` and `entry_exit_2` zones, with protection against older in-flight polls.
+- Prevent duplicate synthetic motion pulses when a live FlexC event already reported the same activation.
+- Convert global panel arm/disarm connection and FLEXML failures to Home Assistant errors, including prechecks, as requested during HACS review.
+- Preserve previously known area history attributes when a reconnect response omits them, without masking explicitly returned values.
+
+### Changed
+
+- Separate event-triggered POLL context resynchronization waits from actual zone read and lock timing.
+- Move high-volume PIR, zone EVENT and FlexC context diagnostic messages from INFO to DEBUG.
+
+### Added
+
+- Optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with the 20 most recent numeric event, zone and area IDs for investigating additional SPC devices without enabling global DEBUG logs.
+- Regression tests for global alarm connection failures, precheck errors and the diagnostic sensor.
+
+### Validation
+
+- SPC4300 live testing: PIR event and restoration updates without duplicate activations.
+- Independent tester: 28/28 PIR detections and restorations, no merged detections, no timeout or reconnect during the test; median detection 0.63 s ahead of Acre/MQTT.
+- 349 automated Python tests passed locally; **92.00% GitHub CI coverage** and **92.06% local coverage** (Python 3.14). Ruff formatting/lint and mypy checks passed locally; HACS and Hassfest checks passed.
+
+**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.3...v1.1.4
+
+---
+
 ## [1.1.3] - 2026-10-19
 
 ### Fixed

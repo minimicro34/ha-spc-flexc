@@ -62,9 +62,11 @@ def _coordinator_stub() -> MagicMock:
     coordinator._discovery_task = None
     coordinator._zone_poll_task = None
     coordinator._pending_zone_restores = set()
+    coordinator._pir_event_generation = {}
     coordinator._xbus_poll_task = None
     coordinator._last_area_diagnostic_log = 0.0
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     return coordinator
 
 
@@ -236,6 +238,78 @@ def test_zone_tamper_reconciles_only_on_complete_normal_status() -> None:
     assert active.event_tamper is True
 
 
+@pytest.mark.parametrize(
+    ("event_id", "expected"),
+    [(2100, 1), (2101, 0)],
+)
+def test_pir_event_publishes_immediately(event_id: int, expected: int) -> None:
+    """PIR transitions publish without waiting for a zone status poll."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=0, logic_input=1 - expected
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": str(event_id), "ZONE_ID": "3", "AREA_ID": "1"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == expected
+    assert coordinator._pir_event_generation[3] == 1
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+@pytest.mark.parametrize("zone_type", [1, 30])
+@pytest.mark.parametrize(("event_id", "expected"), [(2100, 1), (2101, 0)])
+def test_entry_exit_event_publishes_immediately(
+    zone_type: int, event_id: int, expected: int
+) -> None:
+    """Entry/exit zones follow live input events regardless of entry delay."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=zone_type, logic_input=1 - expected
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": str(event_id), "ZONE_ID": "3", "AREA_ID": "1"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == expected
+    assert coordinator._pir_event_generation[3] == 1
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+def test_pir_event_does_not_change_other_zone_types() -> None:
+    """Live input events must not overwrite unsupported zone types."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=4, logic_input=0
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "2100", "ZONE_ID": "3", "AREA_ID": "1"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == 0
+    assert coordinator._pir_event_generation == {}
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+def test_pir_event_rejects_wrong_area() -> None:
+    """A zone EVENT must match the discovered area when supplied."""
+    coordinator = _coordinator_stub()
+    coordinator.state.zones[3] = ZoneState(
+        zone_id=3, area_id=1, zone_type=0, logic_input=0
+    )
+
+    SpcFlexCCoordinator._handle_flexc_event(
+        coordinator, {"EV_ID": "2100", "ZONE_ID": "3", "AREA_ID": "2"}
+    )
+
+    assert coordinator.state.zones[3].logic_input == 0
+    assert coordinator._pir_event_generation == {}
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
 def test_handle_flexc_event() -> None:
     """Test applying a FlexC EVENT to coordinator state."""
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
@@ -244,6 +318,28 @@ def test_handle_flexc_event() -> None:
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "5336"})
 
     assert coordinator.state.faults.rf_jamming is True
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+
+@pytest.mark.parametrize(
+    ("event_id", "expected"),
+    [("7003", True), ("7004", False)],
+)
+def test_engineer_mode_event_updates_panel_immediately(
+    event_id: str, expected: bool
+) -> None:
+    """Engineer mode events publish the new panel state without polling."""
+    coordinator = MagicMock(spec=SpcFlexCCoordinator)
+    coordinator.state = SpcState()
+    coordinator.state.panel.engineer_mode = not expected
+
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
+
+    assert coordinator.state.panel.engineer_mode is expected
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
+
+    coordinator.async_set_updated_data.reset_mock()
+    SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
@@ -288,7 +384,7 @@ def test_alarm_diagnostics_capture_unknown_restore_event_without_personal_data(
     assert "before=(3, True, (), (1,))" in caplog.text
     assert "after=(3, True, (), (1,))" in caplog.text
     assert "private-user" not in caplog.text
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 def test_unknown_flexc_event_does_not_notify() -> None:
@@ -298,7 +394,7 @@ def test_unknown_flexc_event_does_not_notify() -> None:
 
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "9999"})
 
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 @pytest.mark.asyncio
@@ -339,6 +435,100 @@ async def test_reconnect_reconciliation_refreshes_known_base_state() -> None:
     assert coordinator.state.areas[1].mode == 1
     assert coordinator.state.zones[4].input_state == 1
     assert coordinator.state.xbus_devices["4CADF0DA"].tamper_fault is True
+
+
+@pytest.mark.asyncio
+async def test_reconnect_preserves_missing_area_history_and_respects_explicit_values() -> (
+    None
+):
+    """A partial reconnect response must not erase known area history."""
+    coordinator = _coordinator_stub()
+    coordinator._area_discovery_complete = True
+    coordinator._detected_area_ids = {1}
+    coordinator._area_history = {}
+    previous = _area_state_from_status(
+        {
+            "AREA_ID": "1",
+            "MODE": "0",
+            "LAST_SET_TIME": "12345617092026",
+            "LAST_SET_USER_ID": "7",
+            "LAST_SET_USER_NAME": "Private Operator",
+            "LAST_UNSET_USER_NAME": "Former Operator",
+        },
+        ZoneInfo("Europe/Paris"),
+    )
+    coordinator.state.areas[1] = previous
+    coordinator.client.async_get_area_status = AsyncMock(
+        return_value=[
+            {"AREA_ID": "1", "MODE": "1", "LAST_UNSET_USER_NAME": "New Operator"}
+        ]
+    )
+
+    changed = await SpcFlexCCoordinator._async_reconcile_known_state_locked(coordinator)
+
+    assert changed is True
+    area = coordinator.state.areas[1]
+    assert area.mode == 1
+    assert area.last_set_time == previous.last_set_time
+    assert area.last_set_user_id == 7
+    assert area.last_set_user_name == "Private Operator"
+    assert area.raw["LAST_SET_TIME"] == "12345617092026"
+    assert area.last_unset_user_name == "New Operator"
+
+
+@pytest.mark.asyncio
+async def test_reconnect_preserves_history_across_successive_partial_responses() -> (
+    None
+):
+    """Missing history survives multiple reconnects; explicit values win."""
+    coordinator = _coordinator_stub()
+    coordinator._area_discovery_complete = True
+    coordinator._detected_area_ids = {1}
+    coordinator._area_history = {}
+    coordinator.state.areas[1] = _area_state_from_status(
+        {
+            "AREA_ID": "1",
+            "MODE": "0",
+            "LAST_SET_USER_ID": "7",
+            "LAST_SET_USER_NAME": "Original Operator",
+            "LAST_UNSET_USER_NAME": "Previous Operator",
+        },
+        ZoneInfo("Europe/Paris"),
+    )
+    responses = [
+        [{"AREA_ID": "1", "MODE": "1"}],
+        [{"AREA_ID": "1", "MODE": "2", "LAST_SET_USER_NAME": "Updated Operator"}],
+        [{"AREA_ID": "1", "MODE": "3", "LAST_UNSET_USER_NAME": ""}],
+        [{"AREA_ID": "1", "MODE": "0"}],
+    ]
+    coordinator.client.async_get_area_status = AsyncMock(side_effect=responses)
+
+    for expected_mode in (1, 2, 3, 0):
+        changed = await SpcFlexCCoordinator._async_reconcile_known_state_locked(
+            coordinator
+        )
+        assert changed is True
+        assert coordinator.state.areas[1].mode == expected_mode
+
+    area = coordinator.state.areas[1]
+    assert area.last_set_user_id == 7
+    assert area.last_set_user_name == "Updated Operator"
+    assert area.raw["LAST_SET_USER_NAME"] == "Updated Operator"
+    assert area.raw["LAST_UNSET_USER_NAME"] == ""
+    assert area.last_unset_user_name == ""
+
+
+def test_reconciliation_diagnostics_never_log_personal_values() -> None:
+    """Reconciliation diagnostics expose changed keys, never their values."""
+    from custom_components.spc_flexc.coordinator import _area_reconciliation_changes
+
+    changes = _area_reconciliation_changes(
+        {"LAST_SET_USER_NAME": "Private Operator", "MODE": "0"},
+        {"LAST_SET_USER_NAME": "New Operator", "MODE": "1"},
+    )
+    assert changes == ["LAST_SET_USER_NAME", "MODE"]
+    assert "Private Operator" not in repr(changes)
+    assert "New Operator" not in repr(changes)
 
 
 @pytest.mark.asyncio
@@ -546,6 +736,7 @@ async def test_zone_polling_continues_after_malformed_reply() -> None:
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.client.async_get_zone_status = AsyncMock(
         side_effect=[[{"INPUT": "0"}], [{"ZONE_ID": "1", "INPUT": "1"}]]
     )
@@ -704,6 +895,7 @@ async def test_zone_actuation_change_notifies_entities() -> None:
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.client.async_get_zone_status = AsyncMock(
         return_value=[
             {
@@ -739,6 +931,7 @@ async def test_zone_polling_uses_bounded_batches() -> None:
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.client.async_get_zone_status = AsyncMock(
         side_effect=[
             [{"ZONE_ID": str(zone_id)} for zone_id in range(1, 17)],
@@ -859,6 +1052,7 @@ async def test_xbus_polling_reconciles_raw_status_and_preserves_events() -> None
     coordinator._discovery_requested = False
     coordinator._client_operation_lock = _AsyncLock()
     coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
     coordinator.async_set_updated_data = MagicMock()
     coordinator._xbus_poll_task = asyncio.current_task()
     sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
@@ -1051,9 +1245,7 @@ def test_area_reconciliation_logs_only_changed_fields() -> None:
 
     previous = {"MODE": "0", "INTERNAL_BELLS": "0", "EXTERNAL_BELLS": "0"}
     current = {"MODE": "0", "INTERNAL_BELLS": "1", "EXTERNAL_BELLS": "0"}
-    assert _area_reconciliation_changes(previous, current) == [
-        "INTERNAL_BELLS='0' -> '1'"
-    ]
+    assert _area_reconciliation_changes(previous, current) == ["INTERNAL_BELLS"]
 
 
 def test_area_reconciliation_reports_added_and_removed_fields() -> None:
@@ -1065,11 +1257,7 @@ def test_area_reconciliation_reports_added_and_removed_fields() -> None:
     assert _area_reconciliation_changes(
         {"MODE": "3", "OLD": "yes"},
         {"MODE": "0", "NEW": "yes"},
-    ) == [
-        "MODE='3' -> '0'",
-        "NEW=None -> 'yes'",
-        "OLD='yes' -> None",
-    ]
+    ) == ["MODE", "NEW", "OLD"]
 
 
 def test_untimestamped_unset_event_still_clears_latched_alarm() -> None:

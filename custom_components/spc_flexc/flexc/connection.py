@@ -199,6 +199,7 @@ class FlexCClient:
         # An unsolicited EVENT between commands invalidates the DATA chain.
         # Wait for the next SPC POLL before sending another command.
         self._awaiting_poll_after_event = False
+        self._event_resync_started_at: float | None = None
 
     def set_session_ready_callback(self, callback: Callable[[int], None]) -> None:
         """Register a callback invoked when a fresh session context is ready."""
@@ -280,6 +281,7 @@ class FlexCClient:
         self._command_context = None
         self._context_event.clear()
         self._awaiting_poll_after_event = False
+        self._event_resync_started_at = None
 
         _LOGGER.info(
             "SPC FlexC TCP connection #%d accepted from %s", generation, peer_host
@@ -347,6 +349,7 @@ class FlexCClient:
                 self._command_context = None
                 self._context_event.clear()
                 self._awaiting_poll_after_event = False
+                self._event_resync_started_at = None
 
                 if self._pending_reply is not None and not self._pending_reply.done():
                     self._pending_reply.set_exception(
@@ -612,6 +615,19 @@ class FlexCClient:
     ) -> None:
         """Process one validated incoming FlexC message."""
         message_id = int(message["message_id"])
+        # Temporary beta diagnostic: only unusual message types are logged.
+        # Do not log raw application data or credentials.
+        if message_id not in {
+            MSG_CONNECTION_REQUEST_LEGACY,
+            MSG_CONNECTION_REQUEST,
+            MSG_POLL,
+            MSG_EVENT,
+            MSG_EVENT_ACK,
+            MSG_DATA_ACK,
+            MSG_DATA,
+            MSG_ERROR,
+        }:
+            _LOGGER.warning("FlexC RX diagnostic: MSG_ID=0x%02X", message_id)
         trace = self._active_trace
         if trace is not None:
             now = asyncio.get_running_loop().time()
@@ -688,10 +704,21 @@ class FlexCClient:
                 self._awaiting_poll_after_event = False
                 self._context_event.set()
                 if was_waiting_for_poll:
-                    _LOGGER.info(
+                    elapsed_ms = (
+                        (
+                            asyncio.get_running_loop().time()
+                            - self._event_resync_started_at
+                        )
+                        * 1000
+                        if self._event_resync_started_at is not None
+                        else None
+                    )
+                    self._event_resync_started_at = None
+                    _LOGGER.debug(
                         "FlexC context resynchronized from SPC POLL after "
-                        "unsolicited EVENT (session #%d)",
+                        "unsolicited EVENT (session #%d, wait_ms=%s)",
                         self._session_generation,
+                        round(elapsed_ms, 1) if elapsed_ms is not None else None,
                     )
 
                 if self._recovery_started_at is not None:
@@ -735,7 +762,8 @@ class FlexCClient:
                 self._command_context = None
                 self._context_event.clear()
                 self._awaiting_poll_after_event = True
-                _LOGGER.info(
+                self._event_resync_started_at = asyncio.get_running_loop().time()
+                _LOGGER.debug(
                     "FlexC unsolicited EVENT between commands: waiting for "
                     "fresh SPC POLL before next command (session #%d)",
                     self._session_generation,
@@ -744,6 +772,21 @@ class FlexCClient:
             event = parse_event_payload(bytes(message["app_data"]))
 
             if event is not None:
+                # Diagnostic only: report identifiers, never raw EVENT attributes.
+                def _event_identifier(key: str) -> int | None:
+                    try:
+                        return int(str(event.get(key)))
+                    except (TypeError, ValueError):
+                        return None
+
+                _LOGGER.debug(
+                    "FlexC EVENT diagnostic: MSG_ID=0x%02X EV_ID=%s "
+                    "ZONE_ID=%s AREA_ID=%s",
+                    message_id,
+                    _event_identifier("EV_ID"),
+                    _event_identifier("ZONE_ID"),
+                    _event_identifier("AREA_ID"),
+                )
                 event_callback = self._event_callback
 
                 if event_callback is not None:
@@ -930,6 +973,29 @@ class FlexCClient:
             ",".join(trace.timeline),
         )
 
+    async def async_wait_for_event_resync(self) -> float:
+        """Wait for an unsolicited EVENT's next POLL without holding caller locks.
+
+        This is an optimization only. async_send_flexml still validates context
+        under the command lock, including when another EVENT races this wait.
+        """
+        if not self._awaiting_poll_after_event:
+            return 0.0
+        started = asyncio.get_running_loop().time()
+        try:
+            async with asyncio.timeout(COMMAND_TIMEOUT):
+                await self._context_event.wait()
+        except TimeoutError as err:
+            raise FlexCConnectionError(
+                "Timeout waiting for fresh FlexC POLL 0x20 after EVENT"
+            ) from err
+        elapsed_ms = (asyncio.get_running_loop().time() - started) * 1000
+        _LOGGER.debug(
+            "FlexC pre-command EVENT resync wait: wait_ms=%.1f",
+            elapsed_ms,
+        )
+        return elapsed_ms
+
     async def async_send_flexml(self, command: str) -> str:
         """Send one FLEXML command and return FLEXML_REPLY."""
         await self.async_ensure_connected()
@@ -939,13 +1005,21 @@ class FlexCClient:
             # resynchronization needs to wait for a POLL. Subsequent commands
             # chain directly from the previous validated DATA reply.
             if self._command_context is None:
+                waiting_after_event = self._awaiting_poll_after_event
+                wait_started = asyncio.get_running_loop().time()
                 try:
                     async with asyncio.timeout(COMMAND_TIMEOUT):
                         await self._context_event.wait()
                 except TimeoutError as err:
                     raise FlexCConnectionError(
-                        "Timeout waiting for initial FlexC POLL 0x20"
+                        "Timeout waiting for fresh FlexC POLL 0x20"
                     ) from err
+                finally:
+                    if waiting_after_event:
+                        _LOGGER.debug(
+                            "FlexC command context wait after EVENT: wait_ms=%.1f",
+                            (asyncio.get_running_loop().time() - wait_started) * 1000,
+                        )
 
             context = self._command_context
 

@@ -288,6 +288,24 @@ Diagnostic entities are associated with the appropriate SPC devices and can incl
 
 Availability is hardware- and firmware-dependent.
 
+### FlexC event ID diagnostics (optional)
+
+For testing unknown FlexC event IDs (for example WPAN, WRMT or WKP-SIM),
+enable the **Last FlexC event ID** diagnostic sensor in Home Assistant under
+**Settings → Devices & services → SPC FlexC → Entities**. This sensor is
+**disabled by default** to avoid unnecessary state recording.
+
+Its state is the most recent numeric `EV_ID`; attributes expose the matching
+`area_id`, `zone_id`, and the **20 most recent** sets of these numeric
+identifiers. No raw EVENT XML, user names, passwords or device payloads are
+retained in this diagnostic history. The history is in memory only and resets
+when the integration reloads. It is intended for event discovery, not a
+permanent audit log or an implementation of additional devices.
+
+Routine PIR, EVENT and POLL resynchronization traces are logged at
+`DEBUG`, not `INFO`. To capture detailed timing, enable DEBUG logging for
+`custom_components.spc_flexc` temporarily.
+
 ---
 
 ## SPC FlexC Card
@@ -527,6 +545,27 @@ Do not expose the FlexC listener directly to the Internet.
 ---
 
 ## Known limitations
+
+### PIR event updates and beta diagnostics
+
+On supported motion zones (SPC zone types `0` and `2`), FlexC event `2100` updates the Home Assistant motion state immediately, while event `2101` restores it. The event must identify a known zone and match its area. This event-driven path does not wait for the next zone status poll.
+
+Zone polling remains enabled to reconcile state. If an EVENT arrives while a zone-status batch is being read, the integration preserves the newer event-driven motion state rather than overwriting it with a potentially stale poll result. This behavior is being validated on physical SPC hardware for the v1.1.4 beta series.
+
+**Diagnostic logging:** Detailed PIR, EVENT and POLL context traces are emitted at `DEBUG` (not `INFO`). Enable `custom_components.spc_flexc` DEBUG logging temporarily when investigating a problem:
+
+- `FlexC EVENT diagnostic`: incoming event ID, zone ID and area ID (not raw credentials).
+- `FlexC zone EVENT state`: motion state applied from event `2100` or `2101`.
+- `FlexC PIR diagnostic`: changes detected by polling, including logic input, actuation counters and timing.
+- `FlexC PIR publish diagnostic`: processing and Home Assistant publication timings.
+- `FlexC unsolicited EVENT between commands`: the command context was invalidated while idle.
+- `FlexC context resynchronized from SPC POLL`: a fresh POLL restored the command context; `wait_ms` measures the EVENT-to-POLL delay.
+
+A slow zone polling cycle emits `FlexC PIR poll slow` at `WARNING`, with `interval_ms`, `lock_wait_ms`, `read_ms` and per-batch durations. Command timeouts and connection/protocol errors retain their existing warning diagnostics.
+
+**Protocol safety:** An unsolicited EVENT between commands invalidates the existing command context. The next command waits for a fresh SPC POLL before proceeding. These beta diagnostics measure the remaining EVENT-to-POLL wait; the transport still requires a validated fresh POLL before the next command. Zone polling now releases the coordinator operation lock between batches, allowing other operations to run between batches rather than waiting for the full scan. This improves scheduling opportunities but does **not** shorten the panel's EVENT-to-POLL protocol interval. The `FlexC command context wait after EVENT` diagnostic measures how long an actual command was blocked; `lock_wait_ms` now sums lock acquisition delays across zone batches. EVENTs received while a command is in flight do not replace its reply context.
+
+For a hardware test, compare `2100` / `2101` timestamps with the Home Assistant motion entity transitions, then inspect `wait_ms` and `FlexC PIR poll slow` warnings. Do not share credentials, encryption keys or raw sensitive protocol payloads in logs or issues.
 
 ### Intrusion event tracking
 

@@ -157,6 +157,7 @@ class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEn
         self.zone_id = zone_id
         self._activity_pulse_active = False
         self._activity_pulse_handle: asyncio.TimerHandle | None = None
+        self._last_actuations: int | None = None
         zone = coordinator.data.zones[zone_id]
         self._attr_device_class = zone_device_class(zone.zone_type)
         self._attr_name = zone.name or f"Zone {zone_id}"
@@ -214,13 +215,27 @@ class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEn
 
     def _handle_coordinator_update(self) -> None:
         zone = self.coordinator.data.zones.get(self.zone_id)
-        if (
-            zone is not None
-            and self._attr_device_class == BinarySensorDeviceClass.MOTION
-            and not zone.logic_input
-            and (zone.actuations_since_last_read or 0) > 0
-        ):
-            self._start_activity_pulse()
+        if zone is not None:
+            actuations = zone.actuations_since_last_read
+            # The counter is a fallback for motion missed by polling, not a
+            # second activation after a live 2100/2101 event. A repeated
+            # coordinator update must never replay the same counter value.
+            has_live_events = (
+                self.coordinator._pir_event_generation.get(self.zone_id, 0) > 0
+            )
+            if has_live_events or zone.logic_input:
+                if self._activity_pulse_handle is not None:
+                    self._activity_pulse_handle.cancel()
+                    self._activity_pulse_handle = None
+                self._activity_pulse_active = False
+            elif (
+                self._attr_device_class == BinarySensorDeviceClass.MOTION
+                and actuations is not None
+                and actuations > 0
+                and actuations != self._last_actuations
+            ):
+                self._start_activity_pulse()
+            self._last_actuations = actuations
         super()._handle_coordinator_update()
 
     def _start_activity_pulse(self) -> None:
