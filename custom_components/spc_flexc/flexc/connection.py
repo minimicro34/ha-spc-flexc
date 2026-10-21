@@ -714,7 +714,7 @@ class FlexCClient:
                         else None
                     )
                     self._event_resync_started_at = None
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         "FlexC context resynchronized from SPC POLL after "
                         "unsolicited EVENT (session #%d, wait_ms=%s)",
                         self._session_generation,
@@ -763,7 +763,7 @@ class FlexCClient:
                 self._context_event.clear()
                 self._awaiting_poll_after_event = True
                 self._event_resync_started_at = asyncio.get_running_loop().time()
-                _LOGGER.info(
+                _LOGGER.debug(
                     "FlexC unsolicited EVENT between commands: waiting for "
                     "fresh SPC POLL before next command (session #%d)",
                     self._session_generation,
@@ -779,7 +779,7 @@ class FlexCClient:
                     except (TypeError, ValueError):
                         return None
 
-                _LOGGER.info(
+                _LOGGER.debug(
                     "FlexC EVENT diagnostic: MSG_ID=0x%02X EV_ID=%s "
                     "ZONE_ID=%s AREA_ID=%s",
                     message_id,
@@ -1016,7 +1016,7 @@ class FlexCClient:
                     ) from err
                 finally:
                     if waiting_after_event:
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "FlexC command context wait after EVENT: wait_ms=%.1f",
                             (asyncio.get_running_loop().time() - wait_started) * 1000,
                         )
