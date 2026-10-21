@@ -128,7 +128,6 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(add_dynamic_entities))
 
 
-
 class SpcLastEventDiagnosticSensor(
     CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
 ):
