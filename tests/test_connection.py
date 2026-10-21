@@ -743,7 +743,7 @@ async def test_precommand_event_resync_waits_until_fresh_poll() -> None:
 @pytest.mark.asyncio
 async def test_command_wait_after_event_resumes_on_poll(caplog) -> None:
     """A command waiting after an EVENT resumes only after a fresh POLL."""
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.DEBUG)
     client = _client()
     client.async_ensure_connected = AsyncMock()
     client._send_wire = AsyncMock()
@@ -768,7 +768,7 @@ async def test_command_wait_after_event_resumes_on_poll(caplog) -> None:
 @pytest.mark.asyncio
 async def test_command_wait_after_event_timeout(caplog) -> None:
     """A missing POLL fails the command without sending stale-context DATA."""
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.DEBUG)
     client = _client()
     client.async_ensure_connected = AsyncMock()
     client._send_wire = AsyncMock()
