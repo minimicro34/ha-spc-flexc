@@ -575,35 +575,39 @@ class SpcPanelAlarmControlPanel(
         password = self.coordinator.entry.data[CONF_COMMAND_PASSWORD]
 
         sent_area_ids: list[int] = []
-        command_error: FlexCError | HomeAssistantError | None = None
+        command_error: FlexCError | FlexMLError | HomeAssistantError | None = None
 
-        async with self.coordinator._client_operation_lock:
-            await self.coordinator.client.async_ensure_connected()
+        try:
+            async with self.coordinator._client_operation_lock:
+                await self.coordinator.client.async_ensure_connected()
 
-            # Precheck every area before sending the first SET command.
-            for area_id in area_ids:
-                await _async_precheck_area_mode(
-                    self.coordinator,
-                    area_id,
-                    MODE_SET,
-                    username,
-                    password,
-                )
-
-            # All prechecks succeeded. Send each SET exactly once.
-            for area_id in area_ids:
-                try:
-                    await _async_send_area_mode_once(
+                # Precheck every area before sending the first SET command.
+                for area_id in area_ids:
+                    await _async_precheck_area_mode(
                         self.coordinator,
                         area_id,
                         MODE_SET,
                         username,
                         password,
                     )
-                    sent_area_ids.append(area_id)
-                except (FlexCError, HomeAssistantError) as err:
-                    command_error = err
-                    break
+
+                # All prechecks succeeded. Send each SET exactly once.
+                for area_id in area_ids:
+                    try:
+                        await _async_send_area_mode_once(
+                            self.coordinator,
+                            area_id,
+                            MODE_SET,
+                            username,
+                            password,
+                        )
+                        sent_area_ids.append(area_id)
+                    except (FlexCError, FlexMLError, HomeAssistantError) as err:
+                        command_error = err
+                        break
+
+        except (FlexCError, FlexMLError) as err:
+            raise HomeAssistantError("SPC communication failed") from err
 
         # Refresh after releasing the FlexC lock. Never resend a SET because
         # refresh failed.
@@ -640,30 +644,34 @@ class SpcPanelAlarmControlPanel(
 
         failed: list[str] = []
 
-        async with self.coordinator._client_operation_lock:
-            await self.coordinator.client.async_ensure_connected()
+        try:
+            async with self.coordinator._client_operation_lock:
+                await self.coordinator.client.async_ensure_connected()
 
-            # During global UNSET, failure on one area must not prevent an
-            # attempt on the remaining areas. Each state change is still sent
-            # at most once.
-            for area_id in area_ids:
-                try:
-                    await _async_precheck_area_mode(
-                        self.coordinator,
-                        area_id,
-                        MODE_UNSET,
-                        username,
-                        password,
-                    )
-                    await _async_send_area_mode_once(
-                        self.coordinator,
-                        area_id,
-                        MODE_UNSET,
-                        username,
-                        password,
-                    )
-                except (FlexCError, HomeAssistantError) as err:
-                    failed.append(f"{_area_name(self.coordinator, area_id)}: {err}")
+                # During global UNSET, failure on one area must not prevent an
+                # attempt on the remaining areas. Each state change is still sent
+                # at most once.
+                for area_id in area_ids:
+                    try:
+                        await _async_precheck_area_mode(
+                            self.coordinator,
+                            area_id,
+                            MODE_UNSET,
+                            username,
+                            password,
+                        )
+                        await _async_send_area_mode_once(
+                            self.coordinator,
+                            area_id,
+                            MODE_UNSET,
+                            username,
+                            password,
+                        )
+                    except (FlexCError, FlexMLError, HomeAssistantError) as err:
+                        failed.append(f"{_area_name(self.coordinator, area_id)}: {err}")
+
+        except (FlexCError, FlexMLError) as err:
+            raise HomeAssistantError("SPC communication failed") from err
 
         await self.coordinator.async_request_refresh()
 
