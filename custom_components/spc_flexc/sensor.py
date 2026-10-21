@@ -129,7 +129,6 @@ async def async_setup_entry(
 
 
 
-
 class SpcLastEventDiagnosticSensor(
     CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
 ):
@@ -162,6 +161,7 @@ class SpcLastEventDiagnosticSensor(
                 getattr(self.coordinator, "_recent_event_identifiers", [])
             ),
         }
+
 
 class SpcPanelSensor(CoordinatorEntity[SpcFlexCCoordinator], SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
