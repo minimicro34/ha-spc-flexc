@@ -19,6 +19,7 @@ from custom_components.spc_flexc.sensor import (
     SpcDoorModeSensor,
     SpcDoorStatusSensor,
     SpcPanelSensor,
+    SpcLastEventDiagnosticSensor,
     SpcXBusAuxCurrentSensor,
     SpcXBusAuxVoltageSensor,
     SpcXBusDiagnosticSensor,
@@ -199,3 +200,23 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     coordinator.data.xbus_devices[4] = XBusDeviceState(device_id=4, device_type=7)
     listeners[0]()
     assert len(batches[2]) == 4
+
+
+def test_last_event_diagnostic_sensor_identifiers_only() -> None:
+    coordinator = _coordinator()
+    coordinator._last_event_identifiers = None
+    coordinator._recent_event_identifiers = []
+    sensor = SpcLastEventDiagnosticSensor(coordinator)
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes == {"recent_events": []}
+    assert sensor._attr_entity_registry_enabled_default is False
+
+    event = {"event_id": 2100, "zone_id": 3, "area_id": 1}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+    assert sensor.native_value == 2100
+    assert sensor.extra_state_attributes == {
+        "area_id": 1,
+        "zone_id": 3,
+        "recent_events": [event],
+    }
