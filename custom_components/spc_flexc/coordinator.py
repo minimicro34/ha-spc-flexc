@@ -591,7 +591,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     for raw_key, field_name in history_fields.items():
                         if raw_key not in raw_area and raw_key in previous_area.raw:
                             area.raw[raw_key] = previous_area.raw[raw_key]
-                            setattr(area, field_name, getattr(previous_area, field_name))
+                            setattr(
+                                area, field_name, getattr(previous_area, field_name)
+                            )
                 if previous_area is None or previous_area.raw != area.raw:
                     if previous_area is None:
                         _LOGGER.info(
