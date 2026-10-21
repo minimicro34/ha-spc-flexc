@@ -552,10 +552,10 @@ On supported motion zones (SPC zone types `0` and `2`), FlexC event `2100` updat
 
 Zone polling remains enabled to reconcile state. If an EVENT arrives while a zone-status batch is being read, the integration preserves the newer event-driven motion state rather than overwriting it with a potentially stale poll result. This behavior is being validated on physical SPC hardware for the v1.1.4 beta series.
 
-**Temporary beta logging:** The following messages are emitted at `INFO` to aid real-world validation:
+**Diagnostic logging:** Detailed PIR, EVENT and POLL context traces are emitted at `DEBUG` (not `INFO`). Enable `custom_components.spc_flexc` DEBUG logging temporarily when investigating a problem:
 
 - `FlexC EVENT diagnostic`: incoming event ID, zone ID and area ID (not raw credentials).
-- `FlexC PIR EVENT state`: motion state applied from event `2100` or `2101`.
+- `FlexC zone EVENT state`: motion state applied from event `2100` or `2101`.
 - `FlexC PIR diagnostic`: changes detected by polling, including logic input, actuation counters and timing.
 - `FlexC PIR publish diagnostic`: processing and Home Assistant publication timings.
 - `FlexC unsolicited EVENT between commands`: the command context was invalidated while idle.
