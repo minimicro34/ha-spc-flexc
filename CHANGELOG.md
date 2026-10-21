@@ -27,7 +27,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 - SPC4300 live testing: PIR event and restoration updates without duplicate activations.
 - Independent tester: 28/28 PIR detections and restorations, no merged detections, no timeout or reconnect during the test; median detection 0.63 s ahead of Acre/MQTT.
-- Final automated test count and coverage to be recorded after CI completes.
+- 348 automated Python tests passed; **92.00% GitHub CI coverage** and **92.06% local coverage** (Python 3.14). Ruff formatting/lint and mypy checks passed locally.
 
 **Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.3...v1.1.4
 
