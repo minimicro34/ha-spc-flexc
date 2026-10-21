@@ -576,6 +576,22 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
             for raw_area in raw_areas:
                 area = _area_state_from_status(raw_area, timezone)
                 previous_area = self.state.areas.get(area.area_id)
+                if previous_area is not None:
+                    # Some reconnect responses omit history attributes. Absence
+                    # does not mean the panel cleared its previous history.
+                    history_fields = {
+                        "LAST_SET_TIME": "last_set_time",
+                        "LAST_SET_USER_ID": "last_set_user_id",
+                        "LAST_SET_USER_NAME": "last_set_user_name",
+                        "LAST_UNSET_TIME": "last_unset_time",
+                        "LAST_UNSET_USER_ID": "last_unset_user_id",
+                        "LAST_UNSET_USER_NAME": "last_unset_user_name",
+                        "LAST_ALARM": "last_alarm",
+                    }
+                    for raw_key, field_name in history_fields.items():
+                        if raw_key not in raw_area and raw_key in previous_area.raw:
+                            area.raw[raw_key] = previous_area.raw[raw_key]
+                            setattr(area, field_name, getattr(previous_area, field_name))
                 if previous_area is None or previous_area.raw != area.raw:
                     if previous_area is None:
                         _LOGGER.info(
