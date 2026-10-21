@@ -291,7 +291,7 @@ def test_pir_event_does_not_change_other_zone_types() -> None:
 
     assert coordinator.state.zones[3].logic_input == 0
     assert coordinator._pir_event_generation == {}
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 def test_pir_event_rejects_wrong_area() -> None:
@@ -307,7 +307,7 @@ def test_pir_event_rejects_wrong_area() -> None:
 
     assert coordinator.state.zones[3].logic_input == 0
     assert coordinator._pir_event_generation == {}
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 def test_handle_flexc_event() -> None:
@@ -340,7 +340,7 @@ def test_engineer_mode_event_updates_panel_immediately(
 
     coordinator.async_set_updated_data.reset_mock()
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 def test_handle_flexc_restore_event() -> None:
@@ -384,7 +384,7 @@ def test_alarm_diagnostics_capture_unknown_restore_event_without_personal_data(
     assert "before=(3, True, (), (1,))" in caplog.text
     assert "after=(3, True, (), (1,))" in caplog.text
     assert "private-user" not in caplog.text
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 def test_unknown_flexc_event_does_not_notify() -> None:
@@ -394,7 +394,7 @@ def test_unknown_flexc_event_does_not_notify() -> None:
 
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": "9999"})
 
-    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_set_updated_data.assert_called_once_with(coordinator.state)
 
 
 @pytest.mark.asyncio
