@@ -430,3 +430,47 @@ def test_bell_flags_do_not_trigger_without_intrusion_event() -> None:
     area.alarm_event_active = True
     assert area_entity.alarm_state == AlarmControlPanelState.TRIGGERED
     assert panel_entity.alarm_state == AlarmControlPanelState.TRIGGERED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["async_alarm_arm_away", "async_alarm_disarm"])
+@pytest.mark.parametrize("error_type", ["flexc", "flexml"])
+async def test_panel_connection_failure_is_homeassistant_error(
+    action: str, error_type: str
+) -> None:
+    """Global card actions report reconnect failures as HA errors."""
+    from custom_components.spc_flexc.flexc.connection import FlexCConnectionError
+    from custom_components.spc_flexc.flexc.flexml import FlexMLError
+
+    coordinator = _coordinator(AreaState(area_id=1, name="Logis"))
+    error = (
+        FlexCConnectionError("Not connected")
+        if error_type == "flexc"
+        else FlexMLError("Protocol unavailable")
+    )
+    coordinator.client.async_ensure_connected.side_effect = error
+    entity = SpcPanelAlarmControlPanel(coordinator)
+
+    with pytest.raises(HomeAssistantError, match="SPC communication failed"):
+        await getattr(entity, action)()
+
+    coordinator.client.async_send_flexml.assert_not_awaited()
+    coordinator.async_request_refresh.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["async_alarm_arm_away", "async_alarm_disarm"])
+async def test_panel_precheck_protocol_failure_is_homeassistant_error(
+    action: str,
+) -> None:
+    """Precheck protocol failures must not leak raw exceptions to the UI."""
+    from custom_components.spc_flexc.flexc.flexml import FlexMLError
+
+    coordinator = _coordinator(AreaState(area_id=1, name="Logis"))
+    coordinator.client.async_send_flexml.side_effect = FlexMLError("Bad response")
+    entity = SpcPanelAlarmControlPanel(coordinator)
+
+    with pytest.raises(HomeAssistantError, match="SPC communication failed"):
+        await getattr(entity, action)()
+
+    coordinator.async_request_refresh.assert_not_awaited()
