@@ -61,6 +61,7 @@ async def async_setup_entry(
     coordinator: SpcFlexCCoordinator = entry.runtime_data
     async_add_entities(
         [SpcPanelSensor(coordinator, description) for description in DESCRIPTIONS]
+        + [SpcLastEventDiagnosticSensor(coordinator)]
     )
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
@@ -126,6 +127,41 @@ async def async_setup_entry(
     add_dynamic_entities()
     entry.async_on_unload(coordinator.async_add_listener(add_dynamic_entities))
 
+
+
+
+class SpcLastEventDiagnosticSensor(
+    CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
+):
+    """Expose bounded FlexC event identifiers without verbose INFO logging."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Last FlexC event ID"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: SpcFlexCCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id(coordinator)}_last_flexc_event_id"
+        self._attr_device_info = build_device_info(coordinator)
+
+    @property
+    def native_value(self) -> int | None:
+        last = getattr(self.coordinator, "_last_event_identifiers", None)
+        return last["event_id"] if last is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        last = getattr(self.coordinator, "_last_event_identifiers", None)
+        if last is None:
+            return {"recent_events": []}
+        return {
+            "area_id": last["area_id"],
+            "zone_id": last["zone_id"],
+            "recent_events": list(
+                getattr(self.coordinator, "_recent_event_identifiers", [])
+            ),
+        }
 
 class SpcPanelSensor(CoordinatorEntity[SpcFlexCCoordinator], SensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
