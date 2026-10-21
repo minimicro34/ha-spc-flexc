@@ -4,7 +4,7 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.1.4] - Unreleased
+## [1.1.4] - 2026-10-21
 
 ### Fixed
 
