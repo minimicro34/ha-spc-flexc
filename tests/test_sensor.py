@@ -192,7 +192,7 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     await async_setup_entry(
         MagicMock(), entry, lambda entities: batches.append(list(entities))
     )
-    assert len(batches[0]) == 4
+    assert len(batches[0]) == 5
     assert len(batches[1]) == 10
     assert len(listeners) == 1
     listeners[0]()
