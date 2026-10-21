@@ -438,6 +438,54 @@ async def test_reconnect_reconciliation_refreshes_known_base_state() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reconnect_preserves_missing_area_history_and_respects_explicit_values() -> None:
+    """A partial reconnect response must not erase known area history."""
+    coordinator = _coordinator_stub()
+    coordinator._area_discovery_complete = True
+    coordinator._detected_area_ids = {1}
+    coordinator._area_history = {}
+    previous = _area_state_from_status(
+        {
+            "AREA_ID": "1",
+            "MODE": "0",
+            "LAST_SET_TIME": "12345617092026",
+            "LAST_SET_USER_ID": "7",
+            "LAST_SET_USER_NAME": "Private Operator",
+            "LAST_UNSET_USER_NAME": "Former Operator",
+        },
+        ZoneInfo("Europe/Paris"),
+    )
+    coordinator.state.areas[1] = previous
+    coordinator.client.async_get_area_status = AsyncMock(
+        return_value=[{"AREA_ID": "1", "MODE": "1", "LAST_UNSET_USER_NAME": "New Operator"}]
+    )
+
+    changed = await SpcFlexCCoordinator._async_reconcile_known_state_locked(coordinator)
+
+    assert changed is True
+    area = coordinator.state.areas[1]
+    assert area.mode == 1
+    assert area.last_set_time == previous.last_set_time
+    assert area.last_set_user_id == 7
+    assert area.last_set_user_name == "Private Operator"
+    assert area.raw["LAST_SET_TIME"] == "12345617092026"
+    assert area.last_unset_user_name == "New Operator"
+
+
+def test_reconciliation_diagnostics_never_log_personal_values() -> None:
+    """Reconciliation diagnostics expose changed keys, never their values."""
+    from custom_components.spc_flexc.coordinator import _area_reconciliation_changes
+
+    changes = _area_reconciliation_changes(
+        {"LAST_SET_USER_NAME": "Private Operator", "MODE": "0"},
+        {"LAST_SET_USER_NAME": "New Operator", "MODE": "1"},
+    )
+    assert changes == ["LAST_SET_USER_NAME", "MODE"]
+    assert "Private Operator" not in repr(changes)
+    assert "New Operator" not in repr(changes)
+
+
+@pytest.mark.asyncio
 async def test_reconnect_reconciliation_publishes_new_generation() -> None:
     """A ready replacement session reconciles state and publishes changes."""
     coordinator = _coordinator_stub()
