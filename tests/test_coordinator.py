@@ -476,6 +476,46 @@ async def test_reconnect_preserves_missing_area_history_and_respects_explicit_va
     assert area.last_unset_user_name == "New Operator"
 
 
+@pytest.mark.asyncio
+async def test_reconnect_preserves_history_across_successive_partial_responses() -> None:
+    """Missing history survives multiple reconnects; explicit values win."""
+    coordinator = _coordinator_stub()
+    coordinator._area_discovery_complete = True
+    coordinator._detected_area_ids = {1}
+    coordinator._area_history = {}
+    coordinator.state.areas[1] = _area_state_from_status(
+        {
+            "AREA_ID": "1",
+            "MODE": "0",
+            "LAST_SET_USER_ID": "7",
+            "LAST_SET_USER_NAME": "Original Operator",
+            "LAST_UNSET_USER_NAME": "Previous Operator",
+        },
+        ZoneInfo("Europe/Paris"),
+    )
+    responses = [
+        [{"AREA_ID": "1", "MODE": "1"}],
+        [{"AREA_ID": "1", "MODE": "2", "LAST_SET_USER_NAME": "Updated Operator"}],
+        [{"AREA_ID": "1", "MODE": "3", "LAST_UNSET_USER_NAME": ""}],
+        [{"AREA_ID": "1", "MODE": "0"}],
+    ]
+    coordinator.client.async_get_area_status = AsyncMock(side_effect=responses)
+
+    for expected_mode in (1, 2, 3, 0):
+        changed = await SpcFlexCCoordinator._async_reconcile_known_state_locked(
+            coordinator
+        )
+        assert changed is True
+        assert coordinator.state.areas[1].mode == expected_mode
+
+    area = coordinator.state.areas[1]
+    assert area.last_set_user_id == 7
+    assert area.last_set_user_name == "Updated Operator"
+    assert area.raw["LAST_SET_USER_NAME"] == "Updated Operator"
+    assert area.raw["LAST_UNSET_USER_NAME"] == ""
+    assert area.last_unset_user_name == ""
+
+
 def test_reconciliation_diagnostics_never_log_personal_values() -> None:
     """Reconciliation diagnostics expose changed keys, never their values."""
     from custom_components.spc_flexc.coordinator import _area_reconciliation_changes
