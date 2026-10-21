@@ -470,7 +470,14 @@ async def test_panel_precheck_protocol_failure_is_homeassistant_error(
     coordinator.client.async_send_flexml.side_effect = FlexMLError("Bad response")
     entity = SpcPanelAlarmControlPanel(coordinator)
 
-    with pytest.raises(HomeAssistantError, match="SPC communication failed"):
-        await getattr(entity, action)()
-
-    coordinator.async_request_refresh.assert_not_awaited()
+    if action == "async_alarm_disarm":
+        # A failed area is reported as a partial global disarm, and the
+        # coordinator is refreshed to reconcile any other areas.
+        with pytest.raises(ServiceValidationError) as exc:
+            await getattr(entity, action)()
+        assert exc.value.translation_key == "global_disarm_incomplete"
+        coordinator.async_request_refresh.assert_awaited_once()
+    else:
+        with pytest.raises(HomeAssistantError, match="SPC communication failed"):
+            await getattr(entity, action)()
+        coordinator.async_request_refresh.assert_not_awaited()
