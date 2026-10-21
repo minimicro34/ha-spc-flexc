@@ -989,7 +989,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 != zone.actuations_since_last_read
                             )
                             if input_changed or actuations_changed:
-                                _LOGGER.info(
+                                _LOGGER.debug(
                                     "FlexC PIR diagnostic: ZONE_ID=%s "
                                     "LOGIC_INPUT=%s->%s ACTUATIONS=%s->%s "
                                     "interval_ms=%s lock_wait_ms=%.1f read_ms=%.1f "
@@ -1115,7 +1115,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     if changed:
                         publish_started = clock.time()
                         self.async_set_updated_data(self.state)
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "FlexC PIR publish diagnostic: processing_ms=%.1f "
                             "publish_call_ms=%.1f total_ms=%.1f",
                             (publish_started - read_finished) * 1000,
@@ -1415,7 +1415,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 zone_changed = zone.logic_input != new_logic_input or zone_changed
                 zone.logic_input = new_logic_input
                 zone.updated_at = datetime.now(UTC)
-                _LOGGER.info(
+                _LOGGER.debug(
                     "FlexC zone EVENT state: EV_ID=%s ZONE_ID=%s active=%s",
                     event_id,
                     zone_id,
