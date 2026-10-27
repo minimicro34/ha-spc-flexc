@@ -622,6 +622,8 @@ Check Home Assistant diagnostics and the raw SPC/FLEXML data first. Hardware-dep
 
 ## Development
 
+For the ongoing **v1.1.5 development branch**, including the protocol review from issue #11, planned beta changes and validation status, see [v1.1.5 development notes](docs/v1.1.5-development.md). The stable release remains v1.1.4 until these changes are validated.
+
 Development instructions are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The main validation commands are:
