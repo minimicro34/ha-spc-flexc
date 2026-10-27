@@ -953,3 +953,42 @@ async def test_key_management_messages_are_observed_without_ack(
     assert f"MSG_ID=0x{message_id:02X}" in caplog.text
     assert "session #3" in caplog.text
     assert "no key change or ACK sent" in caplog.text
+
+def test_identity_samples_once_per_message_type(caplog: pytest.LogCaptureFixture) -> None:
+    """Sample CONNECT, EVENT and POLL identities without flooding logs."""
+    client = _client()
+    client._session_generation = 2
+    base = _message()
+    with caplog.at_level(logging.INFO):
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_CONNECTION_REQUEST_LEGACY}
+        )
+        client._diagnose_session_identity({**base, "message_id": MSG_EVENT})
+        client._diagnose_session_identity({**base, "message_id": MSG_EVENT})
+        client._diagnose_session_identity({**base, "message_id": MSG_POLL})
+    assert caplog.text.count("identity sample:") == 3
+    assert "message=0x60" in caplog.text
+    assert "message=0x20" in caplog.text
+
+
+def test_known_receiver_connection_id_is_not_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """An observed receiver-side connection ID remains diagnostic-only."""
+    client = _client()
+    client._diagnose_session_identity(
+        {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY}
+    )
+    with caplog.at_level(logging.INFO):
+        client._diagnose_session_identity(
+            {
+                **_message(),
+                "message_id": MSG_EVENT,
+                "connection_id": RCT_CONNECTION_ID,
+            }
+        )
+    assert "field=connection_id" in caplog.text
+    assert not any(
+        record.levelno >= logging.WARNING and "field=connection_id" in record.message
+        for record in caplog.records
+    )
