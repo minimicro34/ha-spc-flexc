@@ -24,6 +24,8 @@ from custom_components.spc_flexc.flexc.connection import (
     MSG_DATA_ACK,
     MSG_ERROR,
     MSG_EVENT,
+    MSG_KEY_ACK,
+    MSG_KEY_UPDATE,
     MSG_POLL,
     PROTOCOL_ID,
     PROTOCOL_VERSION,
@@ -933,3 +935,21 @@ async def test_idle_tcp_connection_is_closed() -> None:
     writer.close.assert_called_once_with()
     assert client._writer is None
     assert not client.connected
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("message_id", [MSG_KEY_UPDATE, MSG_KEY_ACK])
+async def test_key_management_messages_are_observed_without_ack(
+    message_id: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Unknown key management must not falsely acknowledge a key rotation."""
+    client = _client()
+    client._session_generation = 3
+    client._send_wire = AsyncMock()
+
+    with caplog.at_level(logging.WARNING):
+        await client._handle_message({**_message(), "message_id": message_id})
+
+    client._send_wire.assert_not_awaited()
+    assert f"MSG_ID=0x{message_id:02X}" in caplog.text
+    assert "session #3" in caplog.text
+    assert "no key change or ACK sent" in caplog.text
