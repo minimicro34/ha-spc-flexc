@@ -47,7 +47,6 @@ PROTOCOL_VERSION = 0x01
 
 RCT_CONNECTION_ID = 0x77359401
 INITIAL_RCT_SEQUENCE = 0x12345678
-SPT_ACCOUNT = 0x00BC614E
 
 MSG_CONNECTION_REQUEST_LEGACY = 0x00
 MSG_CONNECTION_ACK_LEGACY = 0x01
@@ -266,6 +265,12 @@ class FlexCClient:
             return
 
         if self._writer is not None and self._writer is not writer:
+            # A new TCP session invalidates the command issued on the old one.
+            # Fail it immediately, before processing a new POLL or DATA frame.
+            if self._pending_reply is not None and not self._pending_reply.done():
+                self._pending_reply.set_exception(
+                    FlexCConnectionError("FlexC session replaced during command")
+                )
             _LOGGER.info(
                 "Replacing existing FlexC connection with new connection from %s",
                 peer_host,
@@ -298,6 +303,11 @@ class FlexCClient:
                         message["message_id"],
                     )
                     continue
+
+                # The old reader can still return a complete buffered frame
+                # after the SPC has already opened a replacement connection.
+                if self._writer is not writer:
+                    break
 
                 self._last_message = message
                 self._rct_sequence = message["rct_sequence"]
@@ -504,7 +514,8 @@ class FlexCClient:
 
         plain[0:4] = _put32(request["spt_sequence"])
         plain[4:8] = _put32(INITIAL_RCT_SEQUENCE)
-        plain[8:12] = _put32(SPT_ACCOUNT)
+        # Use the account advertised by this panel, not a captured constant.
+        plain[8:12] = _put32(request["spt_account"])
         plain[12:16] = _put32(request["rct_identifier"])
 
         plain[18] = MSG_CONNECTION_ACK_LEGACY
@@ -1040,6 +1051,7 @@ class FlexCClient:
             )
             self._active_trace = trace
             self._pending_reply = pending
+            command_generation = self._session_generation
             self._response_buffer = bytearray()
             self._response_length = None
 
@@ -1063,6 +1075,12 @@ class FlexCClient:
 
             except TimeoutError as err:
                 self._log_command_timeout(trace)
+                if command_generation != self._session_generation:
+                    # The panel already reconnected: never tear down its new
+                    # socket because an earlier session timed out.
+                    raise FlexCConnectionError(
+                        "FlexC session changed while waiting for command reply"
+                    ) from err
                 # Never reuse a context after a command timeout. Tear down the
                 # current socket so the next connection starts from a clean
                 # handshake/POLL synchronization point.
@@ -1096,8 +1114,9 @@ class FlexCClient:
                 ) from err
 
             except FlexCError:
-                self._command_context = None
-                self._context_event.clear()
+                if command_generation == self._session_generation:
+                    self._command_context = None
+                    self._context_event.clear()
                 raise
 
             finally:
