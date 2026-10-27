@@ -443,8 +443,7 @@ class FlexCClient:
                 # The receiver connection ID may legitimately appear in
                 # EVENT frames; observe it without a misleading warning.
                 known_receiver_id = (
-                    name == "connection_id"
-                    and received == RCT_CONNECTION_ID
+                    name == "connection_id" and received == RCT_CONNECTION_ID
                 )
                 log = _LOGGER.info if known_receiver_id else _LOGGER.warning
                 log(
