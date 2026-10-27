@@ -189,6 +189,8 @@ class FlexCClient:
         self._event_callback: Callable[[dict[str, str]], None] | None = None
         self._session_ready_callback: Callable[[int], None] | None = None
         self._session_generation = 0
+        self._session_identity: tuple[int, int, int] | None = None
+        self._reported_identity_changes: set[str] = set()
         self._notified_session_generation = 0
         self._local_close_reasons: dict[asyncio.StreamWriter, str] = {}
 
@@ -288,6 +290,8 @@ class FlexCClient:
         connection_started_at = asyncio.get_running_loop().time()
         self._reader = reader
         self._writer = writer
+        self._session_identity = None
+        self._reported_identity_changes.clear()
         self._command_context = None
         self._context_event.clear()
         self._awaiting_poll_after_event = False
@@ -317,6 +321,7 @@ class FlexCClient:
                 if self._writer is not writer:
                     break
 
+                self._diagnose_session_identity(message)
                 self._last_message = message
                 self._rct_sequence = message["rct_sequence"]
 
@@ -391,6 +396,44 @@ class FlexCClient:
                 await writer.wait_closed()
             except OSError:
                 pass
+
+    def _diagnose_session_identity(self, message: Mapping[str, Any]) -> None:
+        """Observe session identifiers without rejecting valid FlexC frames.
+
+        Protocol identity semantics vary across message types and firmware;
+        record changes once per field and TCP session until field-tested.
+        """
+        identity = (
+            int(message["spt_account"]),
+            int(message["connection_id"]),
+            int(message["rct_identifier"]),
+        )
+        if self._session_identity is None:
+            if int(message["message_id"]) in {
+                MSG_CONNECTION_REQUEST_LEGACY,
+                MSG_CONNECTION_REQUEST,
+            }:
+                self._session_identity = identity
+            return
+
+        for name, expected, received in zip(
+            ("spt_account", "connection_id", "rct_identifier"),
+            self._session_identity,
+            identity,
+            strict=True,
+        ):
+            if expected != received and name not in self._reported_identity_changes:
+                self._reported_identity_changes.add(name)
+                _LOGGER.warning(
+                    "FlexC session #%d identity changed: field=%s "
+                    "expected=0x%08X received=0x%08X message=0x%02X "
+                    "(diagnostic only; frame accepted)",
+                    self._session_generation,
+                    name,
+                    expected,
+                    received,
+                    int(message["message_id"]),
+                )
 
     async def _read_frame(
         self,
