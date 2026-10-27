@@ -820,6 +820,44 @@ async def test_command_wait_after_event_timeout(caplog) -> None:
     assert "FlexC command context wait after EVENT" in caplog.text
 
 
+def test_session_identity_diagnostic_is_nonblocking_and_deduplicated(caplog) -> None:
+    """Identity changes are observed once per field without rejecting frames."""
+    client = _client()
+    client._session_generation = 3
+    connect = {**_message(), "message_id": MSG_CONNECTION_REQUEST}
+    client._diagnose_session_identity(connect)
+    assert client._session_identity == (
+        connect["spt_account"],
+        connect["connection_id"],
+        connect["rct_identifier"],
+    )
+
+    changed = {
+        **connect,
+        "message_id": MSG_POLL,
+        "spt_account": 999,
+        "connection_id": 123,
+        "rct_identifier": 456,
+    }
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(changed)
+        client._diagnose_session_identity(changed)
+    assert caplog.text.count("identity changed") == 3
+    assert "diagnostic only; frame accepted" in caplog.text
+    assert client._session_identity[0] == connect["spt_account"]
+
+
+def test_session_identity_diagnostic_waits_for_handshake() -> None:
+    """An unsolicited pre-handshake frame cannot establish identity."""
+    client = _client()
+    client._diagnose_session_identity({**_message(), "message_id": MSG_POLL})
+    assert client._session_identity is None
+    client._diagnose_session_identity(
+        {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY}
+    )
+    assert client._session_identity is not None
+
+
 @pytest.mark.asyncio
 async def test_new_session_fails_previous_pending_command() -> None:
     """Replacing the TCP socket immediately fails an in-flight command."""
