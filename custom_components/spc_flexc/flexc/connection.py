@@ -452,7 +452,11 @@ class FlexCClient:
             identity,
             strict=True,
         ):
-            if expected != received and name not in self._reported_identity_changes:
+            if (
+                expected != received
+                and name not in self._reported_identity_changes
+                and (name != "connection_id" or self._session_poll_identity_seen)
+            ):
                 self._reported_identity_changes.add(name)
                 # Identity changes are diagnostic only; do not assume
                 # a particular receiver ID is universal across panels.
