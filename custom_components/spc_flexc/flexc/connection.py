@@ -66,6 +66,7 @@ MSG_ERROR = 0xFF
 
 CONNECT_TIMEOUT = 30.0
 COMMAND_TIMEOUT = 15.0
+FRAME_IDLE_TIMEOUT = 60.0
 MAX_FRAME_LENGTH = 65536
 COMMAND_NAME_PATTERN = re.compile(r"<(CMD_[A-Z0-9_]+)\b")
 
@@ -294,7 +295,10 @@ class FlexCClient:
 
         try:
             while not self._closed:
-                frame = await self._read_frame(reader)
+                # A silent half-open TCP socket must not hold the listener
+                # indefinitely: SPC normally sends periodic POLL frames.
+                async with asyncio.timeout(FRAME_IDLE_TIMEOUT):
+                    frame = await self._read_frame(reader)
                 message = self._parse_frame(frame)
 
                 if not message["sha1_ok"]:
@@ -313,6 +317,13 @@ class FlexCClient:
                 self._rct_sequence = message["rct_sequence"]
 
                 await self._handle_message(message)
+
+        except TimeoutError:
+            _LOGGER.warning(
+                "FlexC connection #%d idle for %.0fs; closing stale session",
+                generation,
+                FRAME_IDLE_TIMEOUT,
+            )
 
         except asyncio.IncompleteReadError as err:
             if err.partial:
