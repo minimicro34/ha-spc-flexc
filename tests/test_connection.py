@@ -844,7 +844,8 @@ def test_session_identity_diagnostic_is_nonblocking_and_deduplicated(caplog) -> 
     with caplog.at_level(logging.WARNING):
         client._diagnose_session_identity(changed)
         client._diagnose_session_identity(changed)
-    assert caplog.text.count("identity changed") == 3
+    assert caplog.text.count("identity changed") == 2
+    assert "field=connection_id" not in caplog.text
     assert "diagnostic only; frame accepted" in caplog.text
     assert client._session_identity[0] == connect["spt_account"]
 
@@ -980,24 +981,57 @@ def test_identity_samples_once_per_message_type(
     assert "message=0x20" in caplog.text
 
 
-def test_known_receiver_connection_id_is_not_warning(
-    caplog: pytest.LogCaptureFixture,
+@pytest.mark.parametrize(
+    ("connect_id", "poll_id"),
+    [(0x3B9ACA00, 0x77359401), (0x11111111, 0x22222222)],
+)
+def test_session_identity_learns_first_poll_connection_id(
+    caplog: pytest.LogCaptureFixture, connect_id: int, poll_id: int
 ) -> None:
-    """An observed receiver-side connection ID remains diagnostic-only."""
+    """Learn a panel-independent active ID without flagging CONNECT transitions."""
     client = _client()
-    client._diagnose_session_identity(
-        {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY}
-    )
+    base = _message()
     with caplog.at_level(logging.INFO):
         client._diagnose_session_identity(
-            {
-                **_message(),
-                "message_id": MSG_EVENT,
-                "connection_id": RCT_CONNECTION_ID,
-            }
+            {**base, "message_id": MSG_CONNECTION_REQUEST_LEGACY, "connection_id": connect_id}
         )
-    assert "field=connection_id" in caplog.text
-    assert not any(
-        record.levelno >= logging.WARNING and "field=connection_id" in record.message
-        for record in caplog.records
-    )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_EVENT, "connection_id": poll_id}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_POLL, "connection_id": poll_id}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_DATA, "connection_id": poll_id}
+        )
+    assert client._session_identity[1] == poll_id
+    assert "identity changed: field=connection_id" not in caplog.text
+
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_EVENT, "connection_id": poll_id + 1}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_EVENT, "connection_id": poll_id + 1}
+        )
+    assert caplog.text.count("identity changed: field=connection_id") == 1
+
+
+def test_connection_request_02_uses_first_poll_baseline(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A modern CONNECT also learns the active ID without hardcoded assumptions."""
+    client = _client()
+    base = _message()
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_CONNECTION_REQUEST, "connection_id": 11}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_POLL, "connection_id": 12}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_DATA, "connection_id": 12}
+        )
+    assert client._session_identity[1] == 12
+    assert "identity changed: field=connection_id" not in caplog.text
