@@ -54,6 +54,8 @@ MSG_CONNECTION_REQUEST = 0x02
 MSG_CONNECTION_ACK = 0x03
 
 MSG_POLL = 0x20
+MSG_KEY_UPDATE = 0x40
+MSG_KEY_ACK = 0x41
 MSG_POLL_ACK = 0x21
 
 MSG_EVENT = 0x60
@@ -684,6 +686,17 @@ class FlexCClient:
     ) -> None:
         """Process one validated incoming FlexC message."""
         message_id = int(message["message_id"])
+        # Observe key management without acknowledging an unsupported rotation.
+        # Never log key material or raw frame contents.
+        if message_id in {MSG_KEY_UPDATE, MSG_KEY_ACK}:
+            _LOGGER.warning(
+                "FlexC key-management message observed: session #%d "
+                "MSG_ID=0x%02X (unsupported; no key change or ACK sent)",
+                self._session_generation,
+                message_id,
+            )
+            return
+
         # Temporary beta diagnostic: only unusual message types are logged.
         # Do not log raw application data or credentials.
         if message_id not in {
