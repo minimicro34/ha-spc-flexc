@@ -294,6 +294,7 @@ def test_build_connection_ack_preserves_validated_fields() -> None:
     assert parsed["message_id"] == MSG_CONNECTION_ACK_LEGACY
     assert parsed["connection_id"] == RCT_CONNECTION_ID
     assert parsed["spt_sequence"] == request["spt_sequence"]
+    assert parsed["spt_account"] == request["spt_account"]
     assert parsed["rct_identifier"] == request["rct_identifier"]
     assert parsed["sha1_ok"] is True
 
@@ -784,3 +785,80 @@ async def test_command_wait_after_event_timeout(caplog) -> None:
 
     client._send_wire.assert_not_awaited()
     assert "FlexC command context wait after EVENT" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_new_session_fails_previous_pending_command() -> None:
+    """Replacing the TCP socket immediately fails an in-flight command."""
+    client = _client()
+    old_writer = MagicMock()
+    old_writer.wait_closed = AsyncMock()
+    client._writer = old_writer
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+
+    reader = MagicMock()
+    reader.readexactly = AsyncMock(side_effect=asyncio.IncompleteReadError(b"", 16))
+    writer = MagicMock()
+    writer.get_extra_info.return_value = ("192.0.2.10", 12345)
+    writer.wait_closed = AsyncMock()
+
+    await client._handle_client(reader, writer)
+
+    assert isinstance(pending.exception(), FlexCConnectionError)
+    assert "replaced" in str(pending.exception())
+    old_writer.close.assert_called_once_with()
+    assert client._session_generation == 1
+
+
+@pytest.mark.asyncio
+async def test_stale_command_timeout_does_not_close_new_connection() -> None:
+    """An old command timeout cannot disconnect a replacement TCP session."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._send_wire = AsyncMock()
+    client._command_context = _message()
+    client._context_event.set()
+    client._session_generation = 1
+    old_writer = MagicMock()
+    client._writer = old_writer
+
+    async def send_and_replace(_wire: bytes) -> None:
+        client._session_generation = 2
+        client._writer = MagicMock()
+        client._command_context = _message()
+        client._context_event.set()
+
+    client._send_wire.side_effect = send_and_replace
+
+    with (
+        patch("custom_components.spc_flexc.flexc.connection.COMMAND_TIMEOUT", 0.001),
+        pytest.raises(FlexCConnectionError, match="session changed"),
+    ):
+        await client.async_send_flexml("<FLEXML/>")
+
+    assert client._session_generation == 2
+    assert client._writer is not old_writer
+    assert client._command_context is not None
+    client._writer.close.assert_not_called()
+    old_writer.close.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_idle_tcp_connection_is_closed() -> None:
+    """A half-open socket must not remain connected indefinitely."""
+    client = _client()
+    reader = MagicMock()
+    reader.readexactly = AsyncMock(side_effect=lambda size: asyncio.sleep(1))
+    writer = MagicMock()
+    writer.get_extra_info.return_value = ("192.0.2.10", 12345)
+    writer.wait_closed = AsyncMock()
+
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.FRAME_IDLE_TIMEOUT", 0.001
+    ):
+        await client._handle_client(reader, writer)
+
+    writer.close.assert_called_once_with()
+    assert client._writer is None
+    assert not client.connected
