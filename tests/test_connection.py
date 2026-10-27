@@ -28,6 +28,7 @@ from custom_components.spc_flexc.flexc.connection import (
     PROTOCOL_ID,
     PROTOCOL_VERSION,
     RCT_CONNECTION_ID,
+    FlexCAuthenticationError,
     FlexCClient,
     FlexCCommandError,
     FlexCConnectionError,
@@ -595,6 +596,38 @@ async def test_handle_message_error_clears_context_and_fails_pending_reply() -> 
     assert client._command_context is None
     assert not client._context_event.is_set()
     assert isinstance(pending.exception(), FlexCCommandError)
+
+
+@pytest.mark.asyncio
+async def test_error_54_is_distinct_authentication_failure() -> None:
+    """Error 54 is classified without logging or returning credentials."""
+    client = _client()
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+    await client._handle_message(
+        {
+            **_message(),
+            "message_id": MSG_ERROR,
+            "data_header": b"\x00\x00\x00\x00\x00\x00\x00\x36",
+        }
+    )
+    error = pending.exception()
+    assert isinstance(error, FlexCAuthenticationError)
+    assert "Authentication failed" in str(error)
+    assert "54" in str(error)
+    assert client.command_password not in str(error)
+
+
+@pytest.mark.parametrize("code", [24, 25, 52])
+def test_other_panel_error_codes_remain_command_errors(code: int) -> None:
+    """Other SPC error codes remain distinguishable in the message."""
+    client = _client()
+    pending = asyncio.get_event_loop().create_future()
+    client._pending_reply = pending
+    client._handle_error({"data_header": b"\x00" * 4 + _put32(code)})
+    error = pending.exception()
+    assert type(error) is FlexCCommandError
+    assert f"code={code}" in str(error)
 
 
 def test_decode_application_extracts_reply_and_rejects_missing_reply() -> None:
