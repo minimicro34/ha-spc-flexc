@@ -936,6 +936,7 @@ async def test_idle_tcp_connection_is_closed() -> None:
     assert client._writer is None
     assert not client.connected
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("message_id", [MSG_KEY_UPDATE, MSG_KEY_ACK])
 async def test_key_management_messages_are_observed_without_ack(
