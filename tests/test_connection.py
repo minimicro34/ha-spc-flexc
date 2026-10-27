@@ -922,6 +922,7 @@ async def test_idle_tcp_connection_is_closed() -> None:
     """A half-open socket must not remain connected indefinitely."""
     client = _client()
     reader = MagicMock()
+
     async def blocked_read(_size: int) -> bytes:
         await asyncio.sleep(1)
         return b""
