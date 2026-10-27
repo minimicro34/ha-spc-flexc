@@ -193,6 +193,7 @@ class FlexCClient:
         self._session_generation = 0
         self._session_identity: tuple[int, int, int] | None = None
         self._reported_identity_changes: set[str] = set()
+        self._observed_identity_message_types: set[int] = set()
         self._notified_session_generation = 0
         self._local_close_reasons: dict[asyncio.StreamWriter, str] = {}
 
@@ -294,6 +295,7 @@ class FlexCClient:
         self._writer = writer
         self._session_identity = None
         self._reported_identity_changes.clear()
+        self._observed_identity_message_types.clear()
         self._command_context = None
         self._context_event.clear()
         self._awaiting_poll_after_event = False
@@ -410,8 +412,20 @@ class FlexCClient:
             int(message["connection_id"]),
             int(message["rct_identifier"]),
         )
+        message_id = int(message["message_id"])
+        if message_id not in self._observed_identity_message_types:
+            self._observed_identity_message_types.add(message_id)
+            _LOGGER.info(
+                "FlexC session #%d identity sample: message=0x%02X "
+                "spt_account=0x%08X connection_id=0x%08X "
+                "rct_identifier=0x%08X",
+                self._session_generation,
+                message_id,
+                *identity,
+            )
+
         if self._session_identity is None:
-            if int(message["message_id"]) in {
+            if message_id in {
                 MSG_CONNECTION_REQUEST_LEGACY,
                 MSG_CONNECTION_REQUEST,
             }:
@@ -426,7 +440,14 @@ class FlexCClient:
         ):
             if expected != received and name not in self._reported_identity_changes:
                 self._reported_identity_changes.add(name)
-                _LOGGER.warning(
+                # The receiver connection ID may legitimately appear in
+                # EVENT frames; observe it without a misleading warning.
+                known_receiver_id = (
+                    name == "connection_id"
+                    and received == RCT_CONNECTION_ID
+                )
+                log = _LOGGER.info if known_receiver_id else _LOGGER.warning
+                log(
                     "FlexC session #%d identity changed: field=%s "
                     "expected=0x%08X received=0x%08X message=0x%02X "
                     "(diagnostic only; frame accepted)",
