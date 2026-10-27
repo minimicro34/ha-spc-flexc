@@ -947,7 +947,9 @@ class FlexCClient:
         # SPC error 54 is an authentication failure. Preserve its distinct
         # type for callers without exposing credentials or assuming that a
         # Home Assistant config-entry reauthentication flow is appropriate.
-        error_type = FlexCAuthenticationError if error_code == 54 else FlexCCommandError
+        error_type = (
+            FlexCAuthenticationError if error_code == 54 else FlexCCommandError
+        )
         description = "Authentication failed" if error_code == 54 else "SPC error"
         error = error_type(
             f"SPC FlexC {description} (code={error_code}, "
