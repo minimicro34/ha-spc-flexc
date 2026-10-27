@@ -87,6 +87,10 @@ class FlexCCommandError(FlexCError):
     """SPC rejected a FlexC command."""
 
 
+class FlexCAuthenticationError(FlexCCommandError):
+    """The SPC rejected the FlexC command credentials (error 54)."""
+
+
 class FlexCCommandTimeout(FlexCCommandError):
     """A FLEXML command did not receive a reply before the timeout."""
 
@@ -940,10 +944,14 @@ class FlexCClient:
         # indication in the diagnostics already captured.
         error_code = _be32(header[4:8])
 
-        error = FlexCCommandError(
-            "SPC returned FlexC ERROR 0xFF "
-            f"(dataHeader={header.hex(' ').upper()}, "
-            f"code=0x{error_code:08X})"
+        # SPC error 54 is an authentication failure. Preserve its distinct
+        # type for callers without exposing credentials or assuming that a
+        # Home Assistant config-entry reauthentication flow is appropriate.
+        error_type = FlexCAuthenticationError if error_code == 54 else FlexCCommandError
+        description = "Authentication failed" if error_code == 54 else "SPC error"
+        error = error_type(
+            f"SPC FlexC {description} (code={error_code}, "
+            f"dataHeader={header.hex(' ').upper()})"
         )
 
         pending = self._pending_reply
