@@ -192,6 +192,7 @@ class FlexCClient:
         self._session_ready_callback: Callable[[int], None] | None = None
         self._session_generation = 0
         self._session_identity: tuple[int, int, int] | None = None
+        self._session_poll_identity_seen = False
         self._reported_identity_changes: set[str] = set()
         self._observed_identity_message_types: set[int] = set()
         self._notified_session_generation = 0
@@ -294,6 +295,7 @@ class FlexCClient:
         self._reader = reader
         self._writer = writer
         self._session_identity = None
+        self._session_poll_identity_seen = False
         self._reported_identity_changes.clear()
         self._observed_identity_message_types.clear()
         self._command_context = None
@@ -432,6 +434,18 @@ class FlexCClient:
                 self._session_identity = identity
             return
 
+        # A legacy CONNECT may carry a different connection ID from the
+        # subsequent POLL. Learn the active ID from the first POLL rather
+        # than assuming a receiver-specific constant across SPC panels.
+        # Until that POLL, retain the CONNECT identity for the other fields.
+        if message_id == MSG_POLL and not self._session_poll_identity_seen:
+            self._session_poll_identity_seen = True
+            self._session_identity = (
+                self._session_identity[0],
+                identity[1],
+                self._session_identity[2],
+            )
+
         for name, expected, received in zip(
             ("spt_account", "connection_id", "rct_identifier"),
             self._session_identity,
@@ -440,13 +454,9 @@ class FlexCClient:
         ):
             if expected != received and name not in self._reported_identity_changes:
                 self._reported_identity_changes.add(name)
-                # The receiver connection ID may legitimately appear in
-                # EVENT frames; observe it without a misleading warning.
-                known_receiver_id = (
-                    name == "connection_id" and received == RCT_CONNECTION_ID
-                )
-                log = _LOGGER.info if known_receiver_id else _LOGGER.warning
-                log(
+                # Identity changes are diagnostic only; do not assume
+                # a particular receiver ID is universal across panels.
+                _LOGGER.warning(
                     "FlexC session #%d identity changed: field=%s "
                     "expected=0x%08X received=0x%08X message=0x%02X "
                     "(diagnostic only; frame accepted)",
