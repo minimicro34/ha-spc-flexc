@@ -993,7 +993,11 @@ def test_session_identity_learns_first_poll_connection_id(
     base = _message()
     with caplog.at_level(logging.INFO):
         client._diagnose_session_identity(
-            {**base, "message_id": MSG_CONNECTION_REQUEST_LEGACY, "connection_id": connect_id}
+            {
+                **base,
+                "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+                "connection_id": connect_id,
+            }
         )
         client._diagnose_session_identity(
             {**base, "message_id": MSG_EVENT, "connection_id": poll_id}
