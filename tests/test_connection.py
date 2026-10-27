@@ -955,7 +955,10 @@ async def test_key_management_messages_are_observed_without_ack(
     assert "session #3" in caplog.text
     assert "no key change or ACK sent" in caplog.text
 
-def test_identity_samples_once_per_message_type(caplog: pytest.LogCaptureFixture) -> None:
+
+def test_identity_samples_once_per_message_type(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Sample CONNECT, EVENT and POLL identities without flooding logs."""
     client = _client()
     client._session_generation = 2
