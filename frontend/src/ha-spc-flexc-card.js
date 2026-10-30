@@ -1541,7 +1541,7 @@ class SpcFlexCCard extends HTMLElement {
     ].join("");
 
     const rfEntities = this._scopedStates(true).filter(({ entityId, stateObj }) =>
-      /\brf\b|radio/i.test(
+      /\brf\b|radio|jamming|brouillage/i.test(
         `${entityId} ${stateObj.attributes?.friendly_name || ""}`
       )
     );
@@ -1621,20 +1621,38 @@ class SpcFlexCCard extends HTMLElement {
         <span class="muted">${this._escapeHtml(metadata)}</span>
       </div>`;
     }).join("");
-    const wirelessSection = wirelessRows
-      ? `<details class="technical-section" data-technical-section="wireless-events">
-          <summary class="technical-section-title">${this._t("system.wireless_events")} (${wirelessEvents.length})</summary>
-          <div class="muted">${this._t("system.event_observation")}</div>
-          ${wirelessRows}
-        </details>`
+    const wirelessDiagnostics = rfEntities.map(({ entityId, stateObj }) => {
+      const label = stateObj.attributes?.friendly_name || entityId;
+      const state = String(stateObj.state ?? "unknown").toLowerCase();
+      const isJamming = /jamming|brouillage/i.test(`${entityId} ${label}`);
+      const display = isJamming
+        ? this._t(state === "on" ? "state.fault" : state === "off" ? "state.ok" : "state.unknown")
+        : this._valueWithUnit(stateObj) || this._t("state.unknown");
+      const tone = isJamming && state === "on" ? "danger" : isJamming && state === "off" ? "ok" : "muted";
+      return `<div class="technical-row"><span class="technical-label">${this._escapeHtml(label)}</span><span class="technical-value ${tone}">${this._escapeHtml(display)}</span></div>`;
+    }).join("");
+    const wirelessSection = wirelessRows || wirelessDiagnostics
+      ? `<div class="technical-section" data-technical-section="wireless-events">
+          <div class="technical-section-title">${this._t("system.rf")}</div>
+          ${wirelessDiagnostics}
+          ${wirelessRows ? `<details class="system-detail-card" data-system-detail-key="wireless-events">
+            <summary>${this._t("system.wireless_events")} (${wirelessEvents.length})</summary>
+            <div class="system-detail-body">${wirelessRows}</div>
+          </details>` : ""}
+        </div>`
       : "";
 
     const eventSection = eventSensor
-      ? `<details class="technical-section" data-technical-section="flexc-events">
-          <summary class="technical-section-title">${this._t("system.event_history")} (${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0})</summary>
-          <div class="muted">${this._t("system.event_observation")}</div>
-          ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
-        </details>`
+      ? `<div class="technical-section" data-technical-section="flexc-events">
+          <div class="technical-section-title">${this._t("system.event_history")}</div>
+          <details class="system-detail-card" data-system-detail-key="flexc-events">
+            <summary>${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0} ${this._t("system.event_history")}</summary>
+            <div class="system-detail-body">
+              <div class="muted">${this._t("system.event_observation")}</div>
+              ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
+            </div>
+          </details>
+        </div>`
       : "";
 
     const content = [
@@ -1644,7 +1662,6 @@ class SpcFlexCCard extends HTMLElement {
       powerSection,
       this._renderFlexcCommunication(),
       this._renderXBusDevices(),
-      renderEntityList(this._t("system.rf"), rfEntities),
       renderEntityList(this._t("system.modem"), modemEntities),
     ].join("");
 
