@@ -140,3 +140,48 @@ test("card does not show empty technical diagnostic fields", () => {
   assert.equal(card._technicalLine("Battery", "  "), "");
   assert.match(card._technicalLine("Battery", "<5"), /&lt;5/);
 });
+
+test("system diagnostics never include faults from a different panel", () => {
+  const Card = cardClass();
+  const card = new Card();
+  card._hass = { states: {
+    "binary_sensor.panel_fault": { state: "on", attributes: { device_class: "problem", friendly_name: "Panel fault" } },
+    "binary_sensor.other_fault": { state: "on", attributes: { device_class: "problem", friendly_name: "Other fault" } },
+  }, locale: { language: "en" } };
+  card._diagnosticScope = {
+    entityIds: new Set(["binary_sensor.panel_fault"]),
+    entryMap: new Map(),
+  };
+  const diagnostics = card._getSystemDiagnostics();
+  assert.equal(diagnostics.scopeAvailable, true);
+  assert.equal(diagnostics.faults.length, 1);
+  assert.equal(diagnostics.faults[0].entityId, "binary_sensor.panel_fault");
+});
+
+test("missing registry scope is not interpreted as a healthy system", () => {
+  const Card = cardClass();
+  const card = new Card();
+  card._hass = { states: {}, locale: { language: "en" } };
+  const diagnostics = card._getSystemDiagnostics();
+  assert.equal(diagnostics.scopeAvailable, false);
+  assert.equal(diagnostics.connection, null);
+  assert.equal(diagnostics.engineerMode, null);
+  assert.equal(diagnostics.faults.length, 0);
+});
+
+test("technical diagnostic lines escape both labels and values", () => {
+  const Card = cardClass();
+  const card = new Card();
+  const html = card._technicalLine("<Panel>", '"><img>');
+  assert.match(html, /&lt;Panel&gt;/);
+  assert.match(html, /&quot;&gt;&lt;img&gt;/);
+  assert.doesNotMatch(html, /<img>/);
+});
+
+test("unknown alarm states never receive the armed or disarmed styling", () => {
+  const Card = cardClass();
+  const card = new Card();
+  assert.equal(card._stateClass("unknown"), "muted");
+  assert.equal(card._stateClass("unavailable"), "muted");
+  assert.equal(card._stateClass("triggered"), "danger");
+});
