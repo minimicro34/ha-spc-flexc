@@ -169,6 +169,34 @@ FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
 }
 
 
+# Zone event suffixes identify the SPC zone type. Names below are
+# documented mappings; other suffixes retain their numeric type rather
+# than guessing a misleading human-readable label.
+FLEXC_ZONE_EVENT_TYPES: dict[int, str] = {
+    0: "Alarm Zone",
+    1: "Entry / Exit",
+    3: "Fire",
+    8: "Tamper",
+    12: "Unused Zone",
+    15: "Detector Fault",
+    23: "Glass Break",
+}
+
+for _base, _prefix, _restored in (
+    (1200, "Zone tamper", False),
+    (1300, "Zone tamper", True),
+    (1800, "Zone trouble", False),
+    (1900, "Zone trouble", True),
+):
+    for _suffix in range(24):
+        _zone_type = FLEXC_ZONE_EVENT_TYPES.get(_suffix, f"Zone type {_suffix}")
+        FLEXC_EVENT_DESCRIPTIONS[_base + _suffix] = (
+            f"{_prefix} restored [{_zone_type}]"
+            if _restored
+            else f"{_prefix} [{_zone_type}]"
+        )
+
+
 # Origin is intentionally separate from alarm state: user-triggered panic
 # events may not provide AREA_ID or a matching restore event.
 def _flexc_event_origin(event_id: int) -> str | None:
