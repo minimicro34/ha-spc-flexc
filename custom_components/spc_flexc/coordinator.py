@@ -72,6 +72,11 @@ def poll_delay_for_phase(phase: float, interval: float) -> float:
     return delay
 
 
+def _pir_slow_poll_log_level(elapsed_seconds: float) -> int:
+    """Suppress startup-only slow-poll warnings without hiding diagnostics."""
+    return logging.DEBUG if elapsed_seconds < 30.0 else logging.WARNING
+
+
 def _float_value(value: Any, suffix: str = "") -> float | None:
     if value is None:
         return None
@@ -969,12 +974,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         # Startup discovery can briefly delay zone reads. Keep
                         # the measurements at DEBUG for the first 30 seconds;
                         # subsequent slow polls remain actionable warnings.
-                        log_slow = (
-                            _LOGGER.debug
-                            if read_finished - poll_loop_started < 30.0
-                            else _LOGGER.warning
-                        )
-                        log_slow(
+                        _LOGGER.log(
+                            _pir_slow_poll_log_level(
+                                read_finished - poll_loop_started
+                            ),
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
                             "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
                             interval_display,
