@@ -75,7 +75,7 @@ function cardClass() {
     },
     document,
     navigator: { language: "en" },
-    window: { customCards: [] },
+    window: { customCards: [], setTimeout() { return 0; }, clearTimeout() {} },
     console,
     Intl,
     Date,
