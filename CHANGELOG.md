@@ -8,6 +8,9 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Fixed
 
+- Retry incomplete or failed Home Assistant entity-registry discovery after a short cooldown instead of leaving detector/output scope permanently empty after a transient failure.
+- Include tamper event flags from ordinary detectors in each area’s sabotage indicator, not only dedicated tamper entities.
+- Keep the selected Outputs tab while SPC entity scope is loading and distinguish loading from a confirmed empty detector list.
 - Echo the panel-provided SPC account code in legacy FlexC CONNECT acknowledgements (`0x01`) instead of a hardcoded value.
 - Clear pending commands when a new TCP session replaces the previous one, preventing stale command timeouts and buffered frames from interfering with the new session.
 - Apply a 60-second idle read timeout to close inactive or stalled FlexC TCP sessions.
