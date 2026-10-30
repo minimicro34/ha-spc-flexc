@@ -490,6 +490,7 @@ class SpcFlexCCard extends HTMLElement {
           procState: attrs.proc_state,
           alarmState: attrs.alarm_state,
           eventTamper: attrs.event_tamper,
+          eventTrouble: attrs.event_trouble,
           lastEvent: attrs.last_event,
           actuationsSinceLastRead:
             attrs.actuations_since_last_read,
@@ -2303,6 +2304,8 @@ class SpcFlexCCard extends HTMLElement {
         <div class="zone-main">
           <div class="zone-name">${this._escapeHtml(zone.name)}</div>
           <div class="zone-area">${this._escapeHtml(this._areaName(zone.areaId))}</div>
+          ${zone.eventTamper === true ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> Sabotage</span>` : ""}
+          ${zone.eventTrouble === true ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> Défaut</span>` : ""}
         </div>
 
         <div class="zone-state ${stateInfo.className}">
