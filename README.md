@@ -291,6 +291,8 @@ X-BUS peripherals are dynamically grouped as Home Assistant devices. Tested devi
 
 Diagnostic entities are associated with the appropriate SPC devices and can include panel power/battery/tamper faults, modem/RF information, FlexC ATS/ATP state and X-BUS operational information.
 
+From **v1.1.5-beta.5**, each discovered SPC zone also exposes separate **tamper** and **trouble** diagnostic binary sensors. These are independent from the zone's physical input (motion, opening, etc.). FlexC zone-event families `1200–1223` / `1300–1323` (tamper / restore) and `1800–1823` / `1900–1923` (trouble / restore) update the corresponding diagnostic states. Event suffixes identify the zone type, not an additional physical detector; events for unknown zone IDs do not create phantom zones. Zone alarms may remain latched until their explicit restore event. A normal PIR motion/rest state does not clear a latched tamper/trouble event.
+
 Availability is hardware- and firmware-dependent.
 
 ### FlexC event ID diagnostics (optional)
@@ -301,8 +303,13 @@ enable the **Last FlexC event ID** diagnostic sensor in Home Assistant under
 **disabled by default** to avoid unnecessary state recording.
 
 Its state is the most recent numeric `EV_ID`; attributes expose the matching
-`area_id`, `zone_id`, and the **20 most recent** sets of these numeric
-identifiers. No raw EVENT XML, user names, passwords or device payloads are
+`area_id`, `zone_id`, a human-readable `event_description` when documented,
+`event_origin`, `alarm_type`, `alarm_transition`, and the **20 most recent**
+observed event identifiers with their decoded descriptions and classifications.
+This includes the zone input events `2100/2101`, the observed `2103/2107`
+diagnostics, zone-type tamper/trouble and restore families, and selected
+Wireless / X-BUS events. Unknown events retain their numeric ID without an
+invented description. No raw EVENT XML, user names, passwords or device payloads are
 retained in this diagnostic history. The history is in memory only and resets
 when the integration reloads. It is intended for event discovery, not a
 permanent audit log or an implementation of additional devices.
@@ -315,15 +322,19 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 
 ## SPC FlexC Card
 
-Starting with **SPC FlexC v1.1.2**, the validated **SPC FlexC Card v1.0.18**
-is bundled with this integration. It is no longer distributed as a separate
-HACS Dashboard plugin.
+Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
+integration. **SPC FlexC v1.1.5-beta.5 bundles Card v1.0.21**. It is no longer
+distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.18` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.21` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
-X-BUS and system diagnostics. Use the custom card type
+X-BUS and system diagnostics. The beta.5 card preserves the physical detector
+icon and displays separate tamper/trouble labels and counts in detector groups
+and the general view. The **System** tab can show the recent FlexC event history
+when the optional **Last FlexC event ID** sensor is enabled. These observations
+are not persistent alarm states. Use the custom card type
 `custom:spc-flexc-card` in your dashboard.
 
 ### Screenshots
