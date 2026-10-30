@@ -142,7 +142,7 @@ def apply_zone_event(
     field, value = transition
     previous = getattr(zone, field)
     setattr(zone, field, value)
-    zone.last_event = {"EV_ID": str(event_id), "ZONE_ID": str(zone_id)}
+    zone.last_event = dict(event)
     return previous != value
 
 
