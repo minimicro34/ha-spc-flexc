@@ -161,6 +161,24 @@ FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
 }
 
 
+# Origin is intentionally separate from alarm state: user-triggered panic
+# events may not provide AREA_ID or a matching restore event.
+def _flexc_event_origin(event_id: int) -> str | None:
+    if event_id in (4002, 4009, 4011, 3523):
+        return "user"
+    if event_id in (8026, 8027, 8028, 8029, 8030, 8031):
+        return "wireless_keypad"
+    if event_id in (5348, 5349, 5350, 5351, 5352, 5353):
+        return "xbus_keypad"
+    if event_id in (8006, 8007, 8012, 8013, 8014, 8015):
+        return "wireless_device"
+    if event_id in (6002, 6003, 6004, 6005):
+        return "communication"
+    if event_id == 7011:
+        return "configuration"
+    return None
+
+
 class SpcLastEventDiagnosticSensor(
     CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
 ):
@@ -190,10 +208,12 @@ class SpcLastEventDiagnosticSensor(
             "area_id": last["area_id"],
             "zone_id": last["zone_id"],
             "event_description": FLEXC_EVENT_DESCRIPTIONS.get(last["event_id"]),
+            "event_origin": _flexc_event_origin(last["event_id"]),
             "recent_events": [
                 {
                     **event,
                     "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
+                    "origin": _flexc_event_origin(event["event_id"]),
                 }
                 for event in getattr(self.coordinator, "_recent_event_identifiers", [])
             ],
