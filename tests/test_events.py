@@ -472,5 +472,7 @@ def test_zone_alarm_zone_tamper_and_trouble_are_independent() -> None:
 def test_zone_alarm_event_wrong_area_is_ignored() -> None:
     """Do not associate an event with a zone in another area."""
     zone = ZoneState(zone_id=2, area_id=1)
-    assert not apply_zone_event({2: zone}, {"EV_ID": "1200", "ZONE_ID": "2", "AREA_ID": "3"})
+    assert not apply_zone_event(
+        {2: zone}, {"EV_ID": "1200", "ZONE_ID": "2", "AREA_ID": "3"}
+    )
     assert zone.event_tamper is None
