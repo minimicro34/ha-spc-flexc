@@ -17,6 +17,8 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
+- Display recent FlexC events in a rounded, collapsible System-tab panel with an event count.
+- Group wireless event observations in an expandable section and show RF diagnostics, including RF Jamming when `off`, under Wireless (RF).
 - Non-blocking, per-session diagnostics for SPC account code, connection ID and receiver identifier changes, with warnings deduplicated per field.
 - Sanitized identity samples for incoming CONNECT, POLL, EVENT and DATA messages, once per message type and TCP session.
 - Explicit diagnostic detection of `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` messages.
@@ -30,6 +32,8 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Changed
 
+- Move RF Jamming out of the separate RF diagnostics list to avoid duplicate display in the System tab.
+- Preserve diagnostic panel expansion state across Home Assistant card updates and synchronize the bundled Lovelace JavaScript.
 - Learn the active connection ID from the first `POLL (0x20)` instead of assuming a fixed receiver connection ID; treat the known receiver identifier `0x77359401` as informational during connection setup.
 - Avoid misleading identity-change warnings during the initial CONNECT-to-POLL transition while retaining warnings for unexpected changes after the session baseline is established.
 - Keep identity diagnostics non-blocking: valid incoming frames are accepted even when identifiers differ.
@@ -45,6 +49,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
+- Frontend distribution consistency check passed in GitHub Actions for the beta.6 development changes; live Home Assistant UI verification remains pending.
 - Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
 - **427 Python tests passed** and **18 Node.js card tests passed** locally and in GitHub Actions on the validated beta.5 development code before the version/documentation update.
 - **Python coverage: 91.95% on GitHub Actions / 92.01% locally**.
