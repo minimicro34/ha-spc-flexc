@@ -164,6 +164,8 @@ SpcFlexCCard.prototype._renderZones = function () {
               this._zoneIsIsolated?.(zone) !== true &&
               (zone.state === "on" || zone.eventTamper === true)
           ).length;
+          const zoneTamperAlerts = group.zones.filter((zone) => zone.eventTamper === true).length;
+          const zoneTroubleAlerts = group.zones.filter((zone) => zone.eventTrouble === true).length;
           const unavailable = group.zones.filter(
             (zone) => ["unknown", "unavailable"].includes(zone.state)
           ).length;
@@ -190,12 +192,14 @@ SpcFlexCCard.prototype._renderZones = function () {
                 </div>
 
                 <div class="zone-group-summary">
+                  ${zoneTamperAlerts ? `<span class="zone-tamper-alert">${zoneTamperAlerts} Sabotage</span>` : ""}
+                  ${zoneTroubleAlerts ? `<span class="zone-trouble-alert">${zoneTroubleAlerts} Défaut</span>` : ""}
                   ${isolatedZones ? `<span class="danger">${isolatedZones} ${this._t("state.isolated")}</span>` : ""}
                   ${inhibitedZones ? `<span class="zone-inhibited">${this._tCount("group.inhibited_count", inhibitedZones)}</span>` : ""}
                   ${activeZones ? `<span class="warning">${this._tCount("group.active_count", activeZones)}</span>` : ""}
                   ${activeTampers ? `<span class="danger">${this._tCount("group.fault_count", activeTampers)}</span>` : ""}
                   ${unavailable ? `<span class="muted">${this._tCount("group.unavailable_count", unavailable)}</span>` : ""}
-                  ${!isolatedZones && !inhibitedZones && !activeZones && !activeTampers && !unavailable ? `<span class="ok">${this._t("group.rest")}</span>` : ""}
+                  ${!isolatedZones && !inhibitedZones && !activeZones && !activeTampers && !zoneTamperAlerts && !zoneTroubleAlerts && !unavailable ? `<span class="ok">${this._t("group.rest")}</span>` : ""}
                 </div>
               </button>
 
@@ -243,6 +247,9 @@ SpcFlexCCard.prototype._styles = function () {
       .zone-group-meta { margin-top:2px; color:var(--secondary-text-color); font-size:11px; }
       .zone-group-summary { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:4px 9px; font-size:12px; font-weight:700; text-align:right; }
       .zone-group-content { display:grid; gap:8px; padding:9px; }
+      .zone-tamper-alert { color:#fb923c; font-weight:600; }
+      .zone-trouble-alert { color:#c4b5fd; font-weight:600; }
+      .zone-tamper-alert ha-icon, .zone-trouble-alert ha-icon { --mdc-icon-size:16px; vertical-align:middle; }
       .zone-group-content .tamper-title { margin:8px 3px 0; }
       @media (max-width:520px) {
         .zone-group-header { grid-template-columns:24px minmax(0,1fr); }
