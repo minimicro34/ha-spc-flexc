@@ -6,23 +6,39 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [1.1.5] - Unreleased
 
+### Fixed
+
+- Echo the panel-provided SPC account code in legacy FlexC CONNECT acknowledgements (`0x01`) instead of a hardcoded value.
+- Clear pending commands when a new TCP session replaces the previous one, preventing stale command timeouts and buffered frames from interfering with the new session.
+- Apply a 60-second idle read timeout to close inactive or stalled FlexC TCP sessions.
+- Distinguish SPC authentication error `54` from other panel error codes.
+
 ### Added
 
+- Non-blocking, per-session diagnostics for SPC account code, connection ID and receiver identifier changes, with warnings deduplicated per field.
+- Sanitized identity samples for incoming CONNECT, POLL, EVENT and DATA messages, once per message type and TCP session.
+- Explicit diagnostic detection of `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` messages.
 - Extend the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm type and transition for validated panic, medical, fire and hold-up events from user commands, wireless keypads and X-BUS keypads.
 - Include validated event origin and identifiers in the diagnostic event history, including events without an area or zone identifier.
 - Add Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`, covering panel selection, diagnostic scoping, HTML escaping, missing entities, and alarm-state presentation.
 
 ### Changed
 
+- Learn the active connection ID from the first `POLL (0x20)` instead of assuming a fixed receiver connection ID; treat the known receiver identifier `0x77359401` as informational during connection setup.
+- Avoid misleading identity-change warnings during the initial CONNECT-to-POLL transition while retaining warnings for unexpected changes after the session baseline is established.
+- Keep identity diagnostics non-blocking: valid incoming frames are accepted even when identifiers differ.
 - Document the bundled card test workflow and clarify that diagnostic alarm event classifications are historical observations, not persistent alarm states.
 
-### Safety
+### Safety and limitations
 
 - Transient alarm events do not latch Home Assistant alarm state without an authoritative SPC state transition; missing area IDs do not suppress event diagnostics.
+- AES key rotation is **not implemented**: `KEY_UPDATE` and `KEY_ACK` remain diagnostic-only; no key change or outgoing key acknowledgement is performed.
+- No changes to outbound FlexC command handling or AES encryption are intended by the session identity diagnostics.
 
 ### Validation
 
-- Automated Python and Node.js card regression tests have been extended during development. Final CI, coverage and hardware/UI validation results will be recorded before the stable release.
+- Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes.
+- Python and Node.js card regression tests have been extended during development. Final CI, coverage and hardware/UI validation results will be recorded before the stable release.
 
 ---
 
