@@ -4,13 +4,13 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — 1.1.5 beta development
+## [Unreleased] — preparing 1.1.5-beta.4
 
 ### Added
 
 - Extend the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm type and transition for validated panic, medical, fire and hold-up events from user commands, wireless keypads and X-BUS keypads.
 - Include validated event origin and identifiers in the diagnostic event history, including events without an area or zone identifier.
-- Add initial Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`.
+- Add Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`, covering panel selection, diagnostic scoping, HTML escaping, missing entities, and alarm-state presentation.
 
 ### Changed
 
@@ -22,7 +22,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
-- CI validation and functional card rendering tests remain pending for this unreleased development version. No signed tag or release has been published.
+- Automated card tests have been extended during beta development; final CI validation of this unreleased set and hardware/UI validation remain pending. No signed tag or release has been published.
 
 ---
 
