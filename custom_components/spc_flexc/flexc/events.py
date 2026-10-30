@@ -114,24 +114,35 @@ def apply_zone_event(
     except (TypeError, ValueError):
         return False
 
-    # Zone tamper fault / restore.
-    if event_id == 1008:
-        value = True
-    elif event_id == 1108:
-        value = False
-    else:
+    # Distinguish zone tamper from trouble; neither changes PIR activity.
+    # 1008/1108 are legacy tamper event IDs; 1200/1300 and 1800/1900
+    # are the validated Alarm Zone transitions observed on SPC 3.16.
+    transitions = {
+        1008: ("event_tamper", True),
+        1108: ("event_tamper", False),
+        1200: ("event_tamper", True),
+        1300: ("event_tamper", False),
+        1800: ("event_trouble", True),
+        1900: ("event_trouble", False),
+    }
+    transition = transitions.get(event_id)
+    if transition is None:
         return False
-
     zone = zones.get(zone_id)
-
     if zone is None:
         return False
-
-    previous = zone.event_tamper
-
-    zone.event_tamper = value
-    zone.last_event = dict(event)
-
+    # Never attach an event from another area to a matching zone number.
+    raw_area_id = event.get("AREA_ID")
+    if raw_area_id is not None:
+        try:
+            if zone.area_id is not None and int(str(raw_area_id)) != zone.area_id:
+                return False
+        except (TypeError, ValueError):
+            return False
+    field, value = transition
+    previous = getattr(zone, field)
+    setattr(zone, field, value)
+    zone.last_event = {"EV_ID": str(event_id), "ZONE_ID": str(zone_id)}
     return previous != value
 
 
