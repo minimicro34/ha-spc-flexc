@@ -1583,13 +1583,14 @@ class SpcFlexCCard extends HTMLElement {
     const recentEvents = eventSensor?.stateObj?.attributes?.recent_events;
     const eventRows = Array.isArray(recentEvents)
       ? recentEvents.slice(-20).reverse().map((event) => {
-          const description = event.description || `EV_ID ${event.event_id}`;
+          const description = event.description || this._t("system.event_unknown");
+          const title = `#${event.event_id} — ${description}`;
           const metadata = [event.origin, event.alarm_type, event.alarm_transition,
             event.area_id != null ? `Area ${event.area_id}` : null,
             event.zone_id != null ? `Zone ${event.zone_id}` : null]
             .filter(Boolean).join(" · ");
           return `<div class="technical-line">
-            <span>${this._escapeHtml(String(description))}</span>
+            <span>${this._escapeHtml(String(title))}</span>
             <span class="muted">${this._escapeHtml(String(metadata))}</span>
           </div>`;
         }).join("")
@@ -4547,6 +4548,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "system.event_history": "Historique des événements FlexC",
     "system.event_observation": "Événements observés uniquement — pas des états d’alarme permanents.",
     "system.no_recent_events": "Aucun événement récent",
+    "system.event_unknown": "Événement non documenté",
     "zone.motion": "Mouvement",
     "zone.rest": "Repos",
     "zone.open": "Ouvert",
@@ -4699,6 +4701,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "system.event_history": "FlexC event history",
     "system.event_observation": "Observed events only — not persistent alarm states.",
     "system.no_recent_events": "No recent events",
+    "system.event_unknown": "Undocumented event",
     "zone.motion": "Motion",
     "zone.rest": "Idle",
     "zone.open": "Open",
