@@ -220,7 +220,16 @@ class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEn
         zone = self.coordinator.data.zones.get(self.zone_id)
         if zone is None:
             return None
-        return bool(zone.logic_input) or self._activity_pulse_active
+        # FlexC LOGIC_INPUT is not boolean: 3 denotes a disconnected input
+        # on a tampered zone, not PIR motion. Unknown values must not be
+        # reported as movement until their meaning is validated.
+        if zone.logic_input == 1:
+            return True
+        if zone.logic_input == 0:
+            return self._activity_pulse_active
+        if zone.logic_input == 3 and zone.event_tamper is True:
+            return False
+        return None
 
     @property
     def available(self) -> bool:
@@ -272,7 +281,7 @@ class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEn
             has_live_events = (
                 self.coordinator._pir_event_generation.get(self.zone_id, 0) > 0
             )
-            if has_live_events or zone.logic_input:
+            if has_live_events or zone.logic_input != 0:
                 if self._activity_pulse_handle is not None:
                     self._activity_pulse_handle.cancel()
                     self._activity_pulse_handle = None
