@@ -703,3 +703,12 @@ Bug reports, feature suggestions, contributions and GitHub stars are also apprec
 Copyright © 2026 minimicro34.
 
 This project is licensed under the [GNU General Public License v3.0 or later](LICENSE).
+
+
+### Bundled card regression checks
+
+The SPC FlexC Lovelace card is bundled with this integration, not installed as a separate HACS dashboard repository. Its canonical JavaScript sources live in `frontend/src/`, and the generated resource is `custom_components/spc_flexc/www/ha-spc-flexc-card.js`.
+
+To validate the bundled card, use `make card-test` (Node.js regression tests) and `cd frontend && npm ci && npm run check` (JavaScript syntax and generated bundle consistency). `make check` includes the card regression tests alongside Python checks; CI also runs the frontend bundle check and `make coverage`.
+
+Diagnostic FlexC event classifications are historical observations, not persistent alarm states. The optional last-event diagnostic sensor may expose `alarm_type` and `alarm_transition` for validated keypad and user alarm events; these fields must not be interpreted as proof that an alarm is still active.
