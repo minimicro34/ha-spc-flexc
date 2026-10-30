@@ -4,7 +4,13 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — preparing 1.1.5-beta.4
+## [Unreleased]
+
+Changes after the next beta will be documented here.
+
+---
+
+## [1.1.5-beta.4] — in development (not released)
 
 ### Added
 
@@ -22,7 +28,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
-- Automated card tests have been extended during beta development; final CI validation of this unreleased set and hardware/UI validation remain pending. No signed tag or release has been published.
+- Automated card tests have been extended during beta development; final CI validation of the beta candidate and hardware/UI validation remain pending. No signed tag or release has been published.
 
 ---
 
