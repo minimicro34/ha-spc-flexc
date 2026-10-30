@@ -220,7 +220,17 @@ def test_last_event_diagnostic_sensor_identifiers_only() -> None:
         "zone_id": 3,
         "event_description": None,
         "event_origin": None,
-        "recent_events": [{**event, "description": None, "origin": None}],
+        "alarm_type": None,
+        "alarm_transition": None,
+        "recent_events": [
+            {
+                **event,
+                "description": None,
+                "origin": None,
+                "alarm_type": None,
+                "alarm_transition": None,
+            }
+        ],
     }
 
 
@@ -238,6 +248,8 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
     attributes = sensor.extra_state_attributes
     assert attributes["event_description"] == "Wireless keypad panic alarm"
     assert attributes["event_origin"] == "wireless_keypad"
+    assert attributes["alarm_type"] == "panic"
+    assert attributes["alarm_transition"] == "trigger"
     assert attributes["recent_events"] == [
         {
             "event_id": 4002,
@@ -245,11 +257,15 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
             "area_id": None,
             "description": "User panic",
             "origin": "user",
+            "alarm_type": "panic",
+            "alarm_transition": "trigger",
         },
         {
             **event,
             "description": "Wireless keypad panic alarm",
             "origin": "wireless_keypad",
+            "alarm_type": "panic",
+            "alarm_transition": "trigger",
         },
     ]
     # Diagnostic descriptions must not alter the original event history.
@@ -287,7 +303,13 @@ def test_last_event_diagnostic_sensor_extended_descriptions(
 
     assert attributes["event_description"] == description
     assert attributes["recent_events"] == [
-        {**event, "description": description, "origin": attributes["event_origin"]}
+        {
+            **event,
+            "description": description,
+            "origin": attributes["event_origin"],
+            "alarm_type": None,
+            "alarm_transition": None,
+        }
     ]
 
 
@@ -320,5 +342,45 @@ def test_last_event_diagnostic_sensor_origin(event_id: int, origin: str | None) 
             **event,
             "description": attributes["event_description"],
             "origin": origin,
+            "alarm_type": attributes["alarm_type"],
+            "alarm_transition": attributes["alarm_transition"],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("event_id", "alarm_type", "transition"),
+    [
+        (4002, "panic", "trigger"),
+        (4009, "medical", "trigger"),
+        (4011, "hold_up", "trigger"),
+        (3523, "hold_up", "confirmed"),
+        (8026, "medical", "trigger"),
+        (8027, "medical", "restore"),
+        (8028, "fire", "trigger"),
+        (8029, "fire", "restore"),
+        (8030, "panic", "trigger"),
+        (8031, "panic", "restore"),
+        (5348, "panic", "trigger"),
+        (5349, "panic", "restore"),
+        (5350, "fire", "trigger"),
+        (5351, "fire", "restore"),
+        (5352, "medical", "trigger"),
+        (5353, "medical", "restore"),
+        (7011, None, None),
+    ],
+)
+def test_last_event_alarm_classification(
+    event_id: int, alarm_type: str | None, transition: str | None
+) -> None:
+    coordinator = _coordinator()
+    event = {"event_id": event_id, "area_id": None, "zone_id": None}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+
+    attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
+
+    assert attributes["alarm_type"] == alarm_type
+    assert attributes["alarm_transition"] == transition
+    assert attributes["recent_events"][0]["alarm_type"] == alarm_type
+    assert attributes["recent_events"][0]["alarm_transition"] == transition
