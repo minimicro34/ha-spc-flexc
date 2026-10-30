@@ -128,6 +128,25 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(add_dynamic_entities))
 
 
+# Validated FlexC IDs from SPC event tables and field diagnostics.
+# Descriptions are diagnostic metadata, not persistent alarm states.
+FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
+    4002: "User panic",
+    4009: "User medical alarm",
+    4011: "User hold-up",
+    3523: "Confirmed hold-up",
+    8026: "Wireless keypad medical alarm",
+    8027: "Wireless keypad medical restore",
+    8028: "Wireless keypad fire alarm",
+    8029: "Wireless keypad fire restore",
+    8030: "Wireless keypad panic alarm",
+    8031: "Wireless keypad panic restore",
+    5348: "X-BUS keypad panic alarm",
+    5349: "X-BUS keypad panic restore",
+    7011: "Configuration changed",
+}
+
+
 class SpcLastEventDiagnosticSensor(
     CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
 ):
@@ -156,9 +175,14 @@ class SpcLastEventDiagnosticSensor(
         return {
             "area_id": last["area_id"],
             "zone_id": last["zone_id"],
-            "recent_events": list(
-                getattr(self.coordinator, "_recent_event_identifiers", [])
-            ),
+            "event_description": FLEXC_EVENT_DESCRIPTIONS.get(last["event_id"]),
+            "recent_events": [
+                {
+                    **event,
+                    "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
+                }
+                for event in getattr(self.coordinator, "_recent_event_identifiers", [])
+            ],
         }
 
 
