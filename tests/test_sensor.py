@@ -218,5 +218,32 @@ def test_last_event_diagnostic_sensor_identifiers_only() -> None:
     assert sensor.extra_state_attributes == {
         "area_id": 1,
         "zone_id": 3,
-        "recent_events": [event],
+        "event_description": None,
+        "recent_events": [{**event, "description": None}],
     }
+
+
+def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
+    coordinator = _coordinator()
+    event = {"event_id": 8030, "zone_id": None, "area_id": 1}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [
+        {"event_id": 4002, "zone_id": None, "area_id": None},
+        event,
+    ]
+    sensor = SpcLastEventDiagnosticSensor(coordinator)
+
+    assert sensor.native_value == 8030
+    attributes = sensor.extra_state_attributes
+    assert attributes["event_description"] == "Wireless keypad panic alarm"
+    assert attributes["recent_events"] == [
+        {
+            "event_id": 4002,
+            "zone_id": None,
+            "area_id": None,
+            "description": "User panic",
+        },
+        {**event, "description": "Wireless keypad panic alarm"},
+    ]
+    # Diagnostic descriptions must not alter the original event history.
+    assert coordinator._recent_event_identifiers[-1] == event
