@@ -419,3 +419,23 @@ def test_zone_intrusion_attributes_without_matching_area() -> None:
     attrs = sensor.extra_state_attributes
     assert attrs["intrusion_active"] is False
     assert attrs["intrusion_triggered"] is False
+
+
+@pytest.mark.parametrize(
+    ("logic_input", "tamper", "expected"),
+    [
+        (0, False, False),
+        (1, False, True),
+        (3, True, False),
+        (3, False, None),
+        (2, False, None),
+        (4, False, None),
+    ],
+)
+def test_zone_logic_input_is_not_boolean(
+    logic_input: int, tamper: bool, expected: bool | None
+) -> None:
+    """A disconnected tampered PIR must not be reported as motion."""
+    sensor, coordinator = _zone_sensor(logic_input=logic_input)
+    coordinator.data.zones[1].event_tamper = tamper
+    assert sensor.is_on is expected
