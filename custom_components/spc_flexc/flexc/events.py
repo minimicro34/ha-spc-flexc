@@ -114,19 +114,19 @@ def apply_zone_event(
     except (TypeError, ValueError):
         return False
 
-    # Distinguish zone tamper from trouble; neither changes PIR activity.
-    # 1008/1108 are legacy tamper event IDs; 1200/1300 and 1800/1900
-    # are the validated Alarm Zone transitions observed on SPC 3.16.
-    transitions = {
-        1008: ("event_tamper", True),
-        1108: ("event_tamper", False),
-        1200: ("event_tamper", True),
-        1300: ("event_tamper", False),
-        1800: ("event_trouble", True),
-        1900: ("event_trouble", False),
-    }
-    transition = transitions.get(event_id)
-    if transition is None:
+    # SPC zone-event tables define 24 type-specific transitions per family.
+    # Keep these independent from physical zone input and intrusion state.
+    if event_id in (1008, 1108):
+        transition = ("event_tamper", event_id == 1008)
+    elif 1200 <= event_id <= 1223:
+        transition = ("event_tamper", True)
+    elif 1300 <= event_id <= 1323:
+        transition = ("event_tamper", False)
+    elif 1800 <= event_id <= 1823:
+        transition = ("event_trouble", True)
+    elif 1900 <= event_id <= 1923:
+        transition = ("event_trouble", False)
+    else:
         return False
     zone = zones.get(zone_id)
     if zone is None:
