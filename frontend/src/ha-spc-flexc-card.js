@@ -557,6 +557,16 @@ class SpcFlexCCard extends HTMLElement {
       return "mdi:shield-alert-outline";
     }
 
+    if (zone.eventTamper === true && zone.deviceClass === "motion") {
+      const disconnected = Number(zone.logicInput) === 3;
+      return {
+        label: disconnected
+          ? this._t("zone.alert_tamper")
+          : `${active ? this._t("zone.motion") : this._t("zone.rest")} · ${this._t("zone.alert_tamper")}`,
+        className: "danger",
+      };
+    }
+
     switch (zone.deviceClass) {
       case "motion":
       case "occupancy":
