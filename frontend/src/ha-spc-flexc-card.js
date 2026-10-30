@@ -2013,6 +2013,9 @@ class SpcFlexCCard extends HTMLElement {
         zone.eventTamper === true
     ).length;
 
+    const zoneTamperAlerts = this._getZones().filter((zone) => zone.eventTamper === true).length;
+    const zoneTroubleAlerts = this._getZones().filter((zone) => zone.eventTrouble === true).length;
+
     const controls =
       this._config.show_controls
         ? `
@@ -2061,6 +2064,8 @@ class SpcFlexCCard extends HTMLElement {
 
           <div class="system-summary">
             ${areaSummary} · ${detectorSummary}
+            ${zoneTamperAlerts ? `<span class="zone-tamper-alert"> · ${zoneTamperAlerts} Sabotage</span>` : ""}
+            ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"> · ${zoneTroubleAlerts} Défaut</span>` : ""}
           </div>
         </div>
 
@@ -2104,6 +2109,10 @@ class SpcFlexCCard extends HTMLElement {
           </div>
         </div>
 
+        ${zoneTamperAlerts || zoneTroubleAlerts ? `<div class="technical-section">
+          ${zoneTamperAlerts ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> ${zoneTamperAlerts} Sabotage</span>` : ""}
+          ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> ${zoneTroubleAlerts} Défaut</span>` : ""}
+        </div>` : ""}
         ${this._renderSystemDiagnostics()}
         ${controls}
       </div>
