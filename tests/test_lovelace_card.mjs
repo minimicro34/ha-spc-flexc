@@ -189,9 +189,8 @@ test("unknown alarm states never receive the armed or disarmed styling", () => {
 test("release metadata keeps bundled card and integration versions synchronized", () => {
   const manifest = JSON.parse(read("../custom_components/spc_flexc/manifest.json"));
   const lock = JSON.parse(read("../frontend/package-lock.json"));
-  assert.equal(manifest.version, "1.1.5-beta.4");
-  assert.equal(packageInfo.version, "1.0.20");
+  assert.match(manifest.version, /^\\d+\\.\\d+\\.\\d+(?:-beta\\.\\d+)?$/);
   assert.equal(lock.version, packageInfo.version);
   assert.equal(lock.packages[""].version, packageInfo.version);
-  assert.match(registration, /_CARD_VERSION = "1\\.0\\.20"/);
+  assert.ok(registration.includes(`_CARD_VERSION = "${packageInfo.version}"`));
 });
