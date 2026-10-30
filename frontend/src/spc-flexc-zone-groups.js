@@ -192,8 +192,8 @@ SpcFlexCCard.prototype._renderZones = function () {
                 </div>
 
                 <div class="zone-group-summary">
-                  ${zoneTamperAlerts ? `<span class="zone-tamper-alert">${zoneTamperAlerts} Sabotage</span>` : ""}
-                  ${zoneTroubleAlerts ? `<span class="zone-trouble-alert">${zoneTroubleAlerts} Défaut</span>` : ""}
+                  ${zoneTamperAlerts ? `<span class="zone-tamper-alert">${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+                  ${zoneTroubleAlerts ? `<span class="zone-trouble-alert">${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
                   ${isolatedZones ? `<span class="danger">${isolatedZones} ${this._t("state.isolated")}</span>` : ""}
                   ${inhibitedZones ? `<span class="zone-inhibited">${this._tCount("group.inhibited_count", inhibitedZones)}</span>` : ""}
                   ${activeZones ? `<span class="warning">${this._tCount("group.active_count", activeZones)}</span>` : ""}
