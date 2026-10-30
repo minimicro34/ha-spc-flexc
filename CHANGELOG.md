@@ -38,7 +38,9 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Validation
 
 - Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes.
-- Python and Node.js card regression tests have been extended during development. Final CI, coverage and hardware/UI validation results will be recorded before the stable release.
+- **406 Python tests passed** and **18 Node.js card tests passed** in local validation; the 18 JavaScript tests also passed on GitHub Actions.
+- **Python coverage: 92.11% on GitHub Actions / 92.17% locally**.
+- Local `make check` and `make coverage` passed. Hardware/UI validation remains to be confirmed before the stable release.
 
 ---
 
