@@ -12,6 +12,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Clear pending commands when a new TCP session replaces the previous one, preventing stale command timeouts and buffered frames from interfering with the new session.
 - Apply a 60-second idle read timeout to close inactive or stalled FlexC TCP sessions.
 - Distinguish SPC authentication error `54` from other panel error codes.
+- Preserve per-zone tamper/trouble observations across ordinary PIR input polling instead of clearing an acknowledged/latched diagnostic from a motion/rest transition.
 
 ### Added
 
@@ -21,6 +22,10 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Extend the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm type and transition for validated panic, medical, fire and hold-up events from user commands, wireless keypads and X-BUS keypads.
 - Include validated event origin and identifiers in the diagnostic event history, including events without an area or zone identifier.
 - Add Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`, covering panel selection, diagnostic scoping, HTML escaping, missing entities, and alarm-state presentation.
+- Add two diagnostic binary sensors per discovered SPC zone for tamper and trouble, independent of the physical detector state, with support for zone-type event families `1200–1223` / `1300–1323` and `1800–1823` / `1900–1923`.
+- Decode zone input events `2100`, `2101`, `2103`, `2107` and zone-type tamper/trouble transitions in the optional **Last FlexC event ID** diagnostic sensor; keep numeric IDs, area/zone identifiers and event classifications in the recent-event attributes.
+- Show tamper/trouble labels on detector rows and counters in collapsed detector groups and the general card overview, without replacing the detector's original icon or counting anomalies as additional detectors.
+- Display recent FlexC event diagnostics in the card's **System** tab when the optional event-ID sensor is enabled; preserve existing Wireless and X-BUS diagnostics.
 
 ### Changed
 
@@ -28,19 +33,21 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Avoid misleading identity-change warnings during the initial CONNECT-to-POLL transition while retaining warnings for unexpected changes after the session baseline is established.
 - Keep identity diagnostics non-blocking: valid incoming frames are accepted even when identifiers differ.
 - Document the bundled card test workflow and clarify that diagnostic alarm event classifications are historical observations, not persistent alarm states.
+- Bundle **SPC FlexC Card v1.0.21** with integration **v1.1.5-beta.5**, including updated event history and zone-alert presentation.
 
 ### Safety and limitations
 
 - Transient alarm events do not latch Home Assistant alarm state without an authoritative SPC state transition; missing area IDs do not suppress event diagnostics.
+- Zone tamper/trouble diagnostics follow observed zone events; unknown zone IDs (including events described as **Unused Zone**) do not create additional entities. Diagnostic event history is in-memory and resets on integration reload.
 - AES key rotation is **not implemented**: `KEY_UPDATE` and `KEY_ACK` remain diagnostic-only; no key change or outgoing key acknowledgement is performed.
 - No changes to outbound FlexC command handling or AES encryption are intended by the session identity diagnostics.
 
 ### Validation
 
-- Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes.
-- **406 Python tests passed** and **18 Node.js card tests passed** in local validation; the 18 JavaScript tests also passed on GitHub Actions.
-- **Python coverage: 92.11% on GitHub Actions / 92.17% locally**.
-- Local `make check` and `make coverage` passed. Hardware/UI validation remains to be confirmed before the stable release.
+- Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
+- **427 Python tests passed** and **18 Node.js card tests passed** locally and in GitHub Actions on the validated beta.5 development code before the version/documentation update.
+- **Python coverage: 91.95% on GitHub Actions / 92.01% locally**.
+- Local tests and GitHub Actions passed before the beta.5 version/documentation update. Final CI verification of the packaged version and hardware/UI validation remain to be confirmed before the stable release.
 
 ---
 
