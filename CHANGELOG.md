@@ -4,13 +4,7 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
-
-Changes after the next beta will be documented here.
-
----
-
-## [1.1.5-beta.4] - 2026-10-30
+## [1.1.5] - Unreleased
 
 ### Added
 
@@ -28,7 +22,7 @@ Changes after the next beta will be documented here.
 
 ### Validation
 
-- Automated card tests have been extended during beta development. CI was green before the release-preparation changes; final beta-candidate CI and hardware/UI validation remain to be confirmed. No signed tag or release has been published.
+- Automated Python and Node.js card regression tests have been extended during development. Final CI, coverage and hardware/UI validation results will be recorded before the stable release.
 
 ---
 
