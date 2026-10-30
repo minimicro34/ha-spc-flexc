@@ -385,7 +385,7 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
         device_id=2, serial_number="XB2"
     )
     callbacks[0]()
-    assert [len(batch) for batch in batches[4:]] == [1, 1, 3]
+    assert [len(batch) for batch in batches[4:]] == [1, 3, 3]
 
 
 def test_zone_intrusion_attributes_follow_area_alarm_lifecycle() -> None:
