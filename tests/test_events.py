@@ -450,3 +450,27 @@ def test_confirmed_entry_zone_intrusion_ignored_when_disarmed() -> None:
     )
     assert not area.alarm_event_active
     assert not area.triggered_alarm_zones
+
+
+def test_zone_alarm_zone_tamper_and_trouble_are_independent() -> None:
+    """A zone may report motion, tamper and trouble independently."""
+    zone = ZoneState(zone_id=2, area_id=1, logic_input=1)
+    zones = {2: zone}
+    assert apply_zone_event(zones, {"EV_ID": "1200", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_tamper is True
+    assert zone.logic_input == 1
+    assert apply_zone_event(zones, {"EV_ID": "1800", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_trouble is True
+    assert apply_zone_event(zones, {"EV_ID": "1300", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_tamper is False
+    assert zone.event_trouble is True
+    assert apply_zone_event(zones, {"EV_ID": "1900", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_trouble is False
+    assert zone.logic_input == 1
+
+
+def test_zone_alarm_event_wrong_area_is_ignored() -> None:
+    """Do not associate an event with a zone in another area."""
+    zone = ZoneState(zone_id=2, area_id=1)
+    assert not apply_zone_event({2: zone}, {"EV_ID": "1200", "ZONE_ID": "2", "AREA_ID": "3"})
+    assert zone.event_tamper is None
