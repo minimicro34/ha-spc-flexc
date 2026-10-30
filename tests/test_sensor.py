@@ -307,8 +307,8 @@ def test_last_event_diagnostic_sensor_extended_descriptions(
             **event,
             "description": description,
             "origin": attributes["event_origin"],
-            "alarm_type": None,
-            "alarm_transition": None,
+            "alarm_type": attributes["alarm_type"],
+            "alarm_transition": attributes["alarm_transition"],
         }
     ]
 
