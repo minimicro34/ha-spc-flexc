@@ -218,14 +218,14 @@ def test_last_event_diagnostic_sensor_identifiers_only() -> None:
     assert sensor.extra_state_attributes == {
         "area_id": 1,
         "zone_id": 3,
-        "event_description": None,
+        "event_description": "Zone input active",
         "event_origin": None,
         "alarm_type": None,
         "alarm_transition": None,
         "recent_events": [
             {
                 **event,
-                "description": None,
+                "description": "Zone input active",
                 "origin": None,
                 "alarm_type": None,
                 "alarm_transition": None,
