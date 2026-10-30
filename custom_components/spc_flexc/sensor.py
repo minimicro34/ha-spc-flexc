@@ -238,8 +238,12 @@ class SpcLastEventDiagnosticSensor(
                     **event,
                     "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
                     "origin": _flexc_event_origin(event["event_id"]),
-                    "alarm_type": FLEXC_ALARM_EVENTS.get(event["event_id"], (None, None))[0],
-                    "alarm_transition": FLEXC_ALARM_EVENTS.get(event["event_id"], (None, None))[1],
+                    "alarm_type": FLEXC_ALARM_EVENTS.get(
+                        event["event_id"], (None, None)
+                    )[0],
+                    "alarm_transition": FLEXC_ALARM_EVENTS.get(
+                        event["event_id"], (None, None)
+                    )[1],
                 }
                 for event in getattr(self.coordinator, "_recent_event_identifiers", [])
             ],
