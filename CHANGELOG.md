@@ -10,7 +10,7 @@ Changes after the next beta will be documented here.
 
 ---
 
-## [1.1.5-beta.4] — in development (not released)
+## [1.1.5-beta.4] - 2026-10-30
 
 ### Added
 
@@ -28,7 +28,7 @@ Changes after the next beta will be documented here.
 
 ### Validation
 
-- Automated card tests have been extended during beta development; final CI validation of the beta candidate and hardware/UI validation remain pending. No signed tag or release has been published.
+- Automated card tests have been extended during beta development. CI was green before the release-preparation changes; final beta-candidate CI and hardware/UI validation remain to be confirmed. No signed tag or release has been published.
 
 ---
 
