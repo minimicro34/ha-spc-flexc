@@ -247,3 +247,36 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
     ]
     # Diagnostic descriptions must not alter the original event history.
     assert coordinator._recent_event_identifiers[-1] == event
+
+
+@pytest.mark.parametrize(
+    ("event_id", "description"),
+    [
+        (5350, "X-BUS keypad fire alarm"),
+        (5351, "X-BUS keypad fire restore"),
+        (5352, "X-BUS keypad medical alarm"),
+        (5353, "X-BUS keypad medical restore"),
+        (8006, "Wireless device tamper"),
+        (8007, "Wireless device tamper restore"),
+        (8012, "Wireless device low battery"),
+        (8013, "Wireless device battery restore"),
+        (8014, "Wireless device fault"),
+        (8015, "Wireless device fault restore"),
+        (6002, "FlexC path down"),
+        (6003, "FlexC path restored"),
+        (6004, "ATS down"),
+        (6005, "ATS restored"),
+    ],
+)
+def test_last_event_diagnostic_sensor_extended_descriptions(
+    event_id: int, description: str
+) -> None:
+    coordinator = _coordinator()
+    event = {"event_id": event_id, "area_id": None, "zone_id": None}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+
+    attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
+
+    assert attributes["event_description"] == description
+    assert attributes["recent_events"] == [{**event, "description": description}]
