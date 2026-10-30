@@ -50,6 +50,7 @@ class SpcFlexCCard extends HTMLElement {
       this._diagnosticScope = null;
       this._diagnosticScopeForEntity = null;
       this._diagnosticScopeLoading = false;
+      this._diagnosticScopeRetryAt = 0;
     }
 
     this._render();
@@ -750,13 +751,18 @@ class SpcFlexCCard extends HTMLElement {
     }
 
     if (
-      this._diagnosticScopeForEntity ===
-        this._config.entity &&
-      this._diagnosticScope
+      this._diagnosticScopeForEntity === this._config.entity &&
+      this._diagnosticScope?.selected?.config_entry_id
     ) {
       return;
     }
 
+    // Retry a failed or incomplete registry lookup on subsequent HA updates,
+    // without flooding the websocket while the panel is temporarily unavailable.
+    if (Date.now() < (this._diagnosticScopeRetryAt || 0)) {
+      return;
+    }
+    this._diagnosticScopeRetryAt = Date.now() + 15000;
     this._diagnosticScopeLoading = true;
     const generation = this._scopeGeneration || 0;
     const requestedEntity = this._config.entity;
@@ -2314,10 +2320,11 @@ class SpcFlexCCard extends HTMLElement {
               (zone) => zone.state === "on"
             ).length;
 
-            const activeTampers = tampers.filter(
+            const activeTampers = areaZones.filter(
               (zone) =>
-                zone.state === "on" ||
-                zone.eventTamper === true
+                zone.eventTamper === true ||
+                ((zone.zoneType === "tamper" || zone.deviceClass === "tamper") &&
+                  zone.state === "on")
             ).length;
 
             const areaEntity = this._getAreaAlarmEntity(area.id);
@@ -2412,6 +2419,13 @@ class SpcFlexCCard extends HTMLElement {
   _renderZones() {
     const zones = this._getNormalZones();
     const tampers = this._getTamperZones();
+
+    if (!zones.length && !tampers.length && !this._panelEntityIds()) {
+      return `<div class="empty-state">
+        <ha-icon icon="mdi:progress-clock"></ha-icon>
+        <div>${this._t("zone.loading", {}, "Chargement des entités SPC…")}</div>
+      </div>`;
+    }
 
     if (!zones.length && !tampers.length) {
       return `
