@@ -219,7 +219,8 @@ def test_last_event_diagnostic_sensor_identifiers_only() -> None:
         "area_id": 1,
         "zone_id": 3,
         "event_description": None,
-        "recent_events": [{**event, "description": None}],
+        "event_origin": None,
+        "recent_events": [{**event, "description": None, "origin": None}],
     }
 
 
@@ -236,14 +237,16 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
     assert sensor.native_value == 8030
     attributes = sensor.extra_state_attributes
     assert attributes["event_description"] == "Wireless keypad panic alarm"
+    assert attributes["event_origin"] == "wireless_keypad"
     assert attributes["recent_events"] == [
         {
             "event_id": 4002,
             "zone_id": None,
             "area_id": None,
             "description": "User panic",
+            "origin": "user",
         },
-        {**event, "description": "Wireless keypad panic alarm"},
+        {**event, "description": "Wireless keypad panic alarm", "origin": "wireless_keypad"},
     ]
     # Diagnostic descriptions must not alter the original event history.
     assert coordinator._recent_event_identifiers[-1] == event
@@ -279,4 +282,41 @@ def test_last_event_diagnostic_sensor_extended_descriptions(
     attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
 
     assert attributes["event_description"] == description
-    assert attributes["recent_events"] == [{**event, "description": description}]
+    assert attributes["recent_events"] == [
+        {**event, "description": description, "origin": attributes["event_origin"]}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("event_id", "origin"),
+    [
+        (4002, "user"),
+        (3523, "user"),
+        (8030, "wireless_keypad"),
+        (8028, "wireless_keypad"),
+        (5348, "xbus_keypad"),
+        (5352, "xbus_keypad"),
+        (8012, "wireless_device"),
+        (6002, "communication"),
+        (7011, "configuration"),
+        (9999, None),
+    ],
+)
+def test_last_event_diagnostic_sensor_origin(
+    event_id: int, origin: str | None
+) -> None:
+    coordinator = _coordinator()
+    event = {"event_id": event_id, "area_id": None, "zone_id": None}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+
+    attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
+
+    assert attributes["event_origin"] == origin
+    assert attributes["recent_events"] == [
+        {
+            **event,
+            "description": attributes["event_description"],
+            "origin": origin,
+        }
+    ]
