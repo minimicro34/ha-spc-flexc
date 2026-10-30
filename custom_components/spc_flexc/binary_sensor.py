@@ -147,6 +147,48 @@ def zone_device_class(zone_type: int | None) -> BinarySensorDeviceClass | None:
     return None
 
 
+class SpcZoneDiagnosticBinarySensor(
+    CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEntity
+):
+    """Zone alarm diagnostics independent from the physical zone input."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SpcFlexCCoordinator, zone_id: int, kind: str) -> None:
+        super().__init__(coordinator)
+        self.zone_id = zone_id
+        self.kind = kind
+        zone = coordinator.data.zones[zone_id]
+        self._attr_name = f"{zone.name or f'Zone {zone_id}'} {kind}"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_zone_{zone_id}_{kind}"
+        self._attr_device_class = (
+            BinarySensorDeviceClass.TAMPER if kind == "tamper"
+            else BinarySensorDeviceClass.PROBLEM
+        )
+        if zone.area_id is not None and zone.area_id in coordinator.data.areas:
+            self._attr_device_info = build_area_device_info(coordinator, zone.area_id)
+        else:
+            self._attr_device_info = build_panel_device_info(coordinator)
+
+    @property
+    def is_on(self) -> bool | None:
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        if zone is None:
+            return None
+        return zone.event_tamper if self.kind == "tamper" else zone.event_trouble
+
+    @property
+    def available(self) -> bool:
+        return self.zone_id in self.coordinator.data.zones
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        zone = self.coordinator.data.zones.get(self.zone_id)
+        return {"zone_id": self.zone_id, "area_id": zone.area_id if zone else None,
+                "diagnostic_kind": self.kind}
+
+
 class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEntity):
     """Represent the live state of an SPC zone."""
 
@@ -210,6 +252,7 @@ class SpcZoneBinarySensor(CoordinatorEntity[SpcFlexCCoordinator], BinarySensorEn
             "isolated": zone.isolated,
             "actuations_since_last_read": zone.actuations_since_last_read,
             "event_tamper": zone.event_tamper,
+            "event_trouble": zone.event_trouble,
             "last_event": zone.last_event,
         }
 
@@ -357,6 +400,8 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
                 continue
             known_zones.add(zone_id)
             entities.append(SpcZoneBinarySensor(coordinator, zone_id))
+            entities.append(SpcZoneDiagnosticBinarySensor(coordinator, zone_id, "tamper"))
+            entities.append(SpcZoneDiagnosticBinarySensor(coordinator, zone_id, "trouble"))
         if entities:
             async_add_entities(entities)
 
