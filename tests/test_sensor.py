@@ -275,6 +275,18 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
 @pytest.mark.parametrize(
     ("event_id", "description"),
     [
+        (1200, "Zone tamper [Alarm Zone]"),
+        (1300, "Zone tamper restored [Alarm Zone]"),
+        (1201, "Zone tamper [Entry / Exit]"),
+        (1301, "Zone tamper restored [Entry / Exit]"),
+        (1801, "Zone trouble [Entry / Exit]"),
+        (1901, "Zone trouble restored [Entry / Exit]"),
+        (1212, "Zone tamper [Unused Zone]"),
+        (1312, "Zone tamper restored [Unused Zone]"),
+        (1812, "Zone trouble [Unused Zone]"),
+        (1912, "Zone trouble restored [Unused Zone]"),
+        (1223, "Zone tamper [Glass Break]"),
+        (1923, "Zone trouble restored [Glass Break]"),
         (5350, "X-BUS keypad fire alarm"),
         (5351, "X-BUS keypad fire restore"),
         (5352, "X-BUS keypad medical alarm"),
