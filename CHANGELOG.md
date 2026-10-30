@@ -13,6 +13,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Apply a 60-second idle read timeout to close inactive or stalled FlexC TCP sessions.
 - Distinguish SPC authentication error `54` from other panel error codes.
 - Preserve per-zone tamper/trouble observations across ordinary PIR input polling instead of clearing an acknowledged/latched diagnostic from a motion/rest transition.
+- Keep startup-only slow PIR zone polling measurements at DEBUG for the first 30 seconds after zone polling begins; preserve WARNING-level reporting afterwards without delaying or changing polling.
 
 ### Added
 
