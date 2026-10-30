@@ -1622,19 +1622,19 @@ class SpcFlexCCard extends HTMLElement {
       </div>`;
     }).join("");
     const wirelessSection = wirelessRows
-      ? `<div class="technical-section" data-technical-section="wireless-events">
-          <div class="technical-section-title">${this._t("system.wireless_events")}</div>
+      ? `<details class="technical-section" data-technical-section="wireless-events">
+          <summary class="technical-section-title">${this._t("system.wireless_events")} (${wirelessEvents.length})</summary>
           <div class="muted">${this._t("system.event_observation")}</div>
           ${wirelessRows}
-        </div>`
+        </details>`
       : "";
 
     const eventSection = eventSensor
-      ? `<div class="technical-section" data-technical-section="flexc-events">
-          <div class="technical-section-title">${this._t("system.event_history")}</div>
+      ? `<details class="technical-section" data-technical-section="flexc-events">
+          <summary class="technical-section-title">${this._t("system.event_history")} (${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0})</summary>
           <div class="muted">${this._t("system.event_observation")}</div>
           ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
-        </div>`
+        </details>`
       : "";
 
     const content = [
