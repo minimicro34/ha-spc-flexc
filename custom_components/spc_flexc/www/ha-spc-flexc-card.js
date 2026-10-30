@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.21";
+const CARD_VERSION = "1.0.22";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -555,6 +555,16 @@ class SpcFlexCCard extends HTMLElement {
       zone.deviceClass === "tamper"
     ) {
       return "mdi:shield-alert-outline";
+    }
+
+    if (zone.eventTamper === true && zone.deviceClass === "motion") {
+      const disconnected = Number(zone.logicInput) === 3;
+      return {
+        label: disconnected
+          ? this._t("zone.alert_tamper")
+          : `${active ? this._t("zone.motion") : this._t("zone.rest")} · ${this._t("zone.alert_tamper")}`,
+        className: "danger",
+      };
     }
 
     switch (zone.deviceClass) {
@@ -1595,6 +1605,30 @@ class SpcFlexCCard extends HTMLElement {
           </div>`;
         }).join("")
       : "";
+    const wirelessEvents = Array.isArray(recentEvents)
+      ? recentEvents.filter((event) =>
+          event.origin === "wireless_keypad" || event.origin === "wireless_device"
+        ).slice(-20).reverse()
+      : [];
+    const wirelessRows = wirelessEvents.map((event) => {
+      const description = event.description || this._t("system.event_unknown");
+      const metadata = [event.origin, event.alarm_type, event.alarm_transition,
+        event.area_id != null ? `Area ${event.area_id}` : null,
+        event.zone_id != null ? `Zone ${event.zone_id}` : null]
+        .filter(Boolean).join(" · ");
+      return `<div class="technical-line">
+        <span>${this._escapeHtml(`#${event.event_id} — ${description}`)}</span>
+        <span class="muted">${this._escapeHtml(metadata)}</span>
+      </div>`;
+    }).join("");
+    const wirelessSection = wirelessRows
+      ? `<div class="technical-section" data-technical-section="wireless-events">
+          <div class="technical-section-title">${this._t("system.wireless_events")}</div>
+          <div class="muted">${this._t("system.event_observation")}</div>
+          ${wirelessRows}
+        </div>`
+      : "";
+
     const eventSection = eventSensor
       ? `<div class="technical-section" data-technical-section="flexc-events">
           <div class="technical-section-title">${this._t("system.event_history")}</div>
@@ -1605,6 +1639,7 @@ class SpcFlexCCard extends HTMLElement {
 
     const content = [
       eventSection,
+      wirelessSection,
       identitySection,
       powerSection,
       this._renderFlexcCommunication(),
@@ -4546,6 +4581,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.alert_tamper": "Sabotage",
     "zone.alert_trouble": "Défaut",
     "system.event_history": "Historique des événements FlexC",
+    "system.wireless_events": "Événements Wireless",
     "system.event_observation": "Événements observés uniquement — pas des états d’alarme permanents.",
     "system.no_recent_events": "Aucun événement récent",
     "system.event_unknown": "Événement non documenté",
@@ -4699,6 +4735,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.alert_tamper": "Tamper",
     "zone.alert_trouble": "Trouble",
     "system.event_history": "FlexC event history",
+    "system.wireless_events": "Wireless events",
     "system.event_observation": "Observed events only — not persistent alarm states.",
     "system.no_recent_events": "No recent events",
     "system.event_unknown": "Undocumented event",
