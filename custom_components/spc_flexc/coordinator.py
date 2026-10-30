@@ -896,6 +896,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     async def _async_zone_poll_loop(self) -> None:
         """Poll zones without allowing one malformed reply to stop live updates."""
         _LOGGER.debug("SPC zone polling started")
+        poll_loop_started = asyncio.get_running_loop().time()
         previous_poll_started: float | None = None
         try:
             while True:
@@ -965,7 +966,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
                     if lock_wait_ms >= 1000 or read_ms >= 1000:
-                        _LOGGER.warning(
+                        # Startup discovery can briefly delay zone reads. Keep
+                        # the measurements at DEBUG for the first 30 seconds;
+                        # subsequent slow polls remain actionable warnings.
+                        log_slow = (
+                            _LOGGER.debug
+                            if read_finished - poll_loop_started < 30.0
+                            else _LOGGER.warning
+                        )
+                        log_slow(
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
                             "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
                             interval_display,
