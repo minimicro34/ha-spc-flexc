@@ -246,7 +246,11 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
             "description": "User panic",
             "origin": "user",
         },
-        {**event, "description": "Wireless keypad panic alarm", "origin": "wireless_keypad"},
+        {
+            **event,
+            "description": "Wireless keypad panic alarm",
+            "origin": "wireless_keypad",
+        },
     ]
     # Diagnostic descriptions must not alter the original event history.
     assert coordinator._recent_event_identifiers[-1] == event
@@ -302,9 +306,7 @@ def test_last_event_diagnostic_sensor_extended_descriptions(
         (9999, None),
     ],
 )
-def test_last_event_diagnostic_sensor_origin(
-    event_id: int, origin: str | None
-) -> None:
+def test_last_event_diagnostic_sensor_origin(event_id: int, origin: str | None) -> None:
     coordinator = _coordinator()
     event = {"event_id": event_id, "area_id": None, "zone_id": None}
     coordinator._last_event_identifiers = event
