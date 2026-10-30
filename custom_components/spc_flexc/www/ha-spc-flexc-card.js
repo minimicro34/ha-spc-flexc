@@ -1596,9 +1596,9 @@ class SpcFlexCCard extends HTMLElement {
       : "";
     const eventSection = eventSensor
       ? `<div class="technical-section" data-technical-section="flexc-events">
-          <div class="technical-section-title">FlexC events (diagnostic history)</div>
-          <div class="muted">Observed events only — not persistent alarm states.</div>
-          ${eventRows || '<div class="muted">No recent events</div>'}
+          <div class="technical-section-title">${this._t("system.event_history")}</div>
+          <div class="muted">${this._t("system.event_observation")}</div>
+          ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
         </div>`
       : "";
 
@@ -2064,8 +2064,8 @@ class SpcFlexCCard extends HTMLElement {
 
           <div class="system-summary">
             ${areaSummary} · ${detectorSummary}
-            ${zoneTamperAlerts ? `<span class="zone-tamper-alert"> · ${zoneTamperAlerts} Sabotage</span>` : ""}
-            ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"> · ${zoneTroubleAlerts} Défaut</span>` : ""}
+            ${zoneTamperAlerts ? `<span class="zone-tamper-alert"> · ${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+            ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"> · ${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
           </div>
         </div>
 
@@ -2110,8 +2110,8 @@ class SpcFlexCCard extends HTMLElement {
         </div>
 
         ${zoneTamperAlerts || zoneTroubleAlerts ? `<div class="technical-section">
-          ${zoneTamperAlerts ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> ${zoneTamperAlerts} Sabotage</span>` : ""}
-          ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> ${zoneTroubleAlerts} Défaut</span>` : ""}
+          ${zoneTamperAlerts ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> ${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+          ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> ${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
         </div>` : ""}
         ${this._renderSystemDiagnostics()}
         ${controls}
@@ -2342,8 +2342,8 @@ class SpcFlexCCard extends HTMLElement {
         <div class="zone-main">
           <div class="zone-name">${this._escapeHtml(zone.name)}</div>
           <div class="zone-area">${this._escapeHtml(this._areaName(zone.areaId))}</div>
-          ${zone.eventTamper === true ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> Sabotage</span>` : ""}
-          ${zone.eventTrouble === true ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> Défaut</span>` : ""}
+          ${zone.eventTamper === true ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> ${this._t("zone.alert_tamper")}</span>` : ""}
+          ${zone.eventTrouble === true ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> ${this._t("zone.alert_trouble")}</span>` : ""}
         </div>
 
         <div class="zone-state ${stateInfo.className}">
@@ -4414,8 +4414,8 @@ SpcFlexCCard.prototype._renderZones = function () {
                 </div>
 
                 <div class="zone-group-summary">
-                  ${zoneTamperAlerts ? `<span class="zone-tamper-alert">${zoneTamperAlerts} Sabotage</span>` : ""}
-                  ${zoneTroubleAlerts ? `<span class="zone-trouble-alert">${zoneTroubleAlerts} Défaut</span>` : ""}
+                  ${zoneTamperAlerts ? `<span class="zone-tamper-alert">${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+                  ${zoneTroubleAlerts ? `<span class="zone-trouble-alert">${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
                   ${isolatedZones ? `<span class="danger">${isolatedZones} ${this._t("state.isolated")}</span>` : ""}
                   ${inhibitedZones ? `<span class="zone-inhibited">${this._tCount("group.inhibited_count", inhibitedZones)}</span>` : ""}
                   ${activeZones ? `<span class="warning">${this._tCount("group.active_count", activeZones)}</span>` : ""}
@@ -4542,6 +4542,11 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "state.not_inhibited": "Non inhibé",
     "state.isolated": "Isolé",
     "state.not_isolated": "Non isolé",
+    "zone.alert_tamper": "Sabotage",
+    "zone.alert_trouble": "Défaut",
+    "system.event_history": "Historique des événements FlexC",
+    "system.event_observation": "Événements observés uniquement — pas des états d’alarme permanents.",
+    "system.no_recent_events": "Aucun événement récent",
     "zone.motion": "Mouvement",
     "zone.rest": "Repos",
     "zone.open": "Ouvert",
@@ -4689,6 +4694,11 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "state.not_inhibited": "Not inhibited",
     "state.isolated": "Isolated",
     "state.not_isolated": "Not isolated",
+    "zone.alert_tamper": "Tamper",
+    "zone.alert_trouble": "Trouble",
+    "system.event_history": "FlexC event history",
+    "system.event_observation": "Observed events only — not persistent alarm states.",
+    "system.no_recent_events": "No recent events",
     "zone.motion": "Motion",
     "zone.rest": "Idle",
     "zone.open": "Open",
