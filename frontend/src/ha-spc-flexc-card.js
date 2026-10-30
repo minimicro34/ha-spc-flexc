@@ -1631,14 +1631,17 @@ class SpcFlexCCard extends HTMLElement {
       const tone = isJamming && state === "on" ? "danger" : isJamming && state === "off" ? "ok" : "muted";
       return `<div class="technical-row"><span class="technical-label">${this._escapeHtml(label)}</span><span class="technical-value ${tone}">${this._escapeHtml(display)}</span></div>`;
     }).join("");
-    const wirelessSection = wirelessRows || wirelessDiagnostics
+    const wirelessCount = rfEntities.length + wirelessEvents.length;
+    const wirelessSection = wirelessCount
       ? `<div class="technical-section" data-technical-section="wireless-events">
           <div class="technical-section-title">${this._t("system.rf")}</div>
-          ${wirelessDiagnostics}
-          ${wirelessRows ? `<details class="system-detail-card" data-system-detail-key="wireless-events">
-            <summary>${this._t("system.wireless_events")} (${wirelessEvents.length})</summary>
-            <div class="system-detail-body">${wirelessRows}</div>
-          </details>` : ""}
+          <details class="system-detail-card" data-system-detail-key="wireless-rf">
+            <summary>${wirelessCount} ${this._t("system.rf")}</summary>
+            <div class="system-detail-body">
+              ${wirelessDiagnostics}
+              ${wirelessRows ? `<div class="muted">${this._t("system.wireless_events")}</div>${wirelessRows}` : ""}
+            </div>
+          </details>
         </div>`
       : "";
 
