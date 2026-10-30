@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.spc_flexc.frontend import async_register_card
+from custom_components.spc_flexc.frontend import _CARD_URL, async_register_card
 
 
 @pytest.fixture
@@ -24,6 +24,7 @@ async def test_register_card_once_with_multiple_panels(hass: MagicMock) -> None:
     resources.loaded = True
     resources.async_items.return_value = []
     resources.async_create_item = AsyncMock()
+    resources.async_update_item = AsyncMock()
     hass.data["lovelace"] = SimpleNamespace(
         resource_mode="storage", resources=resources
     )
@@ -32,7 +33,7 @@ async def test_register_card_once_with_multiple_panels(hass: MagicMock) -> None:
     resources.async_items.return_value = [
         {
             "id": "card",
-            "url": "/spc_flexc/ha-spc-flexc-card.js?v=1.0.19",
+            "url": _CARD_URL,
             "res_type": "module",
         }
     ]
@@ -40,8 +41,9 @@ async def test_register_card_once_with_multiple_panels(hass: MagicMock) -> None:
 
     hass.http.async_register_static_paths.assert_awaited_once()
     resources.async_create_item.assert_awaited_once_with(
-        {"url": "/spc_flexc/ha-spc-flexc-card.js?v=1.0.19", "res_type": "module"}
+        {"url": _CARD_URL, "res_type": "module"}
     )
+    resources.async_update_item.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -68,7 +70,7 @@ async def test_load_resources_before_migration(hass: MagicMock) -> None:
     resources.async_load.assert_awaited_once()
     resources.async_update_item.assert_awaited_once_with(
         "legacy",
-        {"url": "/spc_flexc/ha-spc-flexc-card.js?v=1.0.19", "res_type": "module"},
+        {"url": _CARD_URL, "res_type": "module"},
     )
     resources.async_create_item.assert_not_awaited()
 
