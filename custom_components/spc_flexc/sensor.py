@@ -131,6 +131,14 @@ async def async_setup_entry(
 # Validated FlexC IDs from SPC event tables and field diagnostics.
 # Descriptions are diagnostic metadata, not persistent alarm states.
 FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
+    2100: "Zone input active",
+    2101: "Zone input restored",
+    2103: "Zone input disconnected",
+    2107: "Zone input out of bounds",
+    1200: "Zone tamper",
+    1300: "Zone tamper restored",
+    1800: "Zone trouble",
+    1900: "Zone trouble restored",
     4002: "User panic",
     4009: "User medical alarm",
     4011: "User hold-up",
