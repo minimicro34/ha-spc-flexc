@@ -179,6 +179,27 @@ def _flexc_event_origin(event_id: int) -> str | None:
     return None
 
 
+# Transient events are diagnostic observations, not latched alarm states.
+FLEXC_ALARM_EVENTS: dict[int, tuple[str, str]] = {
+    4002: ("panic", "trigger"),
+    4009: ("medical", "trigger"),
+    4011: ("hold_up", "trigger"),
+    3523: ("hold_up", "confirmed"),
+    8026: ("medical", "trigger"),
+    8027: ("medical", "restore"),
+    8028: ("fire", "trigger"),
+    8029: ("fire", "restore"),
+    8030: ("panic", "trigger"),
+    8031: ("panic", "restore"),
+    5348: ("panic", "trigger"),
+    5349: ("panic", "restore"),
+    5350: ("fire", "trigger"),
+    5351: ("fire", "restore"),
+    5352: ("medical", "trigger"),
+    5353: ("medical", "restore"),
+}
+
+
 class SpcLastEventDiagnosticSensor(
     CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
 ):
@@ -204,16 +225,21 @@ class SpcLastEventDiagnosticSensor(
         last = getattr(self.coordinator, "_last_event_identifiers", None)
         if last is None:
             return {"recent_events": []}
+        alarm = FLEXC_ALARM_EVENTS.get(last["event_id"])
         return {
             "area_id": last["area_id"],
             "zone_id": last["zone_id"],
             "event_description": FLEXC_EVENT_DESCRIPTIONS.get(last["event_id"]),
             "event_origin": _flexc_event_origin(last["event_id"]),
+            "alarm_type": alarm[0] if alarm else None,
+            "alarm_transition": alarm[1] if alarm else None,
             "recent_events": [
                 {
                     **event,
                     "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
                     "origin": _flexc_event_origin(event["event_id"]),
+                    "alarm_type": FLEXC_ALARM_EVENTS.get(event["event_id"], (None, None))[0],
+                    "alarm_transition": FLEXC_ALARM_EVENTS.get(event["event_id"], (None, None))[1],
                 }
                 for event in getattr(self.coordinator, "_recent_event_identifiers", [])
             ],
