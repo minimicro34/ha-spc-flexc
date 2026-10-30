@@ -45,7 +45,8 @@ test("bundled card does not depend on standalone HACS resource", () => {
 function cardClass() {
   const registered = new Map();
   class MockElement {
-    constructor() { this.innerHTML = ""; }
+    constructor() { this.innerHTML = ""; this.style = { minHeight: "" }; }
+    getBoundingClientRect() { return { height: 0 }; }
     querySelector() { return null; }
     querySelectorAll() { return []; }
     addEventListener() {}
@@ -75,7 +76,7 @@ function cardClass() {
     },
     document,
     navigator: { language: "en" },
-    window: { customCards: [], setTimeout() { return 0; }, clearTimeout() {} },
+    window: { customCards: [], setTimeout(callback) { callback(); return 0; }, clearTimeout() {} },
     console,
     Intl,
     Date,
