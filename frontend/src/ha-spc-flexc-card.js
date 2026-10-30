@@ -1574,7 +1574,36 @@ class SpcFlexCCard extends HTMLElement {
         </div>`
       : "";
 
+    const eventSensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      /last[_\\s-]*flexc[_\\s-]*event[_\\s-]*id/i.test(
+        `${entityId} ${stateObj.attributes?.friendly_name || ""}`
+      )
+    );
+    const recentEvents = eventSensor?.stateObj?.attributes?.recent_events;
+    const eventRows = Array.isArray(recentEvents)
+      ? recentEvents.slice(-20).reverse().map((event) => {
+          const description = event.description || `EV_ID ${event.event_id}`;
+          const metadata = [event.origin, event.alarm_type, event.alarm_transition,
+            event.area_id != null ? `Area ${event.area_id}` : null,
+            event.zone_id != null ? `Zone ${event.zone_id}` : null]
+            .filter(Boolean).join(" · ");
+          return `<div class="technical-line">
+            <span>${this._escapeHtml(String(description))}</span>
+            <span class="muted">${this._escapeHtml(String(metadata))}</span>
+          </div>`;
+        }).join("")
+      : "";
+    const eventSection = eventSensor
+      ? `<div class="technical-section" data-technical-section="flexc-events">
+          <div class="technical-section-title">FlexC events (diagnostic history)</div>
+          <div class="muted">Observed events only — not persistent alarm states.</div>
+          ${eventRows || '<div class="muted">No recent events</div>'}
+        </div>`
+      : "";
+
     const content = [
+      eventSection,
       identitySection,
       powerSection,
       this._renderFlexcCommunication(),
