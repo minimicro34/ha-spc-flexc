@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _CARD_PATH = "/spc_flexc/ha-spc-flexc-card.js"
-_CARD_VERSION = "1.0.19"
+_CARD_VERSION = "1.0.20"
 _CARD_URL = f"{_CARD_PATH}?v={_CARD_VERSION}"
 _LEGACY_PATHS = {
     "/hacsfiles/ha-spc-flexc-card/ha-spc-flexc-card.js",
