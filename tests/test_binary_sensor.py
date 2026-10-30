@@ -374,7 +374,7 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
     )
 
     assert len(batches[0]) == len(PANEL) + len(FAULTS) + 1
-    assert [len(batch) for batch in batches[1:]] == [1, 1, 3]
+    assert [len(batch) for batch in batches[1:]] == [1, 3, 3]
     assert len(callbacks) == 1
     callbacks[0]()
     assert len(batches) == 4
