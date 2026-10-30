@@ -230,8 +230,13 @@ def _reconcile_zone_event_state(zone: ZoneState, previous: ZoneState | None) -> 
 
     zone.last_event = previous.last_event
     zone.event_tamper = previous.event_tamper
+    zone.event_trouble = previous.event_trouble
+    # Alarm-zone tamper remains latched until an explicit 1300 restore.
+    # A normal PIR snapshot does not prove the panel alarm was restored.
+    last_event_id = (previous.last_event or {}).get("EV_ID")
     if (
-        zone.event_tamper is True
+        str(last_event_id) not in ("1200", "1800")
+        and zone.event_tamper is True
         and all(
             value == 0
             for value in (
