@@ -975,9 +975,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         # the measurements at DEBUG for the first 30 seconds;
                         # subsequent slow polls remain actionable warnings.
                         _LOGGER.log(
-                            _pir_slow_poll_log_level(
-                                read_finished - poll_loop_started
-                            ),
+                            _pir_slow_poll_log_level(read_finished - poll_loop_started),
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
                             "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
                             interval_display,
