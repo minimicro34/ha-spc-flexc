@@ -50,6 +50,7 @@ class SpcFlexCCard extends HTMLElement {
       this._diagnosticScope = null;
       this._diagnosticScopeForEntity = null;
       this._diagnosticScopeLoading = false;
+      this._diagnosticScopeRetryAt = 0;
     }
 
     this._render();
@@ -557,14 +558,8 @@ class SpcFlexCCard extends HTMLElement {
       return "mdi:shield-alert-outline";
     }
 
-    if (zone.eventTamper === true && zone.deviceClass === "motion") {
-      const disconnected = Number(zone.logicInput) === 3;
-      return {
-        label: disconnected
-          ? this._t("zone.alert_tamper")
-          : `${active ? this._t("zone.motion") : this._t("zone.rest")} · ${this._t("zone.alert_tamper")}`,
-        className: "danger",
-      };
+    if (zone.eventTamper === true) {
+      return "mdi:shield-alert";
     }
 
     switch (zone.deviceClass) {
@@ -628,6 +623,13 @@ class SpcFlexCCard extends HTMLElement {
           ? this._t("zone.tamper")
           : this._t("state.normal"),
         className: tamperActive ? "danger" : "ok",
+      };
+    }
+
+    if (zone.eventTamper === true) {
+      return {
+        label: this._t("zone.alert_tamper"),
+        className: "danger",
       };
     }
 
@@ -750,13 +752,18 @@ class SpcFlexCCard extends HTMLElement {
     }
 
     if (
-      this._diagnosticScopeForEntity ===
-        this._config.entity &&
-      this._diagnosticScope
+      this._diagnosticScopeForEntity === this._config.entity &&
+      this._diagnosticScope?.selected?.config_entry_id
     ) {
       return;
     }
 
+    // Retry a failed or incomplete registry lookup on subsequent HA updates,
+    // without flooding the websocket while the panel is temporarily unavailable.
+    if (Date.now() < (this._diagnosticScopeRetryAt || 0)) {
+      return;
+    }
+    this._diagnosticScopeRetryAt = Date.now() + 15000;
     this._diagnosticScopeLoading = true;
     const generation = this._scopeGeneration || 0;
     const requestedEntity = this._config.entity;
@@ -2314,10 +2321,11 @@ class SpcFlexCCard extends HTMLElement {
               (zone) => zone.state === "on"
             ).length;
 
-            const activeTampers = tampers.filter(
+            const activeTampers = areaZones.filter(
               (zone) =>
-                zone.state === "on" ||
-                zone.eventTamper === true
+                zone.eventTamper === true ||
+                ((zone.zoneType === "tamper" || zone.deviceClass === "tamper") &&
+                  zone.state === "on")
             ).length;
 
             const areaEntity = this._getAreaAlarmEntity(area.id);
@@ -2412,6 +2420,13 @@ class SpcFlexCCard extends HTMLElement {
   _renderZones() {
     const zones = this._getNormalZones();
     const tampers = this._getTamperZones();
+
+    if (!zones.length && !tampers.length && !this._panelEntityIds()) {
+      return `<div class="empty-state">
+        <ha-icon icon="mdi:progress-clock"></ha-icon>
+        <div>${this._t("zone.loading", {}, "Chargement des entités SPC…")}</div>
+      </div>`;
+    }
 
     if (!zones.length && !tampers.length) {
       return `
@@ -3906,14 +3921,15 @@ SpcFlexCCard.prototype._renderTabs = function () {
   const hasDoors = this._getDoors().length > 0;
   const hasOutputs = this._getMappingGates().length > 0;
   if (this._activeTab === "doors" && !hasDoors) this._activeTab = "system";
-  if (this._activeTab === "outputs" && !hasOutputs) this._activeTab = "system";
+  const scopePending = !this._panelEntityIds();
+  if (this._activeTab === "outputs" && !hasOutputs && !scopePending) this._activeTab = "system";
 
   const tabs = [
     ["system", this._t("tab.general")],
     ["areas", this._t("tab.areas")],
     ["zones", this._t("tab.detectors")],
     ...(hasDoors ? [["doors", this._t("tab.doors")]] : []),
-    ...(hasOutputs ? [["outputs", this._t("tab.outputs")]] : []),
+    ...(hasOutputs || (scopePending && this._activeTab === "outputs") ? [["outputs", this._t("tab.outputs")]] : []),
     ["technical", this._t("tab.system")],
   ];
 
@@ -3929,7 +3945,9 @@ SpcFlexCCard.prototype._renderActiveView = function () {
     case "areas": return this._renderAreas();
     case "zones": return this._renderZones();
     case "doors": return this._getDoors().length ? this._renderDoors() : this._renderSystem();
-    case "outputs": return this._getMappingGates().length ? this._renderOutputs() : this._renderSystem();
+    case "outputs": return !this._panelEntityIds()
+      ? `<div class="empty-state"><ha-icon icon="mdi:progress-clock"></ha-icon><div>${this._t("zone.loading", {}, "Chargement des entités SPC…")}</div></div>`
+      : this._renderOutputs();
     case "technical": return this._renderTechnicalSystem();
     case "system":
     default: return this._renderSystem();
@@ -4615,6 +4633,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.tamper": "AUTOPROTECTION",
     "zone.inhibited": "Inhibé",
     "zone.none": "Aucune zone SPC découverte.",
+    "zone.loading": "Chargement des entités SPC…",
     "zone.name": "Zone {id}",
     "area.none": "Aucun secteur SPC disponible.",
     "area.name": "Secteur {id}",
@@ -4769,6 +4788,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.tamper": "TAMPER",
     "zone.inhibited": "Inhibited",
     "zone.none": "No SPC zone discovered.",
+    "zone.loading": "Loading SPC entities…",
     "zone.name": "Zone {id}",
     "area.none": "No SPC area available.",
     "area.name": "Area {id}",
