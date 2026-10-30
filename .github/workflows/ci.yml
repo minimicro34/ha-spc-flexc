@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop/v1.1.5
+      - dev/v1.1.5-beta.4
   pull_request:
 
 jobs:
