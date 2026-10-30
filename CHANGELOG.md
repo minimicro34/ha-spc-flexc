@@ -4,6 +4,28 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — 1.1.5 beta development
+
+### Added
+
+- Extend the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm type and transition for validated panic, medical, fire and hold-up events from user commands, wireless keypads and X-BUS keypads.
+- Include validated event origin and identifiers in the diagnostic event history, including events without an area or zone identifier.
+- Add initial Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`.
+
+### Changed
+
+- Document the bundled card test workflow and clarify that diagnostic alarm event classifications are historical observations, not persistent alarm states.
+
+### Safety
+
+- Transient alarm events do not latch Home Assistant alarm state without an authoritative SPC state transition; missing area IDs do not suppress event diagnostics.
+
+### Validation
+
+- CI validation and functional card rendering tests remain pending for this unreleased development version. No signed tag or release has been published.
+
+---
+
 ## [1.1.4] - 2026-10-21
 
 ### Fixed
