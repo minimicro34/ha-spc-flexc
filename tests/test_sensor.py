@@ -362,6 +362,8 @@ def test_last_event_diagnostic_sensor_origin(event_id: int, origin: str | None) 
             **event,
             "area_name": None,
             "zone_name": None,
+            "area_name": None,
+            "zone_name": None,
             "description": attributes["event_description"],
             "origin": origin,
             "alarm_type": attributes["alarm_type"],
