@@ -1046,9 +1046,21 @@ def test_zero_auto_assigned_atp_account_warns_without_rejecting(caplog) -> None:
     client = _client()
     client._session_generation = 7
     connect = {**_message(), "message_id": MSG_CONNECTION_REQUEST, "spt_account": 0}
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.DEBUG):
         client._diagnose_session_identity(connect)
-    assert "ATP account identifier is 0" in caplog.text
-    assert "Zero is not rejected" in caplog.text
+    assert "CONNECT with ATP account 0" in caplog.text
+    assert "closed before first POLL" not in caplog.text
     assert client._session_identity is not None
     assert client._session_identity[0] == 0
+
+
+def test_auto_assigned_account_transition_on_first_poll_is_not_identity_warning(caplog) -> None:
+    """A nonzero account on first POLL may represent auto-assignment."""
+    client = _client()
+    base = _message()
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity({**base, "message_id": MSG_CONNECTION_REQUEST, "spt_account": 0})
+        client._diagnose_session_identity({**base, "message_id": MSG_POLL, "spt_account": 12345678})
+    assert client._session_identity is not None
+    assert client._session_identity[0] == 12345678
+    assert "identity changed: field=spt_account" not in caplog.text
