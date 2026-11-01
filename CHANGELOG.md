@@ -9,9 +9,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Fixed
 
 - Remove orphaned SPC area alarm-control entities after complete discovery when their area no longer exists, while preserving active entities and skipping empty area discovery results.
-
 - Clean up orphaned SPC zone entities from the Home Assistant entity registry after complete discovery, retaining entities for detected zones and skipping entities with active states or empty discovery results; unavailable orphan entities are eligible for cleanup.
-
 - Render a proper shield-alert icon and explicit Sabotage state for tampered detectors, fixing an empty icon caused by returning an object instead of an icon name.
 - Retry incomplete or failed Home Assistant entity-registry discovery after a short cooldown instead of leaving detector/output scope permanently empty after a transient failure.
 - Include tamper event flags from ordinary detectors in each area’s sabotage indicator, not only dedicated tamper entities.
