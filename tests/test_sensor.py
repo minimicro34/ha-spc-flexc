@@ -225,6 +225,8 @@ def test_last_event_diagnostic_sensor_identifiers_only() -> None:
         "recent_events": [
             {
                 **event,
+                "area_name": None,
+                "zone_name": None,
                 "description": "Zone input active",
                 "origin": None,
                 "alarm_type": None,
@@ -255,6 +257,8 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
             "event_id": 4002,
             "zone_id": None,
             "area_id": None,
+            "area_name": None,
+            "zone_name": None,
             "description": "User panic",
             "origin": "user",
             "alarm_type": "panic",
@@ -262,6 +266,8 @@ def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
         },
         {
             **event,
+            "area_name": None,
+            "zone_name": None,
             "description": "Wireless keypad panic alarm",
             "origin": "wireless_keypad",
             "alarm_type": "panic",
@@ -317,6 +323,8 @@ def test_last_event_diagnostic_sensor_extended_descriptions(
     assert attributes["recent_events"] == [
         {
             **event,
+            "area_name": None,
+            "zone_name": None,
             "description": description,
             "origin": attributes["event_origin"],
             "alarm_type": attributes["alarm_type"],
@@ -352,6 +360,8 @@ def test_last_event_diagnostic_sensor_origin(event_id: int, origin: str | None) 
     assert attributes["recent_events"] == [
         {
             **event,
+            "area_name": None,
+            "zone_name": None,
             "description": attributes["event_description"],
             "origin": origin,
             "alarm_type": attributes["alarm_type"],
