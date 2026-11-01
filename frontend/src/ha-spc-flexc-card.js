@@ -1662,7 +1662,7 @@ class SpcFlexCCard extends HTMLElement {
       ? `<div class="technical-section" data-technical-section="flexc-events">
           <div class="technical-section-title">${this._t("system.event_history")}</div>
           <details class="system-detail-card" data-system-detail-key="flexc-events">
-            <summary>${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0} ${this._t("system.event_history")}</summary>
+            <summary>${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0} ${this._t(Array.isArray(recentEvents) && recentEvents.length === 1 ? "system.event_count_one" : "system.event_count_many")}</summary>
             <div class="system-detail-body">
               <div class="muted">${this._t("system.event_observation")}</div>
               ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
