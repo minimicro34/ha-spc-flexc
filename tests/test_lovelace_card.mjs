@@ -192,5 +192,6 @@ test("release metadata keeps bundled card and integration versions synchronized"
   assert.match(manifest.version, /^[0-9]+[.][0-9]+[.][0-9]+(?:-beta[.][0-9]+)?$/);
   assert.equal(lock.version, packageInfo.version);
   assert.equal(lock.packages[""].version, packageInfo.version);
-  assert.ok(registration.includes(`_CARD_VERSION = "${packageInfo.version}"`));
+  assert.match(registration, /_CARD_VERSION = _bundled_card_version\(\)/);
+  assert.match(registration, /_CARD_FILE\.open\(encoding="utf-8"\)/);
 });
