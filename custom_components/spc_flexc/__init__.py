@@ -2,11 +2,14 @@
 
 import logging
 import re
+from collections.abc import Mapping
+from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceEntry
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, PLATFORMS
@@ -137,7 +140,9 @@ async def async_setup_entry(
                     continue
                 if any(
                     child.via_device_id == device.id
-                    for child in device_registry.devices
+                    for child in cast(
+                        Mapping[str, DeviceEntry], device_registry.devices
+                    ).values()
                 ):
                     continue
                 if device.config_entries != {entry.entry_id}:
