@@ -323,7 +323,7 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **The v1.1.5 development branch currently bundles Card v1.0.25**. It is no longer
+integration. **SPC FlexC v1.1.5-beta.12 bundles Card v1.0.25**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
@@ -333,7 +333,7 @@ The card supports alarm control, areas, detectors, doors, Mapping Gates,
 X-BUS and system diagnostics. The bundled card preserves the physical detector
 icon and displays separate tamper/trouble labels and counts in detector groups
 and the general view. The **System** tab can show the recent FlexC event history
-when the optional **Last FlexC event ID** sensor is enabled. If the sensor is disabled or missing, the card displays a localized activation hint. The card maintains its own French/English JavaScript translations, separate from Home Assistant integration translations. These observations
+when the optional **Last FlexC event ID** sensor is enabled. If the sensor is disabled or missing, the card displays a localized activation hint. Recent events include their reception timestamp and discovered area/zone names alongside numeric IDs. The card maintains its own French/English JavaScript translations, separate from Home Assistant integration translations. These observations
 are not persistent alarm states. Use the custom card type
 `custom:spc-flexc-card` in your dashboard.
 
@@ -663,7 +663,7 @@ make coverage
 git diff --check
 ```
 
-The current coverage gate is 80%. The v1.1.1 release validation reached 90.08% total coverage.
+The current coverage gate is 80%. The v1.1.5-beta.12 validation passed 448 Python tests with 92.00% coverage on GitHub Actions (92.05% locally), plus 20 bundled-card JavaScript tests.
 
 ---
 
