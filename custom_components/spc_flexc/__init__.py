@@ -137,7 +137,7 @@ async def async_setup_entry(
                     continue
                 if any(
                     child.via_device_id == device.id
-                    for child in device_registry.devices.values()
+                    for child in device_registry.devices
                 ):
                     continue
                 if device.config_entries != {entry.entry_id}:
