@@ -57,9 +57,9 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 - Frontend distribution consistency check passed in GitHub Actions for the beta.6 development changes; live Home Assistant UI verification remains pending.
 - Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
-- **427 Python tests passed** and **18 Node.js card tests passed** locally and in GitHub Actions on the validated beta.5 development code before the version/documentation update.
-- **Python coverage: 91.95% on GitHub Actions / 92.01% locally**.
-- Local tests and GitHub Actions passed before the beta.5 version/documentation update. Final CI verification of the packaged version and hardware/UI validation remain to be confirmed before the stable release.
+- **444 Python tests passed** locally and in GitHub Actions on the beta.10 development code; **18 Node.js card tests passed** in the previous validated run.
+- **Python coverage: 92.05% on GitHub Actions / 92.10% locally**.
+- Final CI verification after the beta.10 manifest/changelog updates, and live Home Assistant hardware/UI validation, remain to be confirmed before the stable release.
 
 ---
 
