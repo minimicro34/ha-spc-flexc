@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.24";
+const CARD_VERSION = "1.0.25";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -1598,14 +1598,23 @@ class SpcFlexCCard extends HTMLElement {
       )
     );
     const recentEvents = eventSensor?.stateObj?.attributes?.recent_events;
+    const eventMetadata = (event) => [
+      event.received_at ? this._formatDateTime(event.received_at) : null,
+      event.origin,
+      event.alarm_type,
+      event.alarm_transition,
+      event.area_id != null
+        ? `${this._t("system.area")} ${event.area_id}${event.area_name ? ` — ${event.area_name}` : ""}`
+        : null,
+      event.zone_id != null
+        ? `${this._t("system.zone")} ${event.zone_id}${event.zone_name ? ` — ${event.zone_name}` : ""}`
+        : null,
+    ].filter(Boolean).join(" · ");
     const eventRows = Array.isArray(recentEvents)
       ? recentEvents.slice(-20).reverse().map((event) => {
           const description = event.description || this._t("system.event_unknown");
           const title = `#${event.event_id} — ${description}`;
-          const metadata = [event.origin, event.alarm_type, event.alarm_transition,
-            event.area_id != null ? `Area ${event.area_id}` : null,
-            event.zone_id != null ? `Zone ${event.zone_id}` : null]
-            .filter(Boolean).join(" · ");
+          const metadata = eventMetadata(event);
           return `<div class="technical-line">
             <span>${this._escapeHtml(String(title))}</span>
             <span class="muted">${this._escapeHtml(String(metadata))}</span>
@@ -1619,10 +1628,7 @@ class SpcFlexCCard extends HTMLElement {
       : [];
     const wirelessRows = wirelessEvents.map((event) => {
       const description = event.description || this._t("system.event_unknown");
-      const metadata = [event.origin, event.alarm_type, event.alarm_transition,
-        event.area_id != null ? `Area ${event.area_id}` : null,
-        event.zone_id != null ? `Zone ${event.zone_id}` : null]
-        .filter(Boolean).join(" · ");
+      const metadata = eventMetadata(event);
       return `<div class="technical-line">
         <span>${this._escapeHtml(`#${event.event_id} — ${description}`)}</span>
         <span class="muted">${this._escapeHtml(metadata)}</span>
@@ -1652,7 +1658,7 @@ class SpcFlexCCard extends HTMLElement {
         </div>`
       : "";
 
-    const eventSection = eventSensor
+    const eventSection = eventSensor && eventSensor.stateObj.state !== "unavailable"
       ? `<div class="technical-section" data-technical-section="flexc-events">
           <div class="technical-section-title">${this._t("system.event_history")}</div>
           <details class="system-detail-card" data-system-detail-key="flexc-events">
@@ -1663,7 +1669,10 @@ class SpcFlexCCard extends HTMLElement {
             </div>
           </details>
         </div>`
-      : "";
+      : `<div class="technical-section" data-technical-section="flexc-events">
+          <div class="technical-section-title">${this._t("system.event_history")}</div>
+          <div class="muted">${this._t("system.event_enable_hint")}</div>
+        </div>`;
 
     const content = [
       eventSection,
@@ -4619,6 +4628,9 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.alert_tamper": "Sabotage",
     "zone.alert_trouble": "Défaut",
     "system.event_history": "Historique des événements FlexC",
+    "system.area": "Secteur",
+    "system.zone": "Zone",
+    "system.event_enable_hint": "Pour afficher l’historique, activez l’entité de diagnostic « Last FlexC event ID » dans Paramètres → Appareils et services → Entités, puis rechargez l’intégration si nécessaire.",
     "system.wireless_events": "Événements Wireless",
     "system.event_observation": "Événements observés uniquement — pas des états d’alarme permanents.",
     "system.no_recent_events": "Aucun événement récent",
@@ -4774,6 +4786,9 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.alert_tamper": "Tamper",
     "zone.alert_trouble": "Trouble",
     "system.event_history": "FlexC event history",
+    "system.area": "Area",
+    "system.zone": "Zone",
+    "system.event_enable_hint": "To display event history, enable the diagnostic entity “Last FlexC event ID” under Settings → Devices & services → Entities, then reload the integration if needed.",
     "system.wireless_events": "Wireless events",
     "system.event_observation": "Observed events only — not persistent alarm states.",
     "system.no_recent_events": "No recent events",
