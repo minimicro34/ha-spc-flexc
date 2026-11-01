@@ -271,6 +271,12 @@ class SpcLastEventDiagnosticSensor(
             "alarm_transition": alarm[1] if alarm else None,
             "recent_events": [
                 {
+                    "area_name": (
+                        area.name if (area := self.coordinator.data.areas.get(event["area_id"])) is not None else None
+                    ) if event["area_id"] is not None else None,
+                    "zone_name": (
+                        zone.name if (zone := self.coordinator.data.zones.get(event["zone_id"])) is not None else None
+                    ) if event["zone_id"] is not None else None,
                     **event,
                     "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
                     "origin": _flexc_event_origin(event["event_id"]),
