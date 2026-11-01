@@ -1025,8 +1025,15 @@ def test_connection_request_02_uses_first_poll_baseline(
 def test_auto_assigned_atp_account_in_connect_ack(monkeypatch) -> None:
     """An ATP account of zero receives a stable, nonzero assigned account."""
     client = _client()
-    monkeypatch.setattr("custom_components.spc_flexc.flexc.connection.secrets.randbelow", lambda _: 12345677)
-    request = {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY, "spt_account": 0}
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: 12345677,
+    )
+    request = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 0,
+    }
     client._learn_connect_account(request)
     parsed = client._parse_frame(client._build_connection_ack(request))
     assert parsed["spt_account"] == 12345678
@@ -1039,7 +1046,11 @@ def test_auto_assigned_atp_account_in_connect_ack(monkeypatch) -> None:
 def test_explicit_atp_account_remains_unchanged() -> None:
     """An explicit ATP account is echoed rather than reassigned."""
     client = _client()
-    request = {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY, "spt_account": 87654321}
+    request = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 87654321,
+    }
     client._learn_connect_account(request)
     parsed = client._parse_frame(client._build_connection_ack(request))
     assert parsed["spt_account"] == 87654321
