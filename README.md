@@ -211,7 +211,7 @@ Configure the ATP destination with:
 - FlexC encryption enabled;
 - the same AES-256 encryption key configured in Home Assistant.
 
-Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.
+Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.\n\nStarting with **v1.1.5-beta.13**, an ATP client account set to `0` (automatic assignment) receives a nonzero account identifier in the FlexC CONNECT acknowledgement, following the behavior observed in the decompiled SPCLink receiver. Explicit nonzero ATP accounts are preserved. **This behavior still requires live validation on an SPC4300**; if the connection drops before the first POLL, use an explicit nonzero ATP account as a temporary workaround.
 
 ### Command Profile
 
@@ -323,17 +323,17 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **SPC FlexC v1.1.5-beta.12 bundles Card v1.0.25**. It is no longer
+integration. **SPC FlexC v1.1.5-beta.13 bundles Card v1.0.26**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.25` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.26` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
 X-BUS and system diagnostics. The bundled card preserves the physical detector
 icon and displays separate tamper/trouble labels and counts in detector groups
 and the general view. The **System** tab can show the recent FlexC event history
-when the optional **Last FlexC event ID** sensor is enabled. If the sensor is disabled or missing, the card displays a localized activation hint. Recent events include their reception timestamp and discovered area/zone names alongside numeric IDs. The card maintains its own French/English JavaScript translations, separate from Home Assistant integration translations. These observations
+when the optional **Last FlexC event ID** sensor is enabled. The collapsible event panel shows a localized count (for example, **11 événements**) without repeating the section heading. If the sensor is disabled or missing, the card displays a localized activation hint. Recent events include their reception timestamp and discovered area/zone names alongside numeric IDs. The card maintains its own French/English JavaScript translations, separate from Home Assistant integration translations. These observations
 are not persistent alarm states. Use the custom card type
 `custom:spc-flexc-card` in your dashboard.
 
@@ -663,7 +663,7 @@ make coverage
 git diff --check
 ```
 
-The current coverage gate is 80%. The v1.1.5-beta.12 validation passed 448 Python tests with 92.00% coverage on GitHub Actions (92.05% locally), plus 20 bundled-card JavaScript tests.
+The current coverage gate is 80%. The v1.1.5-beta.13 candidate passed 451 Python tests locally with 92.08% coverage (minimum: 80%). GitHub Actions validation and live SPC4300 testing of ATP account auto-assignment remain pending.
 
 ---
 
