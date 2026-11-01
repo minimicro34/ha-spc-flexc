@@ -415,6 +415,19 @@ class FlexCClient:
             int(message["rct_identifier"]),
         )
         message_id = int(message["message_id"])
+        if (
+            message_id in {MSG_CONNECTION_REQUEST_LEGACY, MSG_CONNECTION_REQUEST}
+            and identity[0] == 0
+        ):
+            _LOGGER.warning(
+                "FlexC session #%d: SPC ATP account identifier is 0 "
+                "(auto-assigned in SPC configuration). If the handshake "
+                "succeeds but no POLL follows and the SPC reconnects, "
+                "check the ATP Client Code / Identifier configuration; "
+                "a non-zero identifier resolved this on one SPC installation. "
+                "Zero is not rejected by this integration.",
+                self._session_generation,
+            )
         if message_id not in self._observed_identity_message_types:
             self._observed_identity_message_types.add(message_id)
             _LOGGER.info(
