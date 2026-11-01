@@ -2,6 +2,11 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 
 const packageMetadata = JSON.parse(await readFile("package.json", "utf8"));
 const CARD_VERSION = packageMetadata.version;
+const lock = JSON.parse(await readFile("package-lock.json", "utf8"));
+lock.version = CARD_VERSION;
+lock.packages[""].version = CARD_VERSION;
+await writeFile("package-lock.json", `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+
 const sources = await Promise.all([
   readFile("src/ha-spc-flexc-card.js", "utf8"),
   readFile("src/spc-flexc-outputs.js", "utf8"),
