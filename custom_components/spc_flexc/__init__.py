@@ -55,15 +55,16 @@ async def async_setup_entry(
         PLATFORMS,
     )
 
-    # Remove stale zone entities only after the complete, successful discovery.
+    # Remove stale zone and area entities only after complete discovery.
     # Restrict cleanup to the exact unique IDs owned by this config entry;
     # other entities (including renamed/customized entities) are untouched.
     zone_entity_pattern = re.compile(
         rf"^{re.escape(entry.entry_id)}_zone_(\d+)_(?:motion|tamper|trouble|inhibition|isolation|restore)$"
     )
+    area_entity_pattern = re.compile(rf"^{re.escape(entry.entry_id)}_area_(\\d+)$")
     orphan_cleanup_done = False
 
-    def cleanup_orphan_zones() -> None:
+    def cleanup_orphan_entities() -> None:
         nonlocal orphan_cleanup_done
         if orphan_cleanup_done or not coordinator._discovery_complete:
             return
@@ -72,10 +73,22 @@ async def async_setup_entry(
         if not discovered_zones:
             _LOGGER.warning("Skipping orphan zone cleanup: no zones discovered")
             return
+        discovered_areas = coordinator._detected_area_ids
+        if not discovered_areas:
+            _LOGGER.warning("Skipping orphan area cleanup: no areas discovered")
         registry = er.async_get(hass)
         for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-            match = zone_entity_pattern.fullmatch(entity.unique_id)
-            if not match or int(match.group(1)) in discovered_zones:
+            zone_match = zone_entity_pattern.fullmatch(entity.unique_id)
+            area_match = area_entity_pattern.fullmatch(entity.unique_id)
+            if zone_match:
+                if int(zone_match.group(1)) in discovered_zones:
+                    continue
+                kind, object_id = "zone", zone_match.group(1)
+            elif area_match and discovered_areas:
+                if int(area_match.group(1)) in discovered_areas:
+                    continue
+                kind, object_id = "area", area_match.group(1)
+            else:
                 continue
             # Never remove a currently loaded entity. Its platform owns its
             # lifecycle, even if a discovery result appears inconsistent.
@@ -87,14 +100,16 @@ async def async_setup_entry(
                 )
                 continue
             _LOGGER.info(
-                "Removing orphan SPC zone entity %s (zone %s no longer discovered)",
+                "Removing orphan SPC %s entity %s (%s %s no longer discovered)",
+                kind,
                 entity.entity_id,
-                match.group(1),
+                kind,
+                object_id,
             )
             registry.async_remove(entity.entity_id)
         orphan_cleanup_done = True
 
-    entry.async_on_unload(coordinator.async_add_listener(cleanup_orphan_zones))
+    entry.async_on_unload(coordinator.async_add_listener(cleanup_orphan_entities))
 
     # Do not await this. Platforms are already loaded and their coordinator
     # listeners can create dynamic entities as discovery completes.
