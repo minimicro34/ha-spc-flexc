@@ -213,7 +213,7 @@ async def test_orphan_cleanup_preserves_active_entities() -> None:
     """Never remove an entity that is still present in the HA state machine."""
     hass = MagicMock()
     hass.config_entries.async_forward_entry_setups = AsyncMock()
-    hass.states.get.return_value = MagicMock()
+    hass.states.get.return_value = MagicMock(state="on")
     entry = MagicMock()
     entry.entry_id = "spc-entry"
     entry.unique_id = "SPC12345678"
@@ -243,3 +243,38 @@ async def test_orphan_cleanup_preserves_active_entities() -> None:
         assert await async_setup_entry(hass, entry)
         coordinator.async_add_listener.call_args.args[0]()
         registry.async_remove.assert_not_called()
+@pytest.mark.asyncio
+async def test_orphan_cleanup_removes_unavailable_entities() -> None:
+    """Remove a stale zone when its HA state is unavailable."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="unavailable")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    registry = MagicMock()
+    stale = MagicMock(
+        entity_id="binary_sensor.zone_13",
+        unique_id="spc-entry_zone_13_motion",
+    )
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[stale],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_called_once_with("binary_sensor.zone_13")
