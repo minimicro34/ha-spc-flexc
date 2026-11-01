@@ -381,7 +381,7 @@ async def test_orphan_area_device_cleanup_removes_empty_device() -> None:
         identifiers={("spc_flexc", "SPC12345678_area_3")},
         config_entries={"spc-entry"},
     )
-    device_registry.devices = {"device-3": orphan}
+    device_registry.devices = [orphan]
     orphan.via_device_id = None
     with (
         patch(
