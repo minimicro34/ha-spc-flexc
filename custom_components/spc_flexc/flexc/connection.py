@@ -7,6 +7,7 @@ import hashlib
 import logging
 import os
 import re
+import secrets
 import zlib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -193,7 +194,7 @@ class FlexCClient:
         self._session_generation = 0
         self._session_identity: tuple[int, int, int] | None = None
         self._session_poll_identity_seen = False
-        self._session_zero_account_connect = False
+        self._assigned_spt_account: int | None = None
         self._reported_identity_changes: set[str] = set()
         self._observed_identity_message_types: set[int] = set()
         self._notified_session_generation = 0
@@ -297,7 +298,7 @@ class FlexCClient:
         self._writer = writer
         self._session_identity = None
         self._session_poll_identity_seen = False
-        self._session_zero_account_connect = False
+        self._assigned_spt_account = None
         self._reported_identity_changes.clear()
         self._observed_identity_message_types.clear()
         self._command_context = None
@@ -379,19 +380,6 @@ class FlexCClient:
             _LOGGER.exception("Unexpected FlexC receiver error")
 
         finally:
-            if (
-                self._writer is writer
-                and self._session_zero_account_connect
-                and not self._session_poll_identity_seen
-            ):
-                _LOGGER.warning(
-                    "FlexC session #%d closed before first POLL after CONNECT "
-                    "with ATP account 0 (SPC auto-assigned mode); the account "
-                    "value is permitted by SPC. If reconnects persist, "
-                    "configuring an explicit non-zero ATP client identifier "
-                    "was a successful workaround on one installation.",
-                    generation,
-                )
             if self._writer is writer:
                 self._reader = None
                 self._writer = None
@@ -430,24 +418,6 @@ class FlexCClient:
             int(message["rct_identifier"]),
         )
         message_id = int(message["message_id"])
-        if message_id in {MSG_CONNECTION_REQUEST_LEGACY, MSG_CONNECTION_REQUEST}:
-            self._session_zero_account_connect = identity[0] == 0
-            if self._session_zero_account_connect:
-                _LOGGER.debug(
-                    "FlexC session #%d CONNECT with ATP account 0 "
-                    "(SPC auto-assigned mode)",
-                    self._session_generation,
-                )
-        if message_id not in self._observed_identity_message_types:
-            self._observed_identity_message_types.add(message_id)
-            _LOGGER.info(
-                "FlexC session #%d identity sample: message=0x%02X "
-                "spt_account=0x%08X connection_id=0x%08X "
-                "rct_identifier=0x%08X",
-                self._session_generation,
-                message_id,
-                *identity,
-            )
 
         if self._session_identity is None:
             if message_id in {
@@ -617,6 +587,28 @@ class FlexCClient:
 
         return clear + ciphertext
 
+    def _account_for_ack(self, request: Mapping[str, Any]) -> int:
+        """Use the assigned ATP account for CONNECT ACK, echo other frames."""
+        if (
+            int(request["message_id"])
+            in {MSG_CONNECTION_REQUEST_LEGACY, MSG_CONNECTION_REQUEST}
+            and self._assigned_spt_account is not None
+        ):
+            return self._assigned_spt_account
+        return int(request["spt_account"])
+
+    def _learn_connect_account(self, message: Mapping[str, Any]) -> None:
+        """Assign an ATP account when SPC requests automatic assignment (0)."""
+        account = int(message["spt_account"])
+        if account == 0:
+            account = secrets.randbelow(99_999_998) + 1
+            _LOGGER.info(
+                "FlexC session #%d assigned automatic ATP account %d",
+                self._session_generation,
+                account,
+            )
+        self._assigned_spt_account = account
+
     def _build_connection_ack(
         self,
         request: Mapping[str, Any],
@@ -634,7 +626,7 @@ class FlexCClient:
         plain[0:4] = _put32(request["spt_sequence"])
         plain[4:8] = _put32(INITIAL_RCT_SEQUENCE)
         # Use the account advertised by this panel, not a captured constant.
-        plain[8:12] = _put32(request["spt_account"])
+        plain[8:12] = _put32(self._account_for_ack(request))
         plain[12:16] = _put32(request["rct_identifier"])
 
         plain[18] = MSG_CONNECTION_ACK_LEGACY
@@ -657,7 +649,7 @@ class FlexCClient:
         # preserve sptSequence exactly.
         plain[0:4] = _put32(request["spt_sequence"])
         plain[4:8] = _put32(request["rct_sequence"])
-        plain[8:12] = _put32(request["spt_account"])
+        plain[8:12] = _put32(self._account_for_ack(request))
         plain[12:16] = _put32(request["rct_identifier"])
 
         plain[18] = reply_id
@@ -796,6 +788,7 @@ class FlexCClient:
                 trace.record(f"0x{message_id:02X}", now)
 
         if message_id == MSG_CONNECTION_REQUEST_LEGACY:
+            self._learn_connect_account(message)
             await self._send_wire(self._build_connection_ack(message))
 
             self._rct_sequence = INITIAL_RCT_SEQUENCE
@@ -808,6 +801,7 @@ class FlexCClient:
             return
 
         if message_id == MSG_CONNECTION_REQUEST:
+            self._learn_connect_account(message)
             await self._send_wire(
                 self._build_clone_ack(
                     message,
