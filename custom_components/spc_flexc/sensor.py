@@ -272,11 +272,15 @@ class SpcLastEventDiagnosticSensor(
             "recent_events": [
                 {
                     "area_name": (
-                        area.name if (area := self.coordinator.data.areas.get(event["area_id"])) is not None else None
-                    ) if event["area_id"] is not None else None,
+                        self.coordinator.data.areas[event["area_id"]].name
+                        if event["area_id"] in self.coordinator.data.areas
+                        else None
+                    ),
                     "zone_name": (
-                        zone.name if (zone := self.coordinator.data.zones.get(event["zone_id"])) is not None else None
-                    ) if event["zone_id"] is not None else None,
+                        self.coordinator.data.zones[event["zone_id"]].name
+                        if event["zone_id"] in self.coordinator.data.zones
+                        else None
+                    ),
                     **event,
                     "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
                     "origin": _flexc_event_origin(event["event_id"]),
