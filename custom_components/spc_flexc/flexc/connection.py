@@ -196,7 +196,6 @@ class FlexCClient:
         self._session_poll_identity_seen = False
         self._assigned_spt_account: int | None = None
         self._reported_identity_changes: set[str] = set()
-        self._observed_identity_message_types: set[int] = set()
         self._notified_session_generation = 0
         self._local_close_reasons: dict[asyncio.StreamWriter, str] = {}
 
@@ -300,7 +299,6 @@ class FlexCClient:
         self._session_poll_identity_seen = False
         self._assigned_spt_account = None
         self._reported_identity_changes.clear()
-        self._observed_identity_message_types.clear()
         self._command_context = None
         self._context_event.clear()
         self._awaiting_poll_after_event = False
