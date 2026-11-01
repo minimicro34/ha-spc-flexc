@@ -1,6 +1,9 @@
 """Home Assistant setup for the SPC FlexC integration."""
 
 import logging
+import re
+
+from homeassistant.helpers import entity_registry as er
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -51,6 +54,37 @@ async def async_setup_entry(
         entry,
         PLATFORMS,
     )
+
+    # Remove stale zone entities only after the complete, successful discovery.
+    # Restrict cleanup to the exact unique IDs owned by this config entry;
+    # other entities (including renamed/customized entities) are untouched.
+    zone_entity_pattern = re.compile(
+        rf"^{re.escape(entry.entry_id)}_zone_(\\d+)_(?:motion|tamper|trouble|inhibition|isolation|restore)$"
+    )
+    orphan_cleanup_done = False
+
+    def cleanup_orphan_zones() -> None:
+        nonlocal orphan_cleanup_done
+        if orphan_cleanup_done or not coordinator._discovery_complete:
+            return
+        # An empty discovery is not sufficient evidence to delete all zones.
+        discovered_zones = coordinator._detected_zone_ids
+        if not discovered_zones:
+            _LOGGER.warning("Skipping orphan zone cleanup: no zones discovered")
+            return
+        registry = er.async_get(hass)
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+            match = zone_entity_pattern.fullmatch(entity.unique_id)
+            if match and int(match.group(1)) not in discovered_zones:
+                _LOGGER.info(
+                    "Removing orphan SPC zone entity %s (zone %s no longer discovered)",
+                    entity.entity_id,
+                    match.group(1),
+                )
+                registry.async_remove(entity.entity_id)
+        orphan_cleanup_done = True
+
+    entry.async_on_unload(coordinator.async_add_listener(cleanup_orphan_zones))
 
     # Do not await this. Platforms are already loaded and their coordinator
     # listeners can create dynamic entities as discovery completes.
