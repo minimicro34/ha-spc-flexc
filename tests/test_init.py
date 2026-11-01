@@ -280,3 +280,81 @@ async def test_orphan_cleanup_removes_unavailable_entities() -> None:
         assert await async_setup_entry(hass, entry)
         coordinator.async_add_listener.call_args.args[0]()
         registry.async_remove.assert_called_once_with("binary_sensor.zone_13")
+
+
+@pytest.mark.asyncio
+async def test_orphan_area_cleanup_removes_unavailable_area_only() -> None:
+    """Remove a missing area without touching discovered or unrelated entities."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="unavailable")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._detected_area_ids = {1, 2}
+    entities = [
+        MagicMock(entity_id="alarm_control_panel.test", unique_id="spc-entry_area_13"),
+        MagicMock(entity_id="alarm_control_panel.home", unique_id="spc-entry_area_1"),
+        MagicMock(entity_id="alarm_control_panel.other", unique_id="other_area_13"),
+    ]
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=entities,
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_called_once_with("alarm_control_panel.test")
+
+
+@pytest.mark.asyncio
+async def test_orphan_area_cleanup_skips_empty_area_discovery() -> None:
+    """Do not prune areas if discovery returned no area IDs."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="unavailable")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._detected_area_ids = set()
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[
+                MagicMock(
+                    entity_id="alarm_control_panel.test",
+                    unique_id="spc-entry_area_13",
+                )
+            ],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_not_called()
