@@ -195,3 +195,18 @@ test("release metadata keeps bundled card and integration versions synchronized"
   assert.match(registration, /_CARD_VERSION = _bundled_card_version\(\)/);
   assert.match(registration, /_CARD_FILE\.open\(encoding="utf-8"\)/);
 });
+
+test("recent FlexC events render reception time and discovered area/zone names", () => {
+  assert.match(frontend, /event\.received_at \? this\._formatDateTime\(event\.received_at\)/);
+  assert.match(frontend, /event\.area_name \? ` — \$\{event\.area_name\}`/);
+  assert.match(frontend, /event\.zone_name \? ` — \$\{event\.zone_name\}`/);
+  assert.match(frontend, /this\._escapeHtml\(String\(metadata\)\)/);
+});
+
+test("disabled event sensor has a localized activation hint", () => {
+  const translations = read("../frontend/src/spc-flexc-i18n.js");
+  assert.match(frontend, /eventSensor && eventSensor\.stateObj\.state !== "unavailable"/);
+  assert.match(frontend, /this\._t\("system\.event_enable_hint"\)/);
+  assert.match(translations, /"system\.event_enable_hint": "Pour afficher/);
+  assert.match(translations, /"system\.event_enable_hint": "To display/);
+});
