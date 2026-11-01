@@ -384,12 +384,23 @@ async def test_orphan_area_device_cleanup_removes_empty_device() -> None:
     device_registry.devices = {"device-3": orphan}
     orphan.via_device_id = None
     with (
-        patch("custom_components.spc_flexc.SpcFlexCMappingGateCoordinator", return_value=coordinator),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
         patch("custom_components.spc_flexc.er.async_get", return_value=registry),
-        patch("custom_components.spc_flexc.er.async_entries_for_config_entry", return_value=[]),
-        patch("custom_components.spc_flexc.er.async_entries_for_device", return_value=[]),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_device", return_value=[]
+        ),
         patch("custom_components.spc_flexc.dr.async_get", return_value=device_registry),
-        patch("custom_components.spc_flexc.dr.async_entries_for_config_entry", return_value=[orphan]),
+        patch(
+            "custom_components.spc_flexc.dr.async_entries_for_config_entry",
+            return_value=[orphan],
+        ),
     ):
         assert await async_setup_entry(hass, entry)
         coordinator.async_add_listener.call_args.args[0]()
@@ -417,12 +428,24 @@ async def test_orphan_area_device_cleanup_keeps_device_with_entities() -> None:
         config_entries={"spc-entry"},
     )
     with (
-        patch("custom_components.spc_flexc.SpcFlexCMappingGateCoordinator", return_value=coordinator),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
         patch("custom_components.spc_flexc.er.async_get"),
-        patch("custom_components.spc_flexc.er.async_entries_for_config_entry", return_value=[]),
-        patch("custom_components.spc_flexc.er.async_entries_for_device", return_value=[MagicMock(device_id="device-3")]),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_device",
+            return_value=[MagicMock(device_id="device-3")],
+        ),
         patch("custom_components.spc_flexc.dr.async_get", return_value=device_registry),
-        patch("custom_components.spc_flexc.dr.async_entries_for_config_entry", return_value=[orphan]),
+        patch(
+            "custom_components.spc_flexc.dr.async_entries_for_config_entry",
+            return_value=[orphan],
+        ),
     ):
         assert await async_setup_entry(hass, entry)
         coordinator.async_add_listener.call_args.args[0]()
