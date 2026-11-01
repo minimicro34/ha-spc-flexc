@@ -84,13 +84,12 @@ async def async_setup_entry(
                     entity.entity_id,
                 )
                 continue
-            if match:
-                _LOGGER.info(
-                    "Removing orphan SPC zone entity %s (zone %s no longer discovered)",
-                    entity.entity_id,
-                    match.group(1),
-                )
-                registry.async_remove(entity.entity_id)
+            _LOGGER.info(
+                "Removing orphan SPC zone entity %s (zone %s no longer discovered)",
+                entity.entity_id,
+                match.group(1),
+            )
+            registry.async_remove(entity.entity_id)
         orphan_cleanup_done = True
 
     entry.async_on_unload(coordinator.async_add_listener(cleanup_orphan_zones))
