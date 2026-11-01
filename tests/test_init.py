@@ -137,18 +137,38 @@ async def test_orphan_zone_cleanup_requires_complete_discovery() -> None:
     coordinator._detected_zone_ids = {1, 2}
 
     entities = [
-        MagicMock(\n            entity_id="binary_sensor.zone_1", unique_id="spc-entry_zone_1_motion"\n        ),
-        MagicMock(\n            entity_id="binary_sensor.zone_13", unique_id="spc-entry_zone_13_motion"\n        ),
-        MagicMock(\n            entity_id="switch.zone_13", unique_id="spc-entry_zone_13_isolation"\n        ),
-        MagicMock(\n            entity_id="button.zone_13", unique_id="spc-entry_zone_13_restore"\n        ),
-        MagicMock(\n            entity_id="sensor.unrelated", unique_id="other-entry_zone_13_motion"\n        ),
-        MagicMock(\n            entity_id="sensor.door", unique_id="spc-entry_door_13_status"\n        ),
+        MagicMock(
+            entity_id="binary_sensor.zone_1", unique_id="spc-entry_zone_1_motion"
+        ),
+        MagicMock(
+            entity_id="binary_sensor.zone_13", unique_id="spc-entry_zone_13_motion"
+        ),
+        MagicMock(
+            entity_id="switch.zone_13", unique_id="spc-entry_zone_13_isolation"
+        ),
+        MagicMock(
+            entity_id="button.zone_13", unique_id="spc-entry_zone_13_restore"
+        ),
+        MagicMock(
+            entity_id="sensor.unrelated", unique_id="other-entry_zone_13_motion"
+        ),
+        MagicMock(
+            entity_id="sensor.door", unique_id="spc-entry_door_13_status"
+        ),
     ]
     registry = MagicMock()
     with (
-        patch(\n            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",\n            return_value=coordinator,\n        ),
-        patch(\n            "custom_components.spc_flexc.er.async_get", return_value=registry\n        ),
-        patch(\n            "custom_components.spc_flexc.er.async_entries_for_config_entry",\n            return_value=entities,\n        ),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_get", return_value=registry
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=entities,
+        ),
     ):
         assert await async_setup_entry(hass, entry)
         listener = coordinator.async_add_listener.call_args.args[0]
@@ -180,8 +200,13 @@ async def test_orphan_zone_cleanup_skips_empty_discovery() -> None:
     coordinator._detected_zone_ids = set()
     registry = MagicMock()
     with (
-        patch(\n            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",\n            return_value=coordinator,\n        ),
-        patch(\n            "custom_components.spc_flexc.er.async_get", return_value=registry\n        ),
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_get", return_value=registry
+        ),
     ):
         assert await async_setup_entry(hass, entry)
         listener = coordinator.async_add_listener.call_args.args[0]
