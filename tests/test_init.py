@@ -243,6 +243,8 @@ async def test_orphan_cleanup_preserves_active_entities() -> None:
         assert await async_setup_entry(hass, entry)
         coordinator.async_add_listener.call_args.args[0]()
         registry.async_remove.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_orphan_cleanup_removes_unavailable_entities() -> None:
     """Remove a stale zone when its HA state is unavailable."""
