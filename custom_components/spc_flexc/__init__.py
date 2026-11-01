@@ -4,6 +4,7 @@ import logging
 import re
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
@@ -78,7 +79,8 @@ async def async_setup_entry(
                 continue
             # Never remove a currently loaded entity. Its platform owns its
             # lifecycle, even if a discovery result appears inconsistent.
-            if hass.states.get(entity.entity_id) is not None:
+            current_state = hass.states.get(entity.entity_id)
+            if current_state is not None and current_state.state != STATE_UNAVAILABLE:
                 _LOGGER.warning(
                     "Skipping orphan cleanup for active SPC entity %s",
                     entity.entity_id,
