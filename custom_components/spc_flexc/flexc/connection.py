@@ -464,7 +464,9 @@ class FlexCClient:
         if message_id == MSG_POLL and not self._session_poll_identity_seen:
             self._session_poll_identity_seen = True
             self._session_identity = (
-                identity[0] if self._session_identity[0] == 0 else self._session_identity[0],
+                identity[0]
+                if self._session_identity[0] == 0
+                else self._session_identity[0],
                 identity[1],
                 self._session_identity[2],
             )
