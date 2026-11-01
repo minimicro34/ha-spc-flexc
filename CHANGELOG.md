@@ -8,7 +8,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Fixed
 
-- Clean up orphaned SPC zone entities from the Home Assistant entity registry after complete discovery, retaining entities for detected zones and skipping active entities or empty discovery results.
+- Clean up orphaned SPC zone entities from the Home Assistant entity registry after complete discovery, retaining entities for detected zones and skipping entities with active states or empty discovery results; unavailable orphan entities are eligible for cleanup.
 
 - Render a proper shield-alert icon and explicit Sabotage state for tampered detectors, fixing an empty icon caused by returning an object instead of an icon name.
 - Retry incomplete or failed Home Assistant entity-registry discovery after a short cooldown instead of leaving detector/output scope permanently empty after a transient failure.
