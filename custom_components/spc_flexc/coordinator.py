@@ -1342,6 +1342,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 "event_id": event_id,
                 "area_id": area_id,
                 "zone_id": zone_id,
+                "received_at": datetime.now(UTC).isoformat(),
             }
             self._recent_event_identifiers = (
                 getattr(self, "_recent_event_identifiers", [])
