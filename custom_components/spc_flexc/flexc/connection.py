@@ -193,6 +193,7 @@ class FlexCClient:
         self._session_generation = 0
         self._session_identity: tuple[int, int, int] | None = None
         self._session_poll_identity_seen = False
+        self._session_zero_account_connect = False
         self._reported_identity_changes: set[str] = set()
         self._observed_identity_message_types: set[int] = set()
         self._notified_session_generation = 0
@@ -296,6 +297,7 @@ class FlexCClient:
         self._writer = writer
         self._session_identity = None
         self._session_poll_identity_seen = False
+        self._session_zero_account_connect = False
         self._reported_identity_changes.clear()
         self._observed_identity_message_types.clear()
         self._command_context = None
@@ -377,6 +379,19 @@ class FlexCClient:
             _LOGGER.exception("Unexpected FlexC receiver error")
 
         finally:
+            if (
+                self._writer is writer
+                and self._session_zero_account_connect
+                and not self._session_poll_identity_seen
+            ):
+                _LOGGER.warning(
+                    "FlexC session #%d closed before first POLL after CONNECT "
+                    "with ATP account 0 (SPC auto-assigned mode); the account "
+                    "value is permitted by SPC. If reconnects persist, "
+                    "configuring an explicit non-zero ATP client identifier "
+                    "was a successful workaround on one installation.",
+                    generation,
+                )
             if self._writer is writer:
                 self._reader = None
                 self._writer = None
@@ -415,19 +430,14 @@ class FlexCClient:
             int(message["rct_identifier"]),
         )
         message_id = int(message["message_id"])
-        if (
-            message_id in {MSG_CONNECTION_REQUEST_LEGACY, MSG_CONNECTION_REQUEST}
-            and identity[0] == 0
-        ):
-            _LOGGER.warning(
-                "FlexC session #%d: SPC ATP account identifier is 0 "
-                "(auto-assigned in SPC configuration). If the handshake "
-                "succeeds but no POLL follows and the SPC reconnects, "
-                "check the ATP Client Code / Identifier configuration; "
-                "a non-zero identifier resolved this on one SPC installation. "
-                "Zero is not rejected by this integration.",
-                self._session_generation,
-            )
+        if message_id in {MSG_CONNECTION_REQUEST_LEGACY, MSG_CONNECTION_REQUEST}:
+            self._session_zero_account_connect = identity[0] == 0
+            if self._session_zero_account_connect:
+                _LOGGER.debug(
+                    "FlexC session #%d CONNECT with ATP account 0 "
+                    "(SPC auto-assigned mode)",
+                    self._session_generation,
+                )
         if message_id not in self._observed_identity_message_types:
             self._observed_identity_message_types.add(message_id)
             _LOGGER.info(
@@ -454,7 +464,7 @@ class FlexCClient:
         if message_id == MSG_POLL and not self._session_poll_identity_seen:
             self._session_poll_identity_seen = True
             self._session_identity = (
-                self._session_identity[0],
+                identity[0] if self._session_identity[0] == 0 else self._session_identity[0],
                 identity[1],
                 self._session_identity[2],
             )
