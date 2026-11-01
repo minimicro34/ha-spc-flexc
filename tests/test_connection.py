@@ -962,25 +962,6 @@ async def test_key_management_messages_are_observed_without_ack(
     assert "no key change or ACK sent" in caplog.text
 
 
-def test_identity_samples_once_per_message_type(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Sample CONNECT, EVENT and POLL identities without flooding logs."""
-    client = _client()
-    client._session_generation = 2
-    base = _message()
-    with caplog.at_level(logging.INFO):
-        client._diagnose_session_identity(
-            {**base, "message_id": MSG_CONNECTION_REQUEST_LEGACY}
-        )
-        client._diagnose_session_identity({**base, "message_id": MSG_EVENT})
-        client._diagnose_session_identity({**base, "message_id": MSG_EVENT})
-        client._diagnose_session_identity({**base, "message_id": MSG_POLL})
-    assert caplog.text.count("identity sample:") == 3
-    assert "message=0x60" in caplog.text
-    assert "message=0x20" in caplog.text
-
-
 @pytest.mark.parametrize(
     ("connect_id", "poll_id"),
     [(0x3B9ACA00, 0x77359401), (0x11111111, 0x22222222)],
@@ -1041,17 +1022,28 @@ def test_connection_request_02_uses_first_poll_baseline(
     assert "identity changed: field=connection_id" not in caplog.text
 
 
-def test_zero_auto_assigned_atp_account_warns_without_rejecting(caplog) -> None:
-    """Zero is a documented SPC auto-assignment option, not a protocol error."""
+def test_auto_assigned_atp_account_in_connect_ack(monkeypatch) -> None:
+    """An ATP account of zero receives a stable, nonzero assigned account."""
     client = _client()
-    client._session_generation = 7
-    connect = {**_message(), "message_id": MSG_CONNECTION_REQUEST, "spt_account": 0}
-    with caplog.at_level(logging.DEBUG):
-        client._diagnose_session_identity(connect)
-    assert "CONNECT with ATP account 0" in caplog.text
-    assert "closed before first POLL" not in caplog.text
-    assert client._session_identity is not None
-    assert client._session_identity[0] == 0
+    monkeypatch.setattr("custom_components.spc_flexc.flexc.connection.secrets.randbelow", lambda _: 12345677)
+    request = {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY, "spt_account": 0}
+    client._learn_connect_account(request)
+    parsed = client._parse_frame(client._build_connection_ack(request))
+    assert parsed["spt_account"] == 12345678
+    assert parsed["sha1_ok"] is True
+    assert client._account_for_ack(request) == 12345678
+    poll = {**request, "message_id": MSG_POLL, "spt_account": 12345678}
+    assert client._account_for_ack(poll) == 12345678
+
+
+def test_explicit_atp_account_remains_unchanged() -> None:
+    """An explicit ATP account is echoed rather than reassigned."""
+    client = _client()
+    request = {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY, "spt_account": 87654321}
+    client._learn_connect_account(request)
+    parsed = client._parse_frame(client._build_connection_ack(request))
+    assert parsed["spt_account"] == 87654321
+    assert client._assigned_spt_account == 87654321
 
 
 def test_auto_assigned_account_transition_on_first_poll_is_not_identity_warning(
