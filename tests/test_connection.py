@@ -1057,6 +1057,79 @@ def test_explicit_atp_account_remains_unchanged() -> None:
     assert client._assigned_spt_account == 87654321
 
 
+@pytest.mark.asyncio
+async def test_modern_connect_assigns_account_in_ack(monkeypatch) -> None:
+    """Modern CONNECT 0x02 also returns the assigned ATP account."""
+    client = _client()
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: 3456788,
+    )
+    client._send_wire = AsyncMock()
+    request = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST,
+        "spt_account": 0,
+    }
+    await client._handle_message(request)
+
+    client._send_wire.assert_awaited_once()
+    parsed = client._parse_frame(client._send_wire.await_args.args[0])
+    assert parsed["message_id"] == 0x03
+    assert parsed["spt_account"] == 3456789
+    assert parsed["sha1_ok"] is True
+
+
+def test_assigned_account_is_not_reused_for_unrelated_ack(monkeypatch) -> None:
+    """A later POLL ACK echoes the panel's active account, not stale CONNECT data."""
+    client = _client()
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: 2345677,
+    )
+    connect = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 0,
+    }
+    client._learn_connect_account(connect)
+    assert client._account_for_ack(connect) == 2345678
+
+    poll = {
+        **_message(),
+        "message_id": MSG_POLL,
+        "spt_account": 2345678,
+    }
+    parsed = client._parse_frame(client._build_clone_ack(poll, 0x21))
+    assert parsed["spt_account"] == 2345678
+    assert parsed["sha1_ok"] is True
+
+
+def test_auto_assigned_account_changes_for_next_connect(monkeypatch) -> None:
+    """A new CONNECT assignment replaces the previous session's account."""
+    client = _client()
+    generated = iter((1111110, 2222221))
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: next(generated),
+    )
+    connect = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 0,
+    }
+    client._learn_connect_account(connect)
+    first = client._parse_frame(client._build_connection_ack(connect))
+    client._assigned_spt_account = None
+    client._learn_connect_account(connect)
+    second = client._parse_frame(client._build_connection_ack(connect))
+
+    assert first["spt_account"] == 1111111
+    assert second["spt_account"] == 2222222
+    assert first["sha1_ok"] is True
+    assert second["sha1_ok"] is True
+
+
 def test_auto_assigned_account_transition_on_first_poll_is_not_identity_warning(
     caplog,
 ) -> None:
