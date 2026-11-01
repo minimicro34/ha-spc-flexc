@@ -1039,3 +1039,16 @@ def test_connection_request_02_uses_first_poll_baseline(
         )
     assert client._session_identity[1] == 12
     assert "identity changed: field=connection_id" not in caplog.text
+
+
+def test_zero_auto_assigned_atp_account_warns_without_rejecting(caplog) -> None:
+    """Zero is a documented SPC auto-assignment option, not a protocol error."""
+    client = _client()
+    client._session_generation = 7
+    connect = {**_message(), "message_id": MSG_CONNECTION_REQUEST, "spt_account": 0}
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(connect)
+    assert "ATP account identifier is 0" in caplog.text
+    assert "Zero is not rejected" in caplog.text
+    assert client._session_identity is not None
+    assert client._session_identity[0] == 0
