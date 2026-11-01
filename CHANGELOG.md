@@ -4,6 +4,25 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.5-beta.13] - Unreleased
+
+### Fixed
+
+- Assign a nonzero ATP client account when SPC sends account `0` in CONNECT, and include it in the corresponding encrypted CONNECT ACK for both legacy and modern message types. Preserve explicitly configured nonzero accounts.
+- Remove temporary beta.12 ATP-zero disconnect warnings and per-message identity sampling logs, while retaining useful session identity-change diagnostics.
+- Avoid repeating the event history title in the bundled card: show a localized singular/plural event count under the existing heading.
+
+### Changed
+
+- Bundle **SPC FlexC Card v1.0.26**, including the synchronized JavaScript distribution, translations and frontend package metadata.
+
+### Validation
+
+- **451 Python tests passed locally; coverage 92.08%** (minimum required: 80%). Additional tests cover modern CONNECT account assignment, subsequent acknowledgements and fresh assignments.
+- GitHub Actions and real SPC4300 validation with ATP account `0` are pending. The connection-ID handshake behavior remains a separate potential compatibility difference.
+
+---
+
 ## [1.1.5-beta.12] - Unreleased
 
 ### Fixed
