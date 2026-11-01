@@ -4,7 +4,7 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.1.5] - Unreleased
+## [1.1.5-beta.12] - Unreleased
 
 ### Fixed
 
@@ -36,7 +36,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Explicit diagnostic detection of `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` messages.
 - Extend the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm type and transition for validated panic, medical, fire and hold-up events from user commands, wireless keypads and X-BUS keypads.
 - Include validated event origin and identifiers in the diagnostic event history, including events without an area or zone identifier.
-- Add Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`, covering panel selection, diagnostic scoping, HTML escaping, missing entities, and alarm-state presentation.
+- Add Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`, covering panel selection, diagnostic scoping, HTML escaping, missing entities, alarm-state presentation, event metadata and the localized diagnostic-sensor activation hint.
 - Add two diagnostic binary sensors per discovered SPC zone for tamper and trouble, independent of the physical detector state, with support for zone-type event families `1200–1223` / `1300–1323` and `1800–1823` / `1900–1923`.
 - Decode zone input events `2100`, `2101`, `2103`, `2107` and zone-type tamper/trouble transitions in the optional **Last FlexC event ID** diagnostic sensor; keep numeric IDs, area/zone identifiers and event classifications in the recent-event attributes.
 - Show tamper/trouble labels on detector rows and counters in collapsed detector groups and the general card overview, without replacing the detector's original icon or counting anomalies as additional detectors.
@@ -61,12 +61,12 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
-- Local `make check` reported passing after the beta.12 event-history, card-version and test corrections (user-reported; independent CI/coverage confirmation pending).
+- **v1.1.5-beta.12:** 448 Python tests passed locally and on GitHub Actions; 20 Node.js card regression tests passed locally, and the GitHub Actions check completed successfully.
 - ATP client account `0` remains diagnostic-only: CONNECT/ACK without a first POLL is not evidence of supported automatic assignment; real-panel protocol validation is still required.
 - Frontend distribution consistency check passed in GitHub Actions for the beta.6 development changes; live Home Assistant UI verification remains pending.
 - Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
-- **446 Python tests passed** locally and in GitHub Actions for beta.11 preparation; **18 Node.js card tests passed** in the previous validated run.
-- **Python coverage: 92.01% on GitHub Actions / 92.07% locally**.
+- **448 Python tests passed** locally and in GitHub Actions for beta.12; **20 Node.js card tests passed** locally and are included in the successful CI checks.
+- **Python coverage: 92.00% on GitHub Actions / 92.05% locally** (required minimum: 80%).
 - Live SPC4300 test on beta.10 confirmed removal of one orphan area entity and six orphan zone entities after discovery.
 - Automatic removal of the now-empty orphan area device remains to be verified on Home Assistant with beta.11; full stable-release validation remains pending.
 
