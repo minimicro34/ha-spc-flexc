@@ -3,10 +3,9 @@
 import logging
 import re
 
-from homeassistant.helpers import entity_registry as er
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from .const import PLATFORMS
 from .frontend import async_register_card
@@ -59,7 +58,7 @@ async def async_setup_entry(
     # Restrict cleanup to the exact unique IDs owned by this config entry;
     # other entities (including renamed/customized entities) are untouched.
     zone_entity_pattern = re.compile(
-        rf"^{re.escape(entry.entry_id)}_zone_(\\d+)_(?:motion|tamper|trouble|inhibition|isolation|restore)$"
+        rf"^{re.escape(entry.entry_id)}_zone_(\d+)_(?:motion|tamper|trouble|inhibition|isolation|restore)$"
     )
     orphan_cleanup_done = False
 
