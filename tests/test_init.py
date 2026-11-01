@@ -15,6 +15,7 @@ async def test_setup_entry_initializes_and_starts_discovery() -> None:
     hass = MagicMock()
     hass.config_entries.async_forward_entry_setups = AsyncMock()
     entry = MagicMock()
+    entry.entry_id = "spc-entry"
     entry.unique_id = None
 
     coordinator = MagicMock()
@@ -53,6 +54,7 @@ async def test_setup_entry_keeps_existing_serial() -> None:
     hass = MagicMock()
     hass.config_entries.async_forward_entry_setups = AsyncMock()
     entry = MagicMock()
+    entry.entry_id = "spc-entry"
     entry.unique_id = "SPC12345678"
 
     coordinator = MagicMock()
