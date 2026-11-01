@@ -26,6 +26,9 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
+- Timestamp each received FlexC event (`received_at`) and enrich recent event history with discovered area/zone names while preserving numeric identifiers.
+- Display event reception time, area and zone labels in the bundled card; show a localized activation hint when the optional Last FlexC event ID sensor is unavailable.
+- Centralize the bundled card version in `frontend/package.json`; the build synchronizes the lockfile and JavaScript bundle, and the integration reads the embedded version for Lovelace resource cache-busting.
 - Display recent FlexC events in a rounded, collapsible System-tab panel with an event count.
 - Group wireless event observations in an expandable section and show RF diagnostics, including RF Jamming when `off`, under Wireless (RF).
 - Non-blocking, per-session diagnostics for SPC account code, connection ID and receiver identifier changes, with warnings deduplicated per field.
@@ -47,7 +50,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Avoid misleading identity-change warnings during the initial CONNECT-to-POLL transition while retaining warnings for unexpected changes after the session baseline is established.
 - Keep identity diagnostics non-blocking: valid incoming frames are accepted even when identifiers differ.
 - Document the bundled card test workflow and clarify that diagnostic alarm event classifications are historical observations, not persistent alarm states.
-- Bundle **SPC FlexC Card v1.0.21** with integration **v1.1.5-beta.5**, including updated event history and zone-alert presentation.
+- Bundle **SPC FlexC Card v1.0.25** on the v1.1.5 development branch, including event history metadata and localized sensor activation guidance.
 
 ### Safety and limitations
 
@@ -58,6 +61,8 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
+- Local `make check` reported passing after the beta.12 event-history, card-version and test corrections (user-reported; independent CI/coverage confirmation pending).
+- ATP client account `0` remains diagnostic-only: CONNECT/ACK without a first POLL is not evidence of supported automatic assignment; real-panel protocol validation is still required.
 - Frontend distribution consistency check passed in GitHub Actions for the beta.6 development changes; live Home Assistant UI verification remains pending.
 - Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
 - **446 Python tests passed** locally and in GitHub Actions for beta.11 preparation; **18 Node.js card tests passed** in the previous validated run.
