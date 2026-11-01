@@ -305,7 +305,7 @@ enable the **Last FlexC event ID** diagnostic sensor in Home Assistant under
 Its state is the most recent numeric `EV_ID`; attributes expose the matching
 `area_id`, `zone_id`, a human-readable `event_description` when documented,
 `event_origin`, `alarm_type`, `alarm_transition`, and the **20 most recent**
-observed event identifiers with their decoded descriptions and classifications.
+observed event identifiers with their decoded descriptions and classifications. Each recent event also includes its Home Assistant reception time (`received_at`) and, when discovered, the corresponding `area_name` and `zone_name` alongside the original numeric IDs.
 This includes the zone input events `2100/2101`, the observed `2103/2107`
 diagnostics, zone-type tamper/trouble and restore families, and selected
 Wireless / X-BUS events. Unknown events retain their numeric ID without an
@@ -323,17 +323,17 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **SPC FlexC v1.1.5-beta.5 bundles Card v1.0.21**. It is no longer
+integration. **The v1.1.5 development branch currently bundles Card v1.0.25**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.21` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.25` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
-X-BUS and system diagnostics. The beta.5 card preserves the physical detector
+X-BUS and system diagnostics. The bundled card preserves the physical detector
 icon and displays separate tamper/trouble labels and counts in detector groups
 and the general view. The **System** tab can show the recent FlexC event history
-when the optional **Last FlexC event ID** sensor is enabled. These observations
+when the optional **Last FlexC event ID** sensor is enabled. If the sensor is disabled or missing, the card displays a localized activation hint. The card maintains its own French/English JavaScript translations, separate from Home Assistant integration translations. These observations
 are not persistent alarm states. Use the custom card type
 `custom:spc-flexc-card` in your dashboard.
 
@@ -720,6 +720,6 @@ This project is licensed under the [GNU General Public License v3.0 or later](LI
 
 The SPC FlexC Lovelace card is bundled with this integration, not installed as a separate HACS dashboard repository. Its canonical JavaScript sources live in `frontend/src/`, and the generated resource is `custom_components/spc_flexc/www/ha-spc-flexc-card.js`.
 
-To validate the bundled card, use `make card-test` (Node.js regression tests) and `cd frontend && npm ci && npm run check` (JavaScript syntax and generated bundle consistency). `make check` includes the card regression tests alongside Python checks; CI also runs the frontend bundle check and `make coverage`.
+The card version has one editable source: `frontend/package.json`. Run `cd frontend && npm run build` when changing the version or card sources; the build updates `package-lock.json` and generates the bundled JavaScript. The integration reads the version embedded in that JavaScript for its Lovelace cache-busting URL. Commit both the source changes and generated artifacts; CI checks consistency rather than rebuilding them.\n\nTo validate the bundled card, use `make card-test` (Node.js regression tests) and `cd frontend && npm ci && npm run check` (JavaScript syntax and generated bundle consistency). `make check` includes the card regression tests alongside Python checks; CI also runs the frontend bundle check and `make coverage`.
 
 Diagnostic FlexC event classifications are historical observations, not persistent alarm states. The optional last-event diagnostic sensor may expose `alarm_type` and `alarm_transition` for validated keypad and user alarm events; these fields must not be interpreted as proof that an alarm is still active.
