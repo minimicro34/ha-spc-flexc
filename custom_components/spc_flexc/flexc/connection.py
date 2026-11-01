@@ -588,7 +588,7 @@ class FlexCClient:
     def _account_for_ack(self, request: Mapping[str, Any]) -> int:
         """Use the assigned ATP account for CONNECT ACK, echo other frames."""
         if (
-            int(request["message_id"])
+            request.get("message_id")
             in {MSG_CONNECTION_REQUEST_LEGACY, MSG_CONNECTION_REQUEST}
             and self._assigned_spt_account is not None
         ):
