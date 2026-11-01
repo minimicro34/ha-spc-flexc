@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.25";
+const CARD_VERSION = "1.0.26";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -1662,7 +1662,7 @@ class SpcFlexCCard extends HTMLElement {
       ? `<div class="technical-section" data-technical-section="flexc-events">
           <div class="technical-section-title">${this._t("system.event_history")}</div>
           <details class="system-detail-card" data-system-detail-key="flexc-events">
-            <summary>${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0} ${this._t("system.event_history")}</summary>
+            <summary>${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0} ${this._t(Array.isArray(recentEvents) && recentEvents.length === 1 ? "system.event_count_one" : "system.event_count_many")}</summary>
             <div class="system-detail-body">
               <div class="muted">${this._t("system.event_observation")}</div>
               ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
@@ -4628,6 +4628,8 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.alert_tamper": "Sabotage",
     "zone.alert_trouble": "Défaut",
     "system.event_history": "Historique des événements FlexC",
+    "system.event_count_one": "événement",
+    "system.event_count_many": "événements",
     "system.area": "Secteur",
     "system.zone": "Zone",
     "system.event_enable_hint": "Pour afficher l’historique, activez l’entité de diagnostic « Last FlexC event ID » dans Paramètres → Appareils et services → Entités, puis rechargez l’intégration si nécessaire.",
@@ -4786,6 +4788,8 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.alert_tamper": "Tamper",
     "zone.alert_trouble": "Trouble",
     "system.event_history": "FlexC event history",
+    "system.event_count_one": "event",
+    "system.event_count_many": "events",
     "system.area": "Area",
     "system.zone": "Zone",
     "system.event_enable_hint": "To display event history, enable the diagnostic entity “Last FlexC event ID” under Settings → Devices & services → Entities, then reload the integration if needed.",
