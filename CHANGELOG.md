@@ -8,7 +8,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Fixed
 
-- Warn when an SPC FlexC CONNECT advertises ATP client account zero (SPC auto-assigned mode), explaining the observed no-POLL/reconnect symptom without rejecting the session or guessing an assigned identifier.
+- Log an ATP client account of zero (SPC auto-assigned mode) at DEBUG; warn only if that session closes before the first POLL, without rejecting zero or inventing an identifier. Allow a first-POLL transition from zero to a nonzero account without a misleading identity-change warning.
 
 - Remove empty orphaned SPC area devices from the Home Assistant device registry after complete discovery; preserve devices with remaining entities, child devices, or other config-entry owners.
 - Remove orphaned SPC area alarm-control entities after complete discovery when their area no longer exists, while preserving active entities and skipping empty area discovery results.
