@@ -61,7 +61,7 @@ async def async_setup_entry(
     zone_entity_pattern = re.compile(
         rf"^{re.escape(entry.entry_id)}_zone_(\d+)_(?:motion|tamper|trouble|inhibition|isolation|restore)$"
     )
-    area_entity_pattern = re.compile(rf"^{re.escape(entry.entry_id)}_area_(\\d+)$")
+    area_entity_pattern = re.compile(rf"^{re.escape(entry.entry_id)}_area_(\d+)$")
     orphan_cleanup_done = False
 
     def cleanup_orphan_entities() -> None:
