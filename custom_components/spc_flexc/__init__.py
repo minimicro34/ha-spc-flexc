@@ -122,7 +122,7 @@ async def async_setup_entry(
                     if identifier_domain == DOMAIN
                     if (
                         match := re.fullmatch(
-                            rf"{re.escape(str(serial))}_area_(\\d+)", identifier
+                            rf"{re.escape(str(serial))}_area_(\d+)", identifier
                         )
                     )
                 ]
