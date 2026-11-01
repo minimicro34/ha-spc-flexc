@@ -9,7 +9,6 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Fixed
 
 - Remove empty orphaned SPC area devices from the Home Assistant device registry after complete discovery; preserve devices with remaining entities, child devices, or other config-entry owners.
-
 - Remove orphaned SPC area alarm-control entities after complete discovery when their area no longer exists, while preserving active entities and skipping empty area discovery results.
 - Clean up orphaned SPC zone entities from the Home Assistant entity registry after complete discovery, retaining entities for detected zones and skipping entities with active states or empty discovery results; unavailable orphan entities are eligible for cleanup.
 - Render a proper shield-alert icon and explicit Sabotage state for tampered detectors, fixing an empty icon caused by returning an object instead of an icon name.
@@ -59,9 +58,10 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 - Frontend distribution consistency check passed in GitHub Actions for the beta.6 development changes; live Home Assistant UI verification remains pending.
 - Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
-- **444 Python tests passed** locally and in GitHub Actions on the beta.10 development code; **18 Node.js card tests passed** in the previous validated run.
-- **Python coverage: 92.05% on GitHub Actions / 92.10% locally**.
-- Final CI verification after the beta.10 manifest/changelog updates, and live Home Assistant hardware/UI validation, remain to be confirmed before the stable release.
+- **446 Python tests passed** locally and in GitHub Actions for beta.11 preparation; **18 Node.js card tests passed** in the previous validated run.
+- **Python coverage: 92.01% on GitHub Actions / 92.07% locally**.
+- Live SPC4300 test on beta.10 confirmed removal of one orphan area entity and six orphan zone entities after discovery.
+- Automatic removal of the now-empty orphan area device remains to be verified on Home Assistant with beta.11; full stable-release validation remains pending.
 
 ---
 
