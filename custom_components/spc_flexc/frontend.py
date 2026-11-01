@@ -18,7 +18,9 @@ def _bundled_card_version() -> str:
     """Read the card version embedded by the frontend build."""
     with _CARD_FILE.open(encoding="utf-8") as card:
         first_line = card.readline()
-    match = re.fullmatch(r'const CARD_VERSION = "([0-9]+[.][0-9]+[.][0-9]+)";\n?', first_line)
+    match = re.fullmatch(
+        r'const CARD_VERSION = "([0-9]+[.][0-9]+[.][0-9]+)";\n?', first_line
+    )
     if match is None:
         raise ValueError("Bundled SPC FlexC card version is missing or invalid")
     return match.group(1)
