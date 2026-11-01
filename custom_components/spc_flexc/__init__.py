@@ -6,9 +6,10 @@ import re
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from .const import PLATFORMS
+from .const import DOMAIN, PLATFORMS
 from .frontend import async_register_card
 from .mapping_gate_coordinator import SpcFlexCMappingGateCoordinator
 
@@ -107,6 +108,46 @@ async def async_setup_entry(
                 object_id,
             )
             registry.async_remove(entity.entity_id)
+        # Remove only vanished SPC area devices, never the panel or a live area.
+        # The device may still be referenced by other integrations or children.
+        if discovered_areas:
+            device_registry = dr.async_get(hass)
+            serial = coordinator.data.panel.serial_number or entry.entry_id
+            for device in dr.async_entries_for_config_entry(
+                device_registry, entry.entry_id
+            ):
+                area_ids = [
+                    int(match.group(1))
+                    for identifier_domain, identifier in device.identifiers
+                    if identifier_domain == DOMAIN
+                    if (
+                        match := re.fullmatch(
+                            rf"{re.escape(str(serial))}_area_(\\d+)", identifier
+                        )
+                    )
+                ]
+                if len(area_ids) != 1 or area_ids[0] in discovered_areas:
+                    continue
+                if any(
+                    entity.device_id == device.id
+                    for entity in er.async_entries_for_device(
+                        registry, device.id, include_disabled_entities=True
+                    )
+                ):
+                    continue
+                if any(
+                    child.via_device_id == device.id
+                    for child in device_registry.devices.values()
+                ):
+                    continue
+                if device.config_entries != {entry.entry_id}:
+                    continue
+                _LOGGER.info(
+                    "Removing orphan SPC area device %s (area %s no longer discovered)",
+                    device.id,
+                    area_ids[0],
+                )
+                device_registry.async_remove_device(device.id)
         orphan_cleanup_done = True
 
     entry.async_on_unload(coordinator.async_add_listener(cleanup_orphan_entities))
