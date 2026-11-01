@@ -143,18 +143,10 @@ async def test_orphan_zone_cleanup_requires_complete_discovery() -> None:
         MagicMock(
             entity_id="binary_sensor.zone_13", unique_id="spc-entry_zone_13_motion"
         ),
-        MagicMock(
-            entity_id="switch.zone_13", unique_id="spc-entry_zone_13_isolation"
-        ),
-        MagicMock(
-            entity_id="button.zone_13", unique_id="spc-entry_zone_13_restore"
-        ),
-        MagicMock(
-            entity_id="sensor.unrelated", unique_id="other-entry_zone_13_motion"
-        ),
-        MagicMock(
-            entity_id="sensor.door", unique_id="spc-entry_door_13_status"
-        ),
+        MagicMock(entity_id="switch.zone_13", unique_id="spc-entry_zone_13_isolation"),
+        MagicMock(entity_id="button.zone_13", unique_id="spc-entry_zone_13_restore"),
+        MagicMock(entity_id="sensor.unrelated", unique_id="other-entry_zone_13_motion"),
+        MagicMock(entity_id="sensor.door", unique_id="spc-entry_door_13_status"),
     ]
     registry = MagicMock()
     with (
@@ -162,9 +154,7 @@ async def test_orphan_zone_cleanup_requires_complete_discovery() -> None:
             "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
             return_value=coordinator,
         ),
-        patch(
-            "custom_components.spc_flexc.er.async_get", return_value=registry
-        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
         patch(
             "custom_components.spc_flexc.er.async_entries_for_config_entry",
             return_value=entities,
@@ -177,7 +167,9 @@ async def test_orphan_zone_cleanup_requires_complete_discovery() -> None:
         coordinator._discovery_complete = True
         listener()
         assert {call.args[0] for call in registry.async_remove.call_args_list} == {
-            "binary_sensor.zone_13", "switch.zone_13", "button.zone_13"
+            "binary_sensor.zone_13",
+            "switch.zone_13",
+            "button.zone_13",
         }
         listener()
         assert registry.async_remove.call_count == 3
@@ -204,9 +196,7 @@ async def test_orphan_zone_cleanup_skips_empty_discovery() -> None:
             "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
             return_value=coordinator,
         ),
-        patch(
-            "custom_components.spc_flexc.er.async_get", return_value=registry
-        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
     ):
         assert await async_setup_entry(hass, entry)
         listener = coordinator.async_add_listener.call_args.args[0]
