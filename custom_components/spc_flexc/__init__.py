@@ -74,7 +74,17 @@ async def async_setup_entry(
         registry = er.async_get(hass)
         for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
             match = zone_entity_pattern.fullmatch(entity.unique_id)
-            if match and int(match.group(1)) not in discovered_zones:
+            if not match or int(match.group(1)) in discovered_zones:
+                continue
+            # Never remove a currently loaded entity. Its platform owns its
+            # lifecycle, even if a discovery result appears inconsistent.
+            if hass.states.get(entity.entity_id) is not None:
+                _LOGGER.warning(
+                    "Skipping orphan cleanup for active SPC entity %s",
+                    entity.entity_id,
+                )
+                continue
+            if match:
                 _LOGGER.info(
                     "Removing orphan SPC zone entity %s (zone %s no longer discovered)",
                     entity.entity_id,
