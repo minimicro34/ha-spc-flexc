@@ -60,6 +60,19 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 
 ---
 
+## Upcoming beta: DRS door-release responsiveness
+
+In the unreleased v1.1.5-beta.14 development build, receiving FlexC event
+**#3012 (door release / DRS)** schedules a fresh status read for the matching
+access-control door. The integration uses `DOOR_ID` when available, falls back
+to doors in `AREA_ID`, and otherwise refreshes discovered doors. The returned
+`DRS_INPUT` state is published to Home Assistant only when it changes; the
+normal polling loop remains active.
+
+The bundled SPC FlexC Card v1.0.27 development build displays seconds in FlexC
+event-history timestamps and uses tighter event rows. Actual DRS-to-automation
+latency and raw event identifiers still need testing on a physical SPC panel.
+
 ## Features
 
 ### FlexC
