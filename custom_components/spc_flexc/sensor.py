@@ -131,6 +131,23 @@ async def async_setup_entry(
 # Validated FlexC IDs from SPC event tables and field diagnostics.
 # Descriptions are diagnostic metadata, not persistent alarm states.
 FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
+    3000: "Entry granted",
+    3001: "Entry denied",
+    3002: "Exit granted",
+    3003: "Exit denied",
+    3004: "Door open too long",
+    3005: "Door left open",
+    3006: "Door forced",
+    3007: "Door normal",
+    3008: "Door locked (access denied)",
+    3009: "Door unlocked (free access)",
+    3010: "Door open too long",
+    3011: "Door closed",
+    3012: "Door release (DRS)",
+    3013: "Door alarm restored",
+    3014: "Unknown card",
+    3015: "Reader locked",
+    3016: "Reader unlocked",
     2100: "Zone input active",
     2101: "Zone input restored",
     2103: "Zone input disconnected",
