@@ -263,6 +263,16 @@ class SpcFlexCCard extends HTMLElement {
     }
   }
 
+  _formatEventDateTime(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat(this._locale(), {
+      dateStyle: "short",
+      timeStyle: "medium",
+    }).format(date);
+  }
+
   _stateLabel(state) {
     const key = {
       disarmed: "state.disarmed",
@@ -1599,7 +1609,7 @@ class SpcFlexCCard extends HTMLElement {
     );
     const recentEvents = eventSensor?.stateObj?.attributes?.recent_events;
     const eventMetadata = (event) => [
-      event.received_at ? this._formatDateTime(event.received_at) : null,
+      event.received_at ? this._formatEventDateTime(event.received_at) : null,
       event.origin,
       event.alarm_type,
       event.alarm_transition,
@@ -2854,6 +2864,11 @@ class SpcFlexCCard extends HTMLElement {
 
         .technical-section {
           padding-top: 15px;
+        }
+
+        .event-history-row {
+          padding: 3px 0;
+          line-height: 1.3;
         }
 
         .technical-section-title {
