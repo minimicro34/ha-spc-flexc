@@ -197,11 +197,11 @@ test("release metadata keeps bundled card and integration versions synchronized"
 });
 
 test("recent FlexC events render reception time and discovered area/zone names", () => {
-  assert.match(frontend, /event\\.received_at \\? this\\._formatEventDateTime\\(event\\.received_at\\)/);
-  assert.match(frontend, /_formatEventDateTime\\(value\\)/);
+  assert.match(frontend, /event\.received_at \? this\._formatEventDateTime\(event\.received_at\)/);
+  assert.match(frontend, /_formatEventDateTime\(value\)/);
   assert.match(frontend, /timeStyle: "medium"/);
   assert.match(frontend, /class="technical-line event-history-row"/);
-  assert.match(frontend, /\\.event-history-row \\{/);
+  assert.match(frontend, /\.event-history-row \{/);
   assert.match(frontend, /event\.area_name \? ` — \$\{event\.area_name\}`/);
   assert.match(frontend, /event\.zone_name \? ` — \$\{event\.zone_name\}`/);
   assert.match(frontend, /this\._escapeHtml\(String\(metadata\)\)/);
