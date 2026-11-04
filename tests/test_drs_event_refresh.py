@@ -14,6 +14,8 @@ from custom_components.spc_flexc.zone_control_coordinator import (
 
 def _coordinator() -> MagicMock:
     coordinator = MagicMock(spec=SpcFlexCZoneControlCoordinator)
+    coordinator.entry = MagicMock()
+    coordinator.hass = MagicMock()
     coordinator.state = SpcState()
     coordinator.state.doors = {
         1: DoorState(door_id=1, area_id=2, drs_input=1, raw={"DRS_INPUT": "1"}),
