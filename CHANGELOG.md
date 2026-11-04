@@ -4,6 +4,26 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.5-beta.14] - Unreleased
+
+### Added
+
+- Refresh SPC door status on live FlexC door-release EVENT #3012. Target the discovered DOOR_ID when available, otherwise match the event AREA_ID and fall back to discovered doors if necessary.
+- Keep existing periodic door polling as a fallback, and publish confirmed DRS_INPUT changes without synthesizing door states.
+- Add automated tests for door-event targeting, missing identifiers, and coordinator shutdown.
+
+### Changed
+
+- Bundle SPC FlexC Card v1.0.27: show event timestamps with seconds and reduce spacing between event-history entries.
+- Update integration and frontend version metadata for the next beta; release remains unpublished.
+
+### Validation
+
+- Local make check reported passing by contributor, with 91.91% coverage (80% minimum).
+- Real-panel DRS timing and event DOOR_ID mapping still require validation on Ludovic's test VM.
+
+---
+
 ## [1.1.5-beta.13] - Unreleased
 
 ### Fixed
