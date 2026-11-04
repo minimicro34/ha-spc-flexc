@@ -146,7 +146,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         _LOGGER.debug(
             "FlexC DRS EVENT refresh: EV_ID=3012 DOOR_ID=%s AREA_ID=%s "
             "selected_doors=%s",
-            door_id, area_id, sorted(door_ids),
+            door_id,
+            area_id,
+            sorted(door_ids),
         )
         self._pending_event_door_ids.update(door_ids)
         if (
@@ -180,7 +182,9 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                 except (FlexCError, FlexMLError) as err:
                     _LOGGER.debug("FlexC DRS EVENT door refresh failed: %s", err)
                 except Exception:
-                    _LOGGER.exception("Unexpected error refreshing doors after DRS EVENT")
+                    _LOGGER.exception(
+                        "Unexpected error refreshing doors after DRS EVENT"
+                    )
         finally:
             self._door_event_refresh_task = None
 
