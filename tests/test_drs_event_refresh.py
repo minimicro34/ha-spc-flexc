@@ -25,7 +25,7 @@ def _coordinator() -> MagicMock:
     coordinator._door_discovery_complete = True
     coordinator._door_event_refresh_task = None
     coordinator._pending_event_door_ids = set()
-    coordinator._async_refresh_doors_after_event.side_effect = lambda: (
+    coordinator._async_refresh_doors_after_event = lambda: (
         SpcFlexCZoneControlCoordinator._async_refresh_doors_after_event(coordinator)
     )
     coordinator._async_read_doors = AsyncMock(
