@@ -61,7 +61,7 @@ async def async_setup_entry(
     coordinator: SpcFlexCCoordinator = entry.runtime_data
     async_add_entities(
         [SpcPanelSensor(coordinator, description) for description in DESCRIPTIONS]
-        + [SpcLastEventDiagnosticSensor(coordinator)]
+        + [SpcLastEventDiagnosticSensor(coordinator), SpcPirSlowReadDiagnosticSensor(coordinator)]
     )
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
@@ -251,6 +251,35 @@ FLEXC_ALARM_EVENTS: dict[int, tuple[str, str]] = {
     5352: ("medical", "trigger"),
     5353: ("medical", "restore"),
 }
+
+
+class SpcPirSlowReadDiagnosticSensor(
+    CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
+):
+    """Optional, rolling one-hour diagnostic history of slow PIR zone reads."""
+
+    _attr_has_entity_name = True
+    _attr_name = "PIR slow reads (1h)"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _attr_icon = "mdi:timer-alert-outline"
+
+    def __init__(self, coordinator: SpcFlexCCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id(coordinator)}_pir_slow_reads_1h"
+        self._attr_device_info = build_device_info(coordinator)
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.pir_slow_reads.snapshot()["count"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        snapshot = self.coordinator.pir_slow_reads.snapshot()
+        return {
+            "max_read_ms": snapshot["max_read_ms"],
+            "slow_reads": snapshot["slow_reads"],
+        }
 
 
 class SpcLastEventDiagnosticSensor(
