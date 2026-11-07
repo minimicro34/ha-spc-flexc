@@ -47,7 +47,6 @@ from .flexc.events import (
 from .flexc.flexml import FlexMLError
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
-from .pir_diagnostics import PirSlowReadHistory, slow_read_log_level
 from .models import (
     AreaState,
     AtpState,
@@ -58,6 +57,7 @@ from .models import (
     XBusDeviceState,
     ZoneState,
 )
+from .pir_diagnostics import PirSlowReadHistory, slow_read_log_level
 from .user_names import display_user_name
 
 _LOGGER = logging.getLogger(__name__)
@@ -903,7 +903,6 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     async def _async_zone_poll_loop(self) -> None:
         """Poll zones without allowing one malformed reply to stop live updates."""
         _LOGGER.debug("SPC zone polling started")
-        poll_loop_started = asyncio.get_running_loop().time()
         previous_poll_started: float | None = None
         try:
             while True:
