@@ -515,6 +515,31 @@ async def test_unsolicited_event_refreshes_idle_command_context() -> None:
 
 
 @pytest.mark.asyncio
+async def test_event_ack_failure_does_not_promote_command_context() -> None:
+    """A failed EVENT ACK must never seed a new outbound DATA sequence."""
+    client = _client()
+    original = _message()
+    client._command_context = original
+    client._rct_sequence = int(original["rct_sequence"])
+    client._context_event.set()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._send_wire = AsyncMock(side_effect=OSError("connection lost"))
+
+    event = {
+        **_message(),
+        "message_id": MSG_EVENT,
+        "rct_sequence": 55,
+        "app_data": b"event",
+    }
+    with pytest.raises(OSError, match="connection lost"):
+        await client._handle_message(event)
+
+    assert client._command_context is original
+    assert client._rct_sequence == int(original["rct_sequence"])
+    assert client._context_event.is_set()
+
+
+@pytest.mark.asyncio
 async def test_successive_unsolicited_events_use_latest_context() -> None:
     """A second EVENT supersedes the first before a new command."""
     client = _client()
