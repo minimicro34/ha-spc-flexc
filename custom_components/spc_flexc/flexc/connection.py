@@ -888,17 +888,20 @@ class FlexCClient:
                 )
             )
 
-            # An EVENT can advance the panel's transport context. Never
-            # replace the context of an in-flight DATA request: its reply
-            # remains authoritative. Between requests, require a fresh POLL.
-            if self._pending_reply is None and not self._awaiting_poll_after_event:
-                self._command_context = None
-                self._context_event.clear()
-                self._awaiting_poll_after_event = True
-                self._event_resync_started_at = asyncio.get_running_loop().time()
+            # An acknowledged EVENT is a fresh panel-originated transport
+            # frame. When no DATA command is in flight, use its validated
+            # sequence fields as the next outbound command context instead of
+            # waiting up to one polling interval for a new POLL. An in-flight
+            # DATA reply remains authoritative for its own command chain.
+            if self._pending_reply is None:
+                self._command_context = dict(message)
+                self._rct_sequence = int(message["rct_sequence"])
+                self._awaiting_poll_after_event = False
+                self._event_resync_started_at = None
+                self._context_event.set()
                 _LOGGER.debug(
-                    "FlexC unsolicited EVENT between commands: waiting for "
-                    "fresh SPC POLL before next command (session #%d)",
+                    "FlexC command context refreshed from acknowledged "
+                    "unsolicited EVENT (session #%d)",
                     self._session_generation,
                 )
 
