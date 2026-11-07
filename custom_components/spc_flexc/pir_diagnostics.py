@@ -1,8 +1,8 @@
 """Bounded, in-memory PIR slow-read diagnostics."""
 
+import logging
 from collections import deque
 from datetime import UTC, datetime
-import logging
 from time import monotonic
 
 SLOW_READ_MS = 1000.0
