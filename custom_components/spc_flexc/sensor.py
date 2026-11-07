@@ -1,6 +1,6 @@
 """Sensor entities for the SPC FlexC integration."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -18,6 +18,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -268,6 +269,20 @@ class SpcPirSlowReadDiagnosticSensor(
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id(coordinator)}_pir_slow_reads_1h"
         self._attr_device_info = build_device_info(coordinator)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Expire rolling history even when no new slow readings arrive.
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                self._async_refresh_history,
+                timedelta(minutes=1),
+            )
+        )
+
+    def _async_refresh_history(self, _now: datetime) -> None:
+        self.async_write_ha_state()
 
     @property
     def native_value(self) -> int:
