@@ -195,10 +195,7 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     )
     assert len(batches[0]) == 6
     assert (
-        sum(
-            isinstance(entity, SpcPirSlowReadDiagnosticSensor)
-            for entity in batches[0]
-        )
+        sum(isinstance(entity, SpcPirSlowReadDiagnosticSensor) for entity in batches[0])
         == 1
     )
     assert len(batches[1]) == 10
