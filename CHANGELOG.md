@@ -6,7 +6,15 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
-Changes planned after the latest documented beta. Individual beta changes and validation results are recorded below.
+### Planned for 1.1.5-beta.16 (not yet implemented)
+
+- PIR slow-read logging: DEBUG from 1000 ms, INFO from 1500 ms, WARNING from 2000 ms, using read_ms rather than polling interval or resync wait.
+- Repeated slow reads: distinct WARNING for 3 occurrences in a rolling 60 seconds, limited to one per 10 minutes, reporting count and maximum duration.
+- Optional diagnostic sensor, disabled by default: number of slow reads over the last hour, maximum read_ms, and bounded timestamped history; expires without additional polling and resets on restart.
+- SPC FlexC Card / System: collapsed PIR diagnostic section below event history and above RF, showing the count, timestamped readings, empty state or activation instructions as appropriate.
+- Tests: threshold boundaries, rolling windows, rate limiting, history expiration, and card display states.
+
+These are planned changes, not yet implemented or validated.
 
 ---
 
