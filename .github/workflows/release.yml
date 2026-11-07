@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Tag to create (for example v1.3.3-beta12)"
+        description: "Tag to create (for example v1.1.5-beta.15)"
         required: true
         type: string
       prerelease:
@@ -145,13 +145,13 @@ jobs:
           version = os.environ["RELEASE_TAG"]
           changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
           section = re.search(
-              rf"(?ms)^## \\[\\s*{re.escape(version.removeprefix('v'))}\\s*\\][^\\n]*\\n(.*?)(?=^---\\s*$|^## \\[|\\Z)",
+              rf"(?ms)^## \[\s*{re.escape(version.removeprefix('v'))}\s*\][^\n]*\n(.*?)(?=^---\s*$|^## \[|\Z)",
               changelog,
           )
           if not section:
               raise SystemExit(f"No changelog entry for {version}")
-          notes = section.group(1).strip() + "\\n"
-          notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\\Z)", "", notes).strip() + "\n"
+          notes = section.group(1).strip() + "\n"
+          notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip() + "\n"
 
           log = Path("quality.log").read_text(encoding="utf-8")
           pytest = re.findall(r"(?m)(\d+) passed\b", log)
