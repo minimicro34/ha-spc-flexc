@@ -539,6 +539,36 @@ async def test_successive_unsolicited_events_use_latest_context() -> None:
 
 
 @pytest.mark.asyncio
+async def test_command_after_event_sends_without_waiting_for_poll() -> None:
+    """Disarm can send immediately after a validated EVENT acknowledgment."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._build_outbound_data = MagicMock(return_value=b"command")
+    event = {
+        **_message(),
+        "message_id": MSG_EVENT,
+        "rct_sequence": 41,
+        "app_data": b"event",
+    }
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=None,
+    ):
+        await client._handle_message(event)
+
+    task = asyncio.create_task(client.async_send_flexml("<FLEXML/>"))
+    await asyncio.sleep(0)
+    client._build_outbound_data.assert_called_once()
+    assert client._build_outbound_data.call_args.args[0] == event
+    assert client._build_outbound_data.call_args.args[1] == 42
+    assert client._pending_reply is not None
+    client._pending_reply.set_result("<REPLY/>")
+    assert await task == "<REPLY/>"
+
+
+@pytest.mark.asyncio
 async def test_event_during_pending_command_preserves_reply_context() -> None:
     """An EVENT must not invalidate a command awaiting its DATA reply."""
     client = _client()
@@ -710,34 +740,32 @@ def test_handle_incoming_data_propagates_malformed_reply() -> None:
 
 
 @pytest.mark.asyncio
-async def test_repeated_events_keep_first_resync_start_until_poll() -> None:
-    """Repeated unsolicited EVENTs must not restart the POLL wait timer."""
+async def test_repeated_events_do_not_require_poll_resync() -> None:
+    """Repeated EVENTs keep the latest acknowledged transport context."""
     client = _client()
     client._send_wire = AsyncMock()
     client._build_clone_ack = MagicMock(return_value=b"ack")
     client._command_context = _message()
     client._context_event.set()
-    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
 
-    with patch(
-        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
-        return_value=None,
-    ):
-        await client._handle_message(event)
-        started_at = client._event_resync_started_at
-        assert started_at is not None
-        await client._handle_message(event)
+    for sequence in (41, 42):
+        event = {
+            **_message(),
+            "message_id": MSG_EVENT,
+            "rct_sequence": sequence,
+            "app_data": b"event",
+        }
+        with patch(
+            "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+            return_value=None,
+        ):
+            await client._handle_message(event)
+        assert client._event_resync_started_at is None
+        assert client._awaiting_poll_after_event is False
+        assert client._context_event.is_set()
 
-    assert client._event_resync_started_at == started_at
-    assert client._awaiting_poll_after_event is True
-    assert client._command_context is None
-
-    poll = {**_message(), "message_id": MSG_POLL}
-    await client._handle_message(poll)
-
-    assert client._event_resync_started_at is None
-    assert client._awaiting_poll_after_event is False
-    assert client._context_event.is_set()
+    assert client._command_context == event
+    assert client._rct_sequence == 42
 
 
 @pytest.mark.asyncio
