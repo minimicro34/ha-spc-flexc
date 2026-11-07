@@ -34,8 +34,6 @@ Changes planned after the latest documented beta. Individual beta changes and va
 
 ---
 
----
-
 ## [1.1.5-beta.14] - 2026-11-04
 
 ### Changed
