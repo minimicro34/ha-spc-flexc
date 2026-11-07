@@ -79,7 +79,7 @@ def _incoming(message_id: int, *, sequence: int = 100) -> dict[str, object]:
 
 
 @pytest.mark.asyncio
-async def test_event_between_commands_invalidates_context_until_fresh_poll(
+async def test_event_between_commands_uses_acknowledged_event_context(
     client: FlexCClient,
 ) -> None:
     """An unsolicited EVENT prevents reuse of the previous DATA context."""
@@ -96,9 +96,10 @@ async def test_event_between_commands_invalidates_context_until_fresh_poll(
     ):
         await client._handle_message(event)
 
-    assert client._command_context is None
-    assert not client._context_event.is_set()
-    assert client._awaiting_poll_after_event is True
+    assert client._command_context == event
+    assert client._rct_sequence == 11
+    assert client._context_event.is_set()
+    assert client._awaiting_poll_after_event is False
     client._send_wire.assert_awaited()
 
     poll = _incoming(MSG_POLL, sequence=12)
@@ -109,20 +110,22 @@ async def test_event_between_commands_invalidates_context_until_fresh_poll(
 
 
 @pytest.mark.asyncio
-async def test_multiple_events_do_not_reenable_stale_context(
+async def test_multiple_events_refresh_context_without_poll(
     client: FlexCClient,
 ) -> None:
-    """Repeated EVENT frames leave the command chain invalid until a POLL."""
+    """Repeated acknowledged EVENT frames advance the idle command context."""
     await client._handle_message(_incoming(MSG_POLL))
     with patch(
         "custom_components.spc_flexc.flexc.connection.parse_event_payload",
         return_value=None,
     ):
         for sequence in (101, 102, 103):
-            await client._handle_message(_incoming(MSG_EVENT, sequence=sequence))
-            assert client._command_context is None
-            assert client._awaiting_poll_after_event
-            assert not client._context_event.is_set()
+            event = _incoming(MSG_EVENT, sequence=sequence)
+            await client._handle_message(event)
+            assert client._command_context == event
+            assert client._rct_sequence == sequence
+            assert not client._awaiting_poll_after_event
+            assert client._context_event.is_set()
 
     await client._handle_message(_incoming(MSG_POLL, sequence=104))
     assert client._command_context is not None
@@ -162,10 +165,10 @@ async def test_event_during_command_keeps_reply_context_authoritative(
 
 
 @pytest.mark.asyncio
-async def test_event_during_command_then_next_event_requires_poll(
+async def test_event_during_command_then_next_event_refreshes_context(
     client: FlexCClient,
 ) -> None:
-    """Only an EVENT after completion invalidates the newly established chain."""
+    """An EVENT after command completion becomes the next context."""
     client._handle_incoming_data = MagicMock()
     pending = asyncio.get_running_loop().create_future()
     client._pending_reply = pending
@@ -179,8 +182,10 @@ async def test_event_during_command_then_next_event_requires_poll(
         client._pending_reply = None
         await client._handle_message(_incoming(MSG_EVENT, sequence=303))
 
-    assert client._command_context is None
-    assert client._awaiting_poll_after_event
+    assert client._command_context == _incoming(MSG_EVENT, sequence=303)
+    assert client._rct_sequence == 303
+    assert not client._awaiting_poll_after_event
+    assert client._context_event.is_set()
     pending.cancel()
 
 
@@ -195,7 +200,8 @@ async def test_new_handshake_resets_wait_for_poll_flag(client: FlexCClient) -> N
         return_value=None,
     ):
         await client._handle_message(_incoming(MSG_EVENT))
-    assert client._awaiting_poll_after_event
+    assert not client._awaiting_poll_after_event
+    assert client._command_context == _incoming(MSG_EVENT)
 
     # The local flag is reset by _handle_client() at TCP connection acceptance,
     # not by the handshake message handler. Test the handshake's context behavior
@@ -221,7 +227,7 @@ async def test_new_handshake_resets_wait_for_poll_flag(client: FlexCClient) -> N
     ],
 )
 @pytest.mark.asyncio
-async def test_ludovic_timeout_patterns_keep_event_poll_order(
+async def test_ludovic_timeout_patterns_use_event_context_without_poll(
     client: FlexCClient, timestamp: str, command: str
 ) -> None:
     """For each observed timeout, reproduce the suspected EVENT/POLL race.
@@ -235,8 +241,12 @@ async def test_ludovic_timeout_patterns_keep_event_poll_order(
         return_value=None,
     ):
         await client._handle_message(_incoming(MSG_EVENT, sequence=501))
-    assert client._command_context is None, (timestamp, command)
-    assert not client._context_event.is_set(), (timestamp, command)
+    assert client._command_context == _incoming(MSG_EVENT, sequence=501), (
+        timestamp,
+        command,
+    )
+    assert client._context_event.is_set(), (timestamp, command)
+    assert client._rct_sequence == 501, (timestamp, command)
     await client._handle_message(_incoming(MSG_POLL, sequence=502))
     assert client._command_context is not None, (timestamp, command)
     assert client._rct_sequence == 502, (timestamp, command)
