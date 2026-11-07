@@ -67,7 +67,7 @@ jobs:
     name: Sign tag and publish
     needs: quality
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || inputs.dry_run == true
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop/v1.1.5'
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.version }}
@@ -93,8 +93,17 @@ jobs:
             echo "::error::Invalid tag format: $RELEASE_TAG"
             exit 1
           fi
-          if [[ "${{ inputs.dry_run }}" != "true" && "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "::error::Publishing releases is restricted to main"
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != "refs/heads/develop/v1.1.5" ]]; then
+            echo "::error::Signed releases are restricted to main and develop/v1.1.5"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" == "refs/heads/develop/v1.1.5" ]]; then
+            if [[ "${{ inputs.prerelease }}" != "true" || ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+              echo "::error::Development branch permits only beta prereleases (vX.Y.Z-beta.N with prerelease=true)"
+              exit 1
+            fi
+          elif [[ "${{ inputs.dry_run }}" != "true" && "$RELEASE_TAG" == *-* ]]; then
+            echo "::error::Prerelease tags must be published from develop/v1.1.5"
             exit 1
           fi
           manifest_version="$(python -c 'import json; print(json.load(open("custom_components/spc_flexc/manifest.json", encoding="utf-8"))["version"])')"
