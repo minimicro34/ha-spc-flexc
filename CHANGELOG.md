@@ -33,13 +33,13 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Tests
 
 - Added unit tests for read thresholds, repeated warning cooldown and history expiry.
-- Full Python and JavaScript test results pending CI verification.
+- GitHub Actions CI: 465 Python tests passed (91.76% coverage) and 20 JavaScript tests passed.
 
 ### Validation
 
 - Beta15 production confirmation (Ludovic, Cat 5): PIR detections on garage zones 45/46 at 18:33:03 and 18:33:11; automation sent `Door 1 Mode normal` at 18:33:13.666; Door 1 returned to normal at 18:33:13.695 (29 ms). DRS response was immediate; the remaining 5–6 seconds were attributed to Nuki mechanical operation. This validates the beta15 command/polling correction in the reported production scenario, not the new beta16 diagnostics.
-- Development changes committed on `develop/v1.1.5`; not yet released.
-- GitHub Actions CI and hardware validation pending.
+- GitHub Actions CI validated: 465 Python tests passed, 91.76% coverage, and 20 JavaScript tests passed.
+- Signed release dry run passed; beta.16 PIR diagnostics hardware validation pending.
 
 ---
 
