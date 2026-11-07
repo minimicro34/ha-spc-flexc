@@ -486,33 +486,56 @@ async def test_handle_message_poll_does_not_replace_active_command_context() -> 
 
 
 @pytest.mark.asyncio
-async def test_unsolicited_event_waits_for_fresh_poll_before_commands() -> None:
-    """An EVENT invalidates idle command context until a validated POLL."""
+async def test_unsolicited_event_refreshes_idle_command_context() -> None:
+    """An acknowledged EVENT provides a fresh context without a POLL."""
     client = _client()
     client._send_wire = AsyncMock()
     client._build_clone_ack = MagicMock(return_value=b"ack")
-    original = _message()
-    client._command_context = original
+    client._command_context = _message()
     client._context_event.set()
 
-    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
+    event = {
+        **_message(),
+        "message_id": MSG_EVENT,
+        "rct_sequence": 41,
+        "app_data": b"event",
+    }
     with patch(
         "custom_components.spc_flexc.flexc.connection.parse_event_payload",
         return_value=None,
     ):
         await client._handle_message(event)
 
-    assert client._command_context is None
-    assert not client._context_event.is_set()
-    assert client._awaiting_poll_after_event is True
-
-    poll = {**_message(), "message_id": MSG_POLL, "rct_sequence": 42}
-    await client._handle_message(poll)
-
-    assert client._command_context == poll
-    assert client._rct_sequence == 42
+    client._send_wire.assert_awaited_once_with(b"ack")
+    assert client._command_context == event
+    assert client._rct_sequence == 41
     assert client._context_event.is_set()
     assert client._awaiting_poll_after_event is False
+    assert await client.async_wait_for_event_resync() == 0.0
+
+
+@pytest.mark.asyncio
+async def test_successive_unsolicited_events_use_latest_context() -> None:
+    """A second EVENT supersedes the first before a new command."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    for sequence in (41, 42):
+        event = {
+            **_message(),
+            "message_id": MSG_EVENT,
+            "rct_sequence": sequence,
+            "app_data": b"event",
+        }
+        with patch(
+            "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+            return_value=None,
+        ):
+            await client._handle_message(event)
+    assert client._command_context == event
+    assert client._rct_sequence == 42
+    assert client._context_event.is_set()
+    assert client._send_wire.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -733,7 +756,8 @@ async def test_data_reply_restores_context_after_unsolicited_event() -> None:
     ):
         await client._handle_message(event)
 
-    assert client._awaiting_poll_after_event is True
+    assert client._command_context == event
+    assert client._awaiting_poll_after_event is False
 
     data = {
         **_message(),
