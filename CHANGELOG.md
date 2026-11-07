@@ -12,6 +12,11 @@ Changes planned after the latest documented beta. Individual beta changes and va
 
 ## [1.1.5-beta.15]
 
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.15`
+- SPC FlexC Card: `1.0.27`
+
 ### Improved
 
 - Refresh the idle FlexC command context immediately after acknowledging an unsolicited EVENT, instead of waiting for the next ATP supervision POLL (8–10 seconds depending on path category).
@@ -36,6 +41,11 @@ Changes planned after the latest documented beta. Individual beta changes and va
 
 ## [1.1.5-beta.14]
 
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.14`
+- SPC FlexC Card: `1.0.27`
+
 ### Changed
 - Improved the integrated Lovelace card event history layout with more compact rows.
 - Updated FlexC event timestamps to include seconds for more precise event tracking.
@@ -44,9 +54,6 @@ Changes planned after the latest documented beta. Individual beta changes and va
 - Improved DRS door-release responsiveness by triggering an immediate door status refresh when FlexC event `#3012` is received, without waiting for the regular polling cycle.
 - Preserved periodic polling as a fallback for door status synchronization.
 
-### Version
-
-- Updated the bundled Lovelace card to `1.0.27`.
 
 ### Validation
 - 458 Python tests passed.
@@ -69,6 +76,11 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 
 **This change requires validation on a real SPC4300.** If the connection still drops before the first POLL, configuring an explicit nonzero ATP account remains the recommended workaround.
 
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.13`
+- SPC FlexC Card: `1.0.26`
+
 ### Added
 - Automatic ATP client account assignment for FlexC CONNECT requests using account `0`, supporting legacy and modern connection acknowledgements.
 - Additional regression tests covering automatic account assignment, explicit accounts, subsequent acknowledgements and new assignments.
@@ -80,9 +92,6 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 ### Changed
 - Preserved explicitly configured nonzero ATP accounts and existing session identity-change diagnostics.
 
-### Version
-
-- Updated the bundled **SPC FlexC Card to v1.0.26**, including its JavaScript distribution and translations.
 
 ### Validation
 - **451 Python tests passed**
@@ -92,6 +101,11 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 ---
 
 ## [1.1.5-beta.12]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.12`
+- SPC FlexC Card: `1.0.25`
 
 ### Added
 
@@ -119,9 +133,6 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 
 Continue using a manually configured, nonzero ATP client account until this behavior has been validated.
 
-### Version
-
-- Bundle **SPC FlexC Card v1.0.25**.
 
 ### Validation
 
@@ -141,6 +152,11 @@ Continue using a manually configured, nonzero ATP client account until this beha
 ---
 
 ## [1.1.5-beta.11]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.11`
+- SPC FlexC Card: `1.0.24`
 
 ### Fixed
 
@@ -165,6 +181,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ## [1.1.5-beta.10]
 
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.10`
+- SPC FlexC Card: `1.0.24`
+
 ### Fixed
 
 - Automatically remove orphaned SPC area (`alarm_control_panel`) entities after complete discovery when their area no longer exists.
@@ -185,6 +206,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 ---
 
 ## [1.1.5-beta.9]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.9`
+- SPC FlexC Card: `1.0.24`
 
 ### Fixed
 - Automatically clean up orphaned SPC zone entities after successful background discovery.
@@ -209,6 +235,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 ---
 
 ## [1.1.5-beta.8]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.8`
+- SPC FlexC Card: `1.0.24`
 
 ### Added
 
@@ -235,9 +266,6 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 - Correct legacy FlexC CONNECT acknowledgement handling.
 - Synchronize bundled card version metadata and Lovelace resource cache version.
 
-### Version
-
-- Bundle **SPC FlexC Card v1.0.24** with integration **v1.1.5-beta.8**.
 
 ### Validation
 
@@ -247,6 +275,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 ---
 
 ## [1.1.5-beta.7]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.7`
+- SPC FlexC Card: `1.0.22`
 
 ### Fixed
 
@@ -269,6 +302,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 ---
 
 ## [1.1.5-beta.6]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.6`
+- SPC FlexC Card: `1.0.22`
 
 ### Added
 
@@ -293,6 +331,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 ---
 
 ## [1.1.5-beta.5]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.5`
+- SPC FlexC Card: `1.0.21`
 
 ### Fixed
 
@@ -362,13 +405,17 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 - **Python coverage:** 91.96% on GitHub Actions.
 - Ruff formatting/lint and automated checks passed.
 
-### Version
 - **SPC FlexC integration:** `1.1.5-beta.5`
 - **Bundled SPC FlexC Card:** `1.0.21`
 
 ---
 
 ## [1.1.5-beta.4]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.4`
+- SPC FlexC Card: `1.0.20`
 
 ### Added
 
@@ -408,6 +455,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ## [1.1.5-beta.3]
 
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.3`
+- SPC FlexC Card: `1.0.19`
+
 ### Changed
 
 - Improved FlexC session identity diagnostics to support different connection ID behaviors across SPC panels and firmware versions.
@@ -432,6 +484,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 ---
 
 ## [1.1.5-beta.2]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.2`
+- SPC FlexC Card: `1.0.19`
 
 ### Changed
 
@@ -462,6 +519,11 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ## [1.1.5-beta.1]
 
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.1`
+- SPC FlexC Card: `1.0.19`
+
 ### Fixed
 
 - Fixed the legacy FlexC connection acknowledgement (`0x01`) to echo the SPC account code supplied by the panel instead of using a hardcoded value.
@@ -480,10 +542,6 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 - Extended GitHub Actions validation to the development branch.
 
-### Version
-
-- Updated the integration manifest version to `1.1.5-beta.1`.
-- Updated the bundled card resource cache marker to `1.0.19`.
 
 ### Validation
 
