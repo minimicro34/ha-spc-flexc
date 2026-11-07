@@ -51,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           make check 2>&1 | tee "$RUNNER_TEMP/quality.log"
+          make coverage 2>&1 | tee -a "$RUNNER_TEMP/quality.log"
           cp "$RUNNER_TEMP/quality.log" quality.log
       - name: Preserve test and coverage results
         uses: actions/upload-artifact@v6
