@@ -4,7 +4,13 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.1.5-beta.15] - Unreleased
+## [Unreleased]
+
+Changes planned after the latest documented beta. Individual beta changes and validation results are recorded below.
+
+---
+
+## [1.1.5-beta.15]
 
 ### Improved
 
@@ -28,110 +34,459 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
-## [1.1.5-beta.14] - Unreleased
+---
 
-### Added
-
-- Refresh SPC door status on live FlexC door-release EVENT #3012. Target the discovered DOOR_ID when available, otherwise match the event AREA_ID and fall back to discovered doors if necessary.
-- Keep existing periodic door polling as a fallback, and publish confirmed DRS_INPUT changes without synthesizing door states.
-- Add automated tests for door-event targeting, missing identifiers, and coordinator shutdown.
+## [1.1.5-beta.14] - 2026-11-04
 
 ### Changed
+- Improved the integrated Lovelace card event history layout with more compact rows.
+- Updated FlexC event timestamps to include seconds for more precise event tracking.
+- Updated the bundled Lovelace card to `1.0.27`.
 
-- Bundle SPC FlexC Card v1.0.27: show event timestamps with seconds and reduce spacing between event-history entries.
-- Update integration and frontend version metadata for the next beta; release remains unpublished.
+### Fixed
+- Improved DRS door-release responsiveness by triggering an immediate door status refresh when FlexC event `#3012` is received, without waiting for the regular polling cycle.
+- Preserved periodic polling as a fallback for door status synchronization.
 
 ### Validation
-
-- Local make check reported passing by contributor, with 91.91% coverage (80% minimum).
-- Real-panel DRS timing and event DOOR_ID mapping still require validation on Ludovic's test VM.
+- 458 Python tests passed.
+- 20 Lovelace card tests passed.
+- Local test coverage: **91.91%**.
+- Full local `make check` passed.
+- Real hardware validation of DRS event `#3012` and Nuki automation responsiveness is pending.
 
 ---
 
-## [1.1.5-beta.13] - Unreleased
+## [1.1.5-beta.13] - 2026-11-01
+
+## Important — FlexC ATP automatic account assignment
+
+This beta introduces automatic ATP client account assignment for SPC panels configured with account `0`.
+
+Based on the behavior identified in the official SPCLink receiver implementation, the integration now generates a nonzero account identifier and returns it in the encrypted FlexC CONNECT acknowledgement.
+
+This addresses a potential cause of the repeated CONNECT/disconnect cycle observed on an SPC4300 when using ATP account `0`.
+
+**This change requires validation on a real SPC4300.** If the connection still drops before the first POLL, configuring an explicit nonzero ATP account remains the recommended workaround.
+
+### Added
+- Automatic ATP client account assignment for FlexC CONNECT requests using account `0`, supporting legacy and modern connection acknowledgements.
+- Additional regression tests covering automatic account assignment, explicit accounts, subsequent acknowledgements and new assignments.
 
 ### Fixed
-
-- Assign a nonzero ATP client account when SPC sends account `0` in CONNECT, and include it in the corresponding encrypted CONNECT ACK for both legacy and modern message types. Preserve explicitly configured nonzero accounts.
-- Remove temporary beta.12 ATP-zero disconnect warnings and per-message identity sampling logs, while retaining useful session identity-change diagnostics.
-- Avoid repeating the event history title in the bundled card: show a localized singular/plural event count under the existing heading.
+- Removed temporary beta.12 ATP account `0` disconnect warnings and redundant session identity sampling logs.
+- Fixed the duplicated event history heading in the bundled Lovelace card. The expandable panel now displays a localized event count (for example, `11 événements`).
 
 ### Changed
-
-- Bundle **SPC FlexC Card v1.0.26**, including the synchronized JavaScript distribution, translations and frontend package metadata.
+- Updated the bundled **SPC FlexC Card to v1.0.26**, including its JavaScript distribution and translations.
+- Preserved explicitly configured nonzero ATP accounts and existing session identity-change diagnostics.
 
 ### Validation
-
-- **451 Python tests passed locally; coverage 92.08%** (minimum required: 80%). Additional tests cover modern CONNECT account assignment, subsequent acknowledgements and fresh assignments.
-- GitHub Actions and real SPC4300 validation with ATP account `0` are pending. The connection-ID handshake behavior remains a separate potential compatibility difference.
+- **451 Python tests passed**
+- **92.08% Python coverage** (minimum required: 80%)
+- Real SPC4300 validation with ATP account `0` pending.
 
 ---
 
-## [1.1.5-beta.12] - Unreleased
-
-### Fixed
-
-- Log an ATP client account of zero (SPC auto-assigned mode) at DEBUG; warn only if that session closes before the first POLL, without rejecting zero or inventing an identifier. Allow a first-POLL transition from zero to a nonzero account without a misleading identity-change warning.
-
-- Remove empty orphaned SPC area devices from the Home Assistant device registry after complete discovery; preserve devices with remaining entities, child devices, or other config-entry owners.
-- Remove orphaned SPC area alarm-control entities after complete discovery when their area no longer exists, while preserving active entities and skipping empty area discovery results.
-- Clean up orphaned SPC zone entities from the Home Assistant entity registry after complete discovery, retaining entities for detected zones and skipping entities with active states or empty discovery results; unavailable orphan entities are eligible for cleanup.
-- Render a proper shield-alert icon and explicit Sabotage state for tampered detectors, fixing an empty icon caused by returning an object instead of an icon name.
-- Retry incomplete or failed Home Assistant entity-registry discovery after a short cooldown instead of leaving detector/output scope permanently empty after a transient failure.
-- Include tamper event flags from ordinary detectors in each area’s sabotage indicator, not only dedicated tamper entities.
-- Keep the selected Outputs tab while SPC entity scope is loading and distinguish loading from a confirmed empty detector list.
-- Echo the panel-provided SPC account code in legacy FlexC CONNECT acknowledgements (`0x01`) instead of a hardcoded value.
-- Clear pending commands when a new TCP session replaces the previous one, preventing stale command timeouts and buffered frames from interfering with the new session.
-- Apply a 60-second idle read timeout to close inactive or stalled FlexC TCP sessions.
-- Distinguish SPC authentication error `54` from other panel error codes.
-- Preserve per-zone tamper/trouble observations across ordinary PIR input polling instead of clearing an acknowledged/latched diagnostic from a motion/rest transition.
-- Keep startup-only slow PIR zone polling measurements at DEBUG for the first 30 seconds after zone polling begins; preserve WARNING-level reporting afterwards without delaying or changing polling.
+## [1.1.5-beta.12] - 2026-11-01
 
 ### Added
 
-- Timestamp each received FlexC event (`received_at`) and enrich recent event history with discovered area/zone names while preserving numeric identifiers.
-- Display event reception time, area and zone labels in the bundled card; show a localized activation hint when the optional Last FlexC event ID sensor is unavailable.
-- Centralize the bundled card version in `frontend/package.json`; the build synchronizes the lockfile and JavaScript bundle, and the integration reads the embedded version for Lovelace resource cache-busting.
-- Display recent FlexC events in a rounded, collapsible System-tab panel with an event count.
-- Group wireless event observations in an expandable section and show RF diagnostics, including RF Jamming when `off`, under Wireless (RF).
-- Non-blocking, per-session diagnostics for SPC account code, connection ID and receiver identifier changes, with warnings deduplicated per field.
-- Sanitized identity samples for incoming CONNECT, POLL, EVENT and DATA messages, once per message type and TCP session.
-- Explicit diagnostic detection of `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` messages.
-- Extend the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm type and transition for validated panic, medical, fire and hold-up events from user commands, wireless keypads and X-BUS keypads.
-- Include validated event origin and identifiers in the diagnostic event history, including events without an area or zone identifier.
-- Add Node.js regression checks for the bundled SPC FlexC Lovelace card and include `make card-test` in `make check`, covering panel selection, diagnostic scoping, HTML escaping, missing entities, alarm-state presentation, event metadata and the localized diagnostic-sensor activation hint.
-- Add two diagnostic binary sensors per discovered SPC zone for tamper and trouble, independent of the physical detector state, with support for zone-type event families `1200–1223` / `1300–1323` and `1800–1823` / `1900–1923`.
-- Decode zone input events `2100`, `2101`, `2103`, `2107` and zone-type tamper/trouble transitions in the optional **Last FlexC event ID** diagnostic sensor; keep numeric IDs, area/zone identifiers and event classifications in the recent-event attributes.
-- Show tamper/trouble labels on detector rows and counters in collapsed detector groups and the general card overview, without replacing the detector's original icon or counting anomalies as additional detectors.
-- Display recent FlexC event diagnostics in the card's **System** tab when the optional event-ID sensor is enabled; preserve existing Wireless and X-BUS diagnostics.
+- Record a UTC reception timestamp (`received_at`) for each recent FlexC event.
+- Include discovered area and zone names (`area_name`, `zone_name`) alongside their original numeric identifiers.
+- Display event reception times, area names and zone names in the **System** tab of the bundled SPC FlexC Card.
+- Show a localized activation hint when the optional **Last FlexC event ID** diagnostic sensor is disabled or unavailable.
+- Add regression tests for event metadata and the diagnostic sensor activation hint.
+
+### Improved
+
+- Bundle **SPC FlexC Card v1.0.25**.
+- Centralize the card version in `frontend/package.json` as the single source of truth.
+- Automatically synchronize the frontend lockfile and generated JavaScript bundle during the build.
+- Read the bundled card version dynamically for Lovelace resource cache-busting.
+- Preserve numeric event identifiers and existing wireless/X-BUS diagnostics.
+
+### FlexC ATP account `0` diagnostics
+
+- Log incoming `CONNECT` messages using account `0` at DEBUG level.
+- Warn when the TCP session closes before receiving its first `POLL`.
+- Allow an initial transition from account `0` to a nonzero account on the first `POLL` without a misleading identity-change warning.
+- Add regression tests for these scenarios.
+
+**Known limitation:** Automatic ATP client account assignment is not yet validated on the SPC4300. A successful `CONNECT → ACK` exchange does not guarantee a usable FlexC session.
+
+Continue using a manually configured, nonzero ATP client account until this behavior has been validated.
+
+### Validation
+
+- **448 Python tests passed**
+- **20 JavaScript card tests passed**
+- **92.00% Python coverage** on GitHub Actions (92.05% locally)
+- Required coverage threshold: 80%
+- Frontend bundle consistency checks included in CI
+
+### Compatibility and limitations
+
+- FlexC encryption and outbound command behavior remain unchanged.
+- AES key rotation remains unsupported.
+- Recent event history is stored in memory and resets when the integration reloads.
+- This is a pre-release intended for testing and feedback.
+
+---
+
+## [1.1.5-beta.11] - 2026-11-01
+
+### Fixed
+
+- Automatically remove orphaned SPC area devices from the Home Assistant device registry after complete discovery.
+- Preserve devices that still contain registered entities, have child devices, or belong to another configuration entry.
+- Automatically remove orphaned area alarm-control entities when the corresponding SPC area no longer exists.
+- Automatically clean up orphaned zone entities when their zone is no longer discovered.
+- Prevent cleanup when discovery results are incomplete or when entities remain active.
+
+### Validation
+
+- **446 Python tests passed** locally and in GitHub Actions.
+- **Python coverage:** 92.07% locally / 92.01% in GitHub Actions.
+- **SPC4300 hardware:** confirmed automatic removal of one orphan area entity and six orphan zone entities with beta.10.
+- **Pending hardware validation:** automatic removal of the empty orphan area device with beta.11.
+
+### Testing
+
+After installing beta.11, reload the SPC FlexC integration and verify that the orphan `TEST FLEXC` device disappears from Home Assistant without manual deletion.
+
+---
+
+## [1.1.5-beta.10] - 2026-11-01
+
+### Fixed
+
+- Automatically remove orphaned SPC area (`alarm_control_panel`) entities after complete discovery when their area no longer exists.
+- Preserve active area entities and skip cleanup when no areas are discovered.
+- Retain the orphaned zone entity cleanup introduced in beta.9.
+
+### Validation
+
+- **444 Python tests passed** locally and in GitHub Actions.
+- **Python coverage:** 92.05% CI / 92.10% locally.
+- Automated regression tests added for orphaned area cleanup and empty discovery protection.
+
+### Testing
+
+- Verify that deleting a temporary SPC area removes its unavailable Home Assistant alarm-control entity after integration reload and complete discovery.
+- Confirm that existing areas and their alarm-control entities remain unaffected.
+
+---
+
+## [1.1.5-beta.9] - 2026-11-01
+
+### Fixed
+- Automatically clean up orphaned SPC zone entities after successful background discovery.
+- Remove stale zone entities left **unavailable** in Home Assistant when their zone is no longer discovered by the SPC panel.
+- Preserve entities belonging to discovered zones and protect entities with active Home Assistant states.
+- Skip orphan cleanup when zone discovery returns no zones.
+
+### Diagnostics
+- Preserve `FlexC PIR poll slow` warnings after the startup grace period to help investigate occasional slow zone polling and resynchronization delays.
+
+### Validation
+- **442 Python tests passed.**
+- **18 JavaScript tests passed locally.**
+- **92.03% Python coverage** in GitHub Actions (minimum required: 80%).
+
+### Testing notes
+- Orphan cleanup runs only after background discovery completes, not immediately when the integration reloads.
+- No Home Assistant Core restart is required.
+- Existing automations, helpers and dashboards are not automatically modified when orphan entities are removed.
+- Testing on a non-production Home Assistant instance is recommended before deployment to a live alarm system.
+
+---
+
+## [1.1.5-beta.8] - 2026-10-30
+
+### Added
+
+- Display recent FlexC events in a collapsible System panel.
+- Group wireless events in an expandable section, including RF Jamming diagnostics.
+- Add per-zone tamper and trouble diagnostic sensors.
+- Show detector anomaly indicators and counters in the Lovelace card.
 
 ### Changed
 
-- Move RF Jamming out of the separate RF diagnostics list to avoid duplicate display in the System tab.
-- Preserve diagnostic panel expansion state across Home Assistant card updates and synchronize the bundled Lovelace JavaScript.
-- Learn the active connection ID from the first `POLL (0x20)` instead of assuming a fixed receiver connection ID; treat the known receiver identifier `0x77359401` as informational during connection setup.
-- Avoid misleading identity-change warnings during the initial CONNECT-to-POLL transition while retaining warnings for unexpected changes after the session baseline is established.
-- Keep identity diagnostics non-blocking: valid incoming frames are accepted even when identifiers differ.
-- Document the bundled card test workflow and clarify that diagnostic alarm event classifications are historical observations, not persistent alarm states.
-- Bundle **SPC FlexC Card v1.0.25** on the v1.1.5 development branch, including event history metadata and localized sensor activation guidance.
+- Bundle **SPC FlexC Card v1.0.24** with integration **v1.1.5-beta.8**.
+- Preserve expanded diagnostic panels across card updates.
+- Improve FlexC session identity diagnostics and connection handling.
+
+### Fixed
+
+- Fix an undefined-variable error in detector icon rendering.
+- Display a shield-alert icon and explicit Sabotage state for tampered detectors.
+- Include ordinary detector tamper events in area sabotage indicators.
+- Retry transient Home Assistant entity-registry discovery failures.
+- Preserve the Outputs tab while entity discovery is in progress.
+- Distinguish loading states from genuinely empty detector lists.
+- Preserve latched tamper and trouble observations during ordinary PIR polling.
+- Clear pending commands when a TCP session is replaced.
+- Correct legacy FlexC CONNECT acknowledgement handling.
+- Synchronize bundled card version metadata and Lovelace resource cache version.
+
+### Validation
+
+- Includes Lovelace card regression tests and frontend distribution consistency checks.
+- Release candidate intended for validation on Home Assistant.
+
+---
+
+## [1.1.5-beta.7] - 2026-10-30
+
+### Fixed
+
+- Fixed the **Wireless (RF)** section in the System tab, which was still displayed as a regular diagnostics list instead of a collapsible panel.
+- RF Jamming now appears inside the expandable Wireless (RF) panel, including when its state is `off`.
+
+### Changed
+
+- Aligned the Wireless (RF) panel with the rounded, expandable layout used for FlexC event history.
+- Added a count of available RF diagnostics and wireless events to the collapsed panel header.
+- Preserved the expanded/collapsed state during Home Assistant card updates.
+- Updated the bundled Lovelace card JavaScript.
+
+### Validation
+
+- Frontend distribution bundle synchronized with its source files.
+- GitHub Actions CI verification pending.
+- Live Home Assistant UI verification pending.
+
+---
+
+## [1.1.5-beta.6] - 2026-10-30
+
+### Added
+
+- Added a collapsible **FlexC event history** panel in the **System** tab, displaying the number of recent events.
+- Added a dedicated **Wireless (RF)** diagnostics section, including RF Jamming even when its state is `off`.
+- Added expandable wireless event details when wireless events are available.
+
+### Changed
+
+- Updated the System tab layout with rounded, expandable diagnostic panels.
+- Moved **RF Jamming** into the Wireless (RF) section, removing its duplicate display from the previous location.
+- Improved RF Jamming status presentation to distinguish normal, active and unknown states.
+- Preserved the expanded/collapsed state of diagnostic panels during Home Assistant updates.
+- Updated the bundled Lovelace card JavaScript.
+
+### Validation
+
+- Frontend distribution bundle synchronized with its source files.
+- Frontend CI checks passed.
+- Live Home Assistant UI validation pending.
+
+---
+
+## [1.1.5-beta.5] - 2026-10-30
+
+### Fixed
+
+- Fixed legacy FlexC `CONNECT (0x01)` acknowledgements to echo the SPC account code supplied by the panel instead of using a hardcoded value.
+- Clear pending commands when a new TCP session replaces an existing one, preventing stale commands and buffered frames from interfering with the new session.
+- Added a 60-second idle read timeout to close stalled or inactive FlexC TCP sessions.
+- Improved handling of SPC authentication error `54`.
+- Preserve zone tamper and trouble event states across normal PIR polling and physical input changes.
+- Avoid unnecessary **PIR poll slow** warnings during the first 30 seconds after zone polling starts. Slow readings remain available at DEBUG level during startup; WARNING-level reporting resumes afterwards.
+
+### Added
+
+**Zone tamper and trouble diagnostics**
+
+- Added two diagnostic binary sensors per discovered SPC zone: **Tamper** and **Trouble**.
+- Handle zone-type event families:
+  - `1200–1223`: zone tamper.
+  - `1300–1323`: zone tamper restored.
+  - `1800–1823`: zone trouble.
+  - `1900–1923`: zone trouble restored.
+- Support corresponding events for different zone types, including `1201/1301`, `1801/1901` and unused-zone variants.
+- Prevent events referencing unknown zones from creating phantom entities.
+- Preserve the original PIR or door-contact state and icon independently of these diagnostics.
+
+**Enhanced FlexC event diagnostics**
+
+- Extended the optional, disabled-by-default **Last FlexC event ID** sensor with descriptions and classifications for supported events.
+- Added decoding for zone input events `2100`, `2101`, `2103` and `2107`, zone tamper/trouble transitions, and validated panic, medical, fire and hold-up events.
+- Improved the 20-event diagnostic history with event descriptions, origins and available area/zone identifiers.
+- Retained numeric event IDs for events without a known description.
+- Added diagnostic support for events originating from wireless devices and X-BUS keypads.
+
+**FlexC session diagnostics**
+
+- Added non-blocking monitoring of SPC account code, connection ID and receiver identifier changes.
+- Added sanitized identity diagnostics for incoming CONNECT, POLL, EVENT and DATA messages.
+- Added detection of `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` messages for diagnostic purposes only.
+
+**SPC FlexC Card v1.0.21**
+
+- Added separate tamper and trouble indicators to detector rows.
+- Added anomaly counters to detector groups and the general overview.
+- Improved the **System** tab with recent FlexC event IDs and descriptions.
+- Preserved existing detector icons, physical input states and Wireless/X-BUS diagnostics.
+- Added automated JavaScript regression tests for the bundled card.
+
+### Changed
+
+- Learn the active FlexC connection ID from the first POLL instead of assuming a fixed receiver connection ID.
+- Avoid misleading session identity warnings during the initial CONNECT-to-POLL transition.
+- Keep identity diagnostics non-blocking without changing valid incoming frame processing.
+- Improved documentation for event classifications, diagnostic entities and the bundled card.
 
 ### Safety and limitations
 
-- Transient alarm events do not latch Home Assistant alarm state without an authoritative SPC state transition; missing area IDs do not suppress event diagnostics.
-- Zone tamper/trouble diagnostics follow observed zone events; unknown zone IDs (including events described as **Unused Zone**) do not create additional entities. Diagnostic event history is in-memory and resets on integration reload.
-- AES key rotation is **not implemented**: `KEY_UPDATE` and `KEY_ACK` remain diagnostic-only; no key change or outgoing key acknowledgement is performed.
-- No changes to outbound FlexC command handling or AES encryption are intended by the session identity diagnostics.
+- Transient alarm events do not automatically latch Home Assistant alarm state without an authoritative SPC state transition.
+- Zone tamper/trouble diagnostics reflect observed events and should not be confused with physical PIR motion or door-contact states.
+- AES key rotation is **not implemented**. `KEY_UPDATE` and `KEY_ACK` remain diagnostic-only.
+- The recent event history is held in memory and resets when the integration reloads.
+- Hardware validation of the new zone diagnostics remains ongoing.
 
 ### Validation
 
-- **v1.1.5-beta.12:** 448 Python tests passed locally and on GitHub Actions; 20 Node.js card regression tests passed locally, and the GitHub Actions check completed successfully.
-- ATP client account `0` remains diagnostic-only: CONNECT/ACK without a first POLL is not evidence of supported automatic assignment; real-panel protocol validation is still required.
-- Frontend distribution consistency check passed in GitHub Actions for the beta.6 development changes; live Home Assistant UI verification remains pending.
-- Regression tests cover legacy CONNECT variants, session replacement, idle timeout, authentication errors, per-message identity samples and session identity changes, plus zone-type tamper/trouble event transitions and decoded event descriptions.
-- **448 Python tests passed** locally and in GitHub Actions for beta.12; **20 Node.js card tests passed** locally and are included in the successful CI checks.
-- **Python coverage: 92.00% on GitHub Actions / 92.05% locally** (required minimum: 80%).
-- Live SPC4300 test on beta.10 confirmed removal of one orphan area entity and six orphan zone entities after discovery.
-- Automatic removal of the now-empty orphan area device remains to be verified on Home Assistant with beta.11; full stable-release validation remains pending.
+- **Python:** 432 tests passed.
+- **JavaScript:** 18 card tests passed.
+- **GitHub Actions CI:** Passed.
+- **Python coverage:** 91.96% on GitHub Actions.
+- Ruff formatting/lint and automated checks passed.
+
+### Versions
+
+- **SPC FlexC integration:** `1.1.5-beta.5`
+- **Bundled SPC FlexC Card:** `1.0.21`
+
+---
+
+## [1.1.5-beta.4] - 2026-10-30
+
+### Added
+
+- Extended the optional, disabled-by-default **Last FlexC event ID** diagnostic sensor with decoded alarm types and transitions for validated panic, medical, fire and hold-up events.
+- Added event origin classification for user commands, wireless keypads and X-BUS keypads.
+- Extended the recent event history with event descriptions, origins, alarm types and transitions, including events without area or zone identifiers.
+- Added automated Node.js regression tests for the bundled Lovelace card, integrated into `make check` through `make card-test`.
+
+### Improved
+
+- Expanded card regression coverage for panel selection, diagnostic isolation, missing entities, HTML escaping and alarm-state presentation.
+- Improved documentation for the card testing workflow and diagnostic event classifications.
+- Consolidated the upcoming stable release changes in `CHANGELOG.md`, keeping individual beta changes in their GitHub Releases.
+
+### Safety
+
+- Transient panic, medical, fire and hold-up events remain **diagnostic observations**, not persistent Home Assistant alarm states.
+- Alarm state changes continue to require authoritative SPC state information.
+- Events without area or zone identifiers remain available for diagnostics.
+
+### Validation
+
+- **406 Python tests passed.**
+- **18 Node.js card tests passed**, locally and on GitHub Actions.
+- **92.11% Python coverage on GitHub Actions.**
+- **92.17% Python coverage locally.**
+- Local `make check` and `make coverage` passed.
+- Hardware validation remains recommended before production use.
+
+### Notes
+
+- No changes to FlexC command handling or AES encryption.
+- `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` remain diagnostic-only; automatic AES key rotation is not implemented.
+- The stable release remains `v1.1.4`.
+
+---
+
+## [1.1.5-beta.3] - 2026-10-27
+
+### Changed
+
+- Improved FlexC session identity diagnostics to support different connection ID behaviors across SPC panels and firmware versions.
+- Learn the active connection ID from the first `POLL (0x20)` instead of assuming a fixed receiver connection ID.
+- Avoid misleading identity-change warnings during the initial CONNECT-to-POLL transition.
+- Continue reporting unexpected identity changes after the session baseline is established, without rejecting valid frames.
+- Preserve per-message-type identity samples introduced in beta.2.
+
+### Tests
+
+- Added regression tests covering legacy `CONNECT (0x00)` and `CONNECT (0x02)`, different connection IDs, and unexpected changes during an established session.
+- 364 tests passed.
+- CI coverage: 92.08%.
+- Local coverage: 92.13%.
+
+### Notes
+
+- No changes to FlexC command handling, outbound frames, or AES encryption.
+- `KEY_UPDATE (0x40)` and `KEY_ACK (0x41)` remain diagnostic-only and unsupported.
+- The stable release remains `v1.1.4`.
+
+---
+
+## [1.1.5-beta.2] - 2026-10-27
+
+### Changed
+
+- Record a sanitized identity sample once per incoming message type and TCP session, including CONNECT, POLL, EVENT and DATA.
+- Treat the known receiver connection ID (`0x77359401`) as an informational difference rather than an unexpected identity warning.
+- Continue reporting other unexpected changes to `spt_account`, `connection_id` and `rct_identifier`.
+- Keep all identity diagnostics non-blocking: incoming frames are still accepted.
+
+### Added
+
+- Explicit detection and logging of `KEY_UPDATE` (`0x40`) and `KEY_ACK` (`0x41`) messages.
+- Dedicated regression tests for identity sampling, receiver connection ID handling and key-management messages.
+
+### Important limitations
+
+- AES key rotation is **not implemented**. The integration does not send a `KEY_ACK` or change encryption keys.
+- Message-type diagnostics require successful frame decoding.
+- Some identity-field semantics remain under investigation and require further hardware validation.
+
+### Validation
+
+- **362 tests passed**
+- **92.07% coverage (CI)**
+- **92.13% coverage (local)**
+- GitHub Actions quality checks passed.
+
+---
+
+## [1.1.5-beta.1] - 2026-10-27
+
+### Fixed
+
+- Fixed the legacy FlexC connection acknowledgement (`0x01`) to echo the SPC account code supplied by the panel instead of using a hardcoded value.
+- Prevented pending commands from remaining active when a new TCP session replaces the previous connection.
+- Prevented stale command timeouts and buffered frames from an old session from interfering with a newer connection.
+- Added a 60-second idle read timeout to close inactive or stalled FlexC TCP sessions.
+- Improved SPC error handling by distinguishing authentication error `54` from other panel error codes.
+
+### Added
+
+- Non-blocking session identity diagnostics for changes in SPC account code, connection ID and receiver identifier.
+- Diagnostic warnings are deduplicated per field and TCP session, without rejecting incoming frames.
+- Additional regression tests covering connection acknowledgements, session replacement, timeouts, authentication errors and identity diagnostics.
+
+### Changed
+
+- Updated the integration manifest version to `1.1.5-beta.1`.
+- Updated the bundled card resource cache marker to `1.0.19`.
+- Extended GitHub Actions validation to the development branch.
+
+### Validation
+
+- **358 automated tests passed.**
+- **92.15% GitHub Actions coverage** / **92.21% local coverage** (macOS, Python 3.14).
+- Minimum required coverage: **80%**.
+- CI checks passed, including Ruff, mypy and pytest.
+
+### Notes
+
+- This is a beta release focused on FlexC connection reliability and protocol diagnostics.
+- Session identity changes are logged for investigation but do not cause frame rejection.
+- Fixed AES-256 encryption remains the supported configuration. Automatic encryption and key rotation are not yet validated; `KEY_UPDATE` (`0x40`) and `KEY_ACK` (`0x41`) support has not been implemented.
+- No changes to alarm arming logic or existing entity behavior are intended.
+- Hardware validation is recommended before production use.
 
 ---
 
