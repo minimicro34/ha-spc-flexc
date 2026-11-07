@@ -207,8 +207,8 @@ class FlexCClient:
         self._command_context: dict[str, Any] | None = None
         self._context_event = asyncio.Event()
         self._recovery_started_at: float | None = None
-        # An unsolicited EVENT between commands invalidates the DATA chain.
-        # Wait for the next SPC POLL before sending another command.
+        # An acknowledged unsolicited EVENT refreshes the idle DATA context.
+        # This flag is retained for recovery paths requiring a fresh POLL.
         self._awaiting_poll_after_event = False
         self._event_resync_started_at: float | None = None
 
@@ -1114,7 +1114,7 @@ class FlexCClient:
         )
 
     async def async_wait_for_event_resync(self) -> float:
-        """Wait for an unsolicited EVENT's next POLL without holding caller locks.
+        """Wait for a required EVENT recovery context without holding caller locks.
 
         This is an optimization only. async_send_flexml still validates context
         under the command lock, including when another EVENT races this wait.
@@ -1141,9 +1141,9 @@ class FlexCClient:
         await self.async_ensure_connected()
 
         async with self._command_lock:
-            # Only the first command after a connection or a transport
-            # resynchronization needs to wait for a POLL. Subsequent commands
-            # chain directly from the previous validated DATA reply.
+            # Wait for a fresh context only when connection or recovery has
+            # invalidated it. Otherwise, commands chain from a validated
+            # DATA reply or an acknowledged idle EVENT.
             if self._command_context is None:
                 waiting_after_event = self._awaiting_poll_after_event
                 wait_started = asyncio.get_running_loop().time()
