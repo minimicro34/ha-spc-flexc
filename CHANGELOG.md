@@ -4,6 +4,30 @@ All notable changes to SPC FlexC are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.5-beta.15] - Unreleased
+
+### Improved
+
+- Refresh the idle FlexC command context immediately after acknowledging an unsolicited EVENT, instead of waiting for the next ATP supervision POLL (8–10 seconds depending on path category).
+- Preserve the authoritative DATA reply context while a command is in flight; subsequent EVENTs update the idle context using their latest validated transport sequence.
+
+### Fixed
+
+- Avoid unnecessary pre-command EVENT-to-POLL synchronization delays for alarm arm/disarm and read-only status requests.
+- Align EVENT/POLL regression tests with the acknowledged-EVENT context behavior, including consecutive events, pending commands, handshake reset, and reported timeout patterns.
+
+### Tests
+
+- 461 Python tests passed in GitHub Actions; coverage 91.86% (80% minimum).
+- CI quality checks and coverage completed successfully on commit `1ec8a1c`.
+
+### Validation
+
+- GitHub Actions CI: https://github.com/minimicro34/ha-spc-flexc/actions/runs/42368264306
+- Real SPC panel validation remains pending, especially unsolicited PIR EVENT → immediate arm/disarm commands, consecutive EVENTs and reconnects. Keep production on beta.14 until confirmed.
+
+---
+
 ## [1.1.5-beta.14] - Unreleased
 
 ### Added
