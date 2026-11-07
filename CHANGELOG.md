@@ -6,15 +6,39 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
-### Planned for 1.1.5-beta.16 (not yet implemented)
+---
 
-- PIR slow-read logging: DEBUG from 1000 ms, INFO from 1500 ms, WARNING from 2000 ms, using read_ms rather than polling interval or resync wait.
-- Repeated slow reads: distinct WARNING for 3 occurrences in a rolling 60 seconds, limited to one per 10 minutes, reporting count and maximum duration.
-- Optional diagnostic sensor, disabled by default: number of slow reads over the last hour, maximum read_ms, and bounded timestamped history; expires without additional polling and resets on restart.
-- SPC FlexC Card / System: collapsed PIR diagnostic section below event history and above RF, showing the count, timestamped readings, empty state or activation instructions as appropriate.
-- Tests: threshold boundaries, rolling windows, rate limiting, history expiration, and card display states.
+## [1.1.5-beta.16]
 
-These are planned changes, not yet implemented or validated.
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.16`
+- SPC FlexC Card: `1.0.28`
+
+### Added
+
+- Optional, disabled-by-default PIR slow-read diagnostic sensor with a rolling one-hour count, maximum read duration and timestamped readings.
+- Collapsible PIR diagnostic section in the System tab of the bundled card, below FlexC event history and above RF.
+
+### Improved
+
+- Classify actual PIR zone read latency using DEBUG (1,000–1,499 ms), INFO (1,500–1,999 ms), and WARNING (2,000 ms and above).
+- Detect three slow reads within a rolling 60-second window and rate-limit repeated-slow-read warnings to once per ten minutes.
+- Keep resynchronization waits and lock delays separate from actual read duration.
+
+### Fixed
+
+- Refresh the optional diagnostic sensor periodically to expire measurements older than one hour.
+
+### Tests
+
+- Added unit tests for read thresholds, repeated warning cooldown and history expiry.
+- Full Python and JavaScript test results pending CI verification.
+
+### Validation
+
+- Development changes committed on `develop/v1.1.5`; not yet released.
+- GitHub Actions CI and hardware validation pending.
 
 ---
 
