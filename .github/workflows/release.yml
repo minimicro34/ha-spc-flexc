@@ -161,6 +161,20 @@ jobs:
           if not section:
               raise SystemExit(f"No changelog entry for {version}")
           notes = section.group(1).strip() + "\n"
+          # Keep release notes concise: CI metrics belong in Validation only.
+          notes = re.sub(r"(?ms)^### Tests\n.*?(?=^### |\Z)", "", notes)
+          manual_validation = re.search(
+              r"(?ms)^### Validation\n(.*?)(?=^### |\Z)", notes
+          )
+          manual_checks = (
+              [
+                  line
+                  for line in manual_validation.group(1).splitlines()
+                  if line.strip().startswith("- ")
+              ]
+              if manual_validation
+              else []
+          )
           notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip() + "\n"
 
           log = Path("quality.log").read_text(encoding="utf-8")
@@ -169,7 +183,9 @@ jobs:
           js = re.findall(r"(?m)^\s*(?:#|ℹ)\s*pass\s+(\d+)\s*$", log)
           if not pytest or not coverage or not js:
               raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality.log artifact.")
-          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage[-1]}%.\n- JavaScript: {js[-1]} tests passed.\n- `make check` passed.\n"
+          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage[-1]}%.\n- SPC FlexC Card (JavaScript): {js[-1]} tests passed.\n- `make check` passed.\n"
+          if manual_checks:
+              notes += "\n".join(manual_checks) + "\n"
           Path("release-notes.md").write_text(notes, encoding="utf-8")
           PY
 
