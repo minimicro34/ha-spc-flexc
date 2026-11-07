@@ -999,8 +999,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                                 burst[1],
                             )
                         self.async_update_listeners()
-                    elif lock_wait_ms >= 1000 or resync_wait_total_ms >= 1000 or (
-                        interval_ms is not None and interval_ms >= 2000
+                    elif (
+                        lock_wait_ms >= 1000
+                        or resync_wait_total_ms >= 1000
+                        or (interval_ms is not None and interval_ms >= 2000)
                     ):
                         _LOGGER.debug(
                             "FlexC PIR poll delayed: interval_ms=%s "
