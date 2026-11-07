@@ -62,7 +62,10 @@ async def async_setup_entry(
     coordinator: SpcFlexCCoordinator = entry.runtime_data
     async_add_entities(
         [SpcPanelSensor(coordinator, description) for description in DESCRIPTIONS]
-        + [SpcLastEventDiagnosticSensor(coordinator), SpcPirSlowReadDiagnosticSensor(coordinator)]
+        + [
+            SpcLastEventDiagnosticSensor(coordinator),
+            SpcPirSlowReadDiagnosticSensor(coordinator),
+        ]
     )
     known_ats: set[int] = set()
     known_atps: set[tuple[int, int]] = set()
