@@ -57,7 +57,9 @@ class PirSlowReadHistory:
                 {
                     "timestamp": datetime.now(UTC).isoformat(),
                     "read_ms": round(read_ms, 1),
-                    "interval_ms": round(interval_ms, 1) if interval_ms is not None else None,
+                    "interval_ms": round(interval_ms, 1)
+                    if interval_ms is not None
+                    else None,
                     "lock_wait_ms": round(lock_wait_ms, 1),
                     "resync_wait_ms": round(resync_wait_ms, 1),
                     "batches": [list(batch) for batch in batches],
