@@ -34,16 +34,19 @@ Changes planned after the latest documented beta. Individual beta changes and va
 
 ---
 
-## [1.1.5-beta.14] - 2026-11-04
+## [1.1.5-beta.14]
 
 ### Changed
 - Improved the integrated Lovelace card event history layout with more compact rows.
 - Updated FlexC event timestamps to include seconds for more precise event tracking.
-- Updated the bundled Lovelace card to `1.0.27`.
 
 ### Fixed
 - Improved DRS door-release responsiveness by triggering an immediate door status refresh when FlexC event `#3012` is received, without waiting for the regular polling cycle.
 - Preserved periodic polling as a fallback for door status synchronization.
+
+### Version
+
+- Updated the bundled Lovelace card to `1.0.27`.
 
 ### Validation
 - 458 Python tests passed.
@@ -54,7 +57,7 @@ Changes planned after the latest documented beta. Individual beta changes and va
 
 ---
 
-## [1.1.5-beta.13] - 2026-11-01
+## [1.1.5-beta.13]
 
 ## Important — FlexC ATP automatic account assignment
 
@@ -75,8 +78,11 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 - Fixed the duplicated event history heading in the bundled Lovelace card. The expandable panel now displays a localized event count (for example, `11 événements`).
 
 ### Changed
-- Updated the bundled **SPC FlexC Card to v1.0.26**, including its JavaScript distribution and translations.
 - Preserved explicitly configured nonzero ATP accounts and existing session identity-change diagnostics.
+
+### Version
+
+- Updated the bundled **SPC FlexC Card to v1.0.26**, including its JavaScript distribution and translations.
 
 ### Validation
 - **451 Python tests passed**
@@ -85,7 +91,7 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 
 ---
 
-## [1.1.5-beta.12] - 2026-11-01
+## [1.1.5-beta.12]
 
 ### Added
 
@@ -97,7 +103,6 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 
 ### Improved
 
-- Bundle **SPC FlexC Card v1.0.25**.
 - Centralize the card version in `frontend/package.json` as the single source of truth.
 - Automatically synchronize the frontend lockfile and generated JavaScript bundle during the build.
 - Read the bundled card version dynamically for Lovelace resource cache-busting.
@@ -113,6 +118,10 @@ This addresses a potential cause of the repeated CONNECT/disconnect cycle observ
 **Known limitation:** Automatic ATP client account assignment is not yet validated on the SPC4300. A successful `CONNECT → ACK` exchange does not guarantee a usable FlexC session.
 
 Continue using a manually configured, nonzero ATP client account until this behavior has been validated.
+
+### Version
+
+- Bundle **SPC FlexC Card v1.0.25**.
 
 ### Validation
 
@@ -131,7 +140,7 @@ Continue using a manually configured, nonzero ATP client account until this beha
 
 ---
 
-## [1.1.5-beta.11] - 2026-11-01
+## [1.1.5-beta.11]
 
 ### Fixed
 
@@ -154,7 +163,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.10] - 2026-11-01
+## [1.1.5-beta.10]
 
 ### Fixed
 
@@ -175,7 +184,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.9] - 2026-11-01
+## [1.1.5-beta.9]
 
 ### Fixed
 - Automatically clean up orphaned SPC zone entities after successful background discovery.
@@ -199,7 +208,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.8] - 2026-10-30
+## [1.1.5-beta.8]
 
 ### Added
 
@@ -210,7 +219,6 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ### Changed
 
-- Bundle **SPC FlexC Card v1.0.24** with integration **v1.1.5-beta.8**.
 - Preserve expanded diagnostic panels across card updates.
 - Improve FlexC session identity diagnostics and connection handling.
 
@@ -227,6 +235,10 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 - Correct legacy FlexC CONNECT acknowledgement handling.
 - Synchronize bundled card version metadata and Lovelace resource cache version.
 
+### Version
+
+- Bundle **SPC FlexC Card v1.0.24** with integration **v1.1.5-beta.8**.
+
 ### Validation
 
 - Includes Lovelace card regression tests and frontend distribution consistency checks.
@@ -234,7 +246,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.7] - 2026-10-30
+## [1.1.5-beta.7]
 
 ### Fixed
 
@@ -256,7 +268,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.6] - 2026-10-30
+## [1.1.5-beta.6]
 
 ### Added
 
@@ -280,7 +292,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.5] - 2026-10-30
+## [1.1.5-beta.5]
 
 ### Fixed
 
@@ -350,14 +362,13 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 - **Python coverage:** 91.96% on GitHub Actions.
 - Ruff formatting/lint and automated checks passed.
 
-### Versions
-
+### Version
 - **SPC FlexC integration:** `1.1.5-beta.5`
 - **Bundled SPC FlexC Card:** `1.0.21`
 
 ---
 
-## [1.1.5-beta.4] - 2026-10-30
+## [1.1.5-beta.4]
 
 ### Added
 
@@ -395,7 +406,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.3] - 2026-10-27
+## [1.1.5-beta.3]
 
 ### Changed
 
@@ -420,7 +431,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.2] - 2026-10-27
+## [1.1.5-beta.2]
 
 ### Changed
 
@@ -449,7 +460,7 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ---
 
-## [1.1.5-beta.1] - 2026-10-27
+## [1.1.5-beta.1]
 
 ### Fixed
 
@@ -467,9 +478,12 @@ After installing beta.11, reload the SPC FlexC integration and verify that the o
 
 ### Changed
 
+- Extended GitHub Actions validation to the development branch.
+
+### Version
+
 - Updated the integration manifest version to `1.1.5-beta.1`.
 - Updated the bundled card resource cache marker to `1.0.19`.
-- Extended GitHub Actions validation to the development branch.
 
 ### Validation
 
