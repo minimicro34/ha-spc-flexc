@@ -64,7 +64,7 @@ jobs:
     name: Sign tag and publish
     needs: quality
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || inputs.dry_run == true
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.version }}
@@ -88,6 +88,15 @@ jobs:
           set -euo pipefail
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
             echo "::error::Invalid tag format: $RELEASE_TAG"
+            exit 1
+          fi
+          if [[ "${{ inputs.dry_run }}" != "true" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Publishing releases is restricted to main"
+            exit 1
+          fi
+          manifest_version="$(python -c 'import json; print(json.load(open("custom_components/spc_flexc/manifest.json", encoding="utf-8"))["version"])')"
+          if [[ "$RELEASE_TAG" != "v$manifest_version" ]]; then
+            echo "::error::Tag $RELEASE_TAG does not match manifest version $manifest_version"
             exit 1
           fi
           if [[ -z "$GPG_PRIVATE_KEY" || -z "$GPG_PASSPHRASE" ]]; then
