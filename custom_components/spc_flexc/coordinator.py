@@ -47,6 +47,7 @@ from .flexc.events import (
 from .flexc.flexml import FlexMLError
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
+from .pir_diagnostics import PirSlowReadHistory, slow_read_log_level
 from .models import (
     AreaState,
     AtpState,
@@ -363,6 +364,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # Monotonic generation for PIR EVENT transitions; used to reject
         # in-flight polling snapshots older than a received live EVENT.
         self._pir_event_generation: dict[int, int] = {}
+        self.pir_slow_reads = PirSlowReadHistory()
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
         self._detected_xbus_serials: set[str] = set()
@@ -970,12 +972,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     interval_display = (
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
-                    if lock_wait_ms >= 1000 or read_ms >= 1000:
-                        # Startup discovery can briefly delay zone reads. Keep
-                        # the measurements at DEBUG for the first 30 seconds;
-                        # subsequent slow polls remain actionable warnings.
+                    level = slow_read_log_level(read_ms)
+                    if level is not None:
+                        burst = self.pir_slow_reads.record(
+                            read_ms,
+                            interval_ms=interval_ms,
+                            lock_wait_ms=lock_wait_ms,
+                            resync_wait_ms=resync_wait_total_ms,
+                            batches=batch_timings,
+                        )
                         _LOGGER.log(
-                            _pir_slow_poll_log_level(read_finished - poll_loop_started),
+                            level,
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
                             "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
                             interval_display,
@@ -984,7 +991,15 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             resync_wait_total_ms,
                             batch_timings,
                         )
-                    elif resync_wait_total_ms >= 1000 or (
+                        if burst is not None:
+                            _LOGGER.warning(
+                                "FlexC PIR repeated slow reads: count=%d "
+                                "window_seconds=60 max_read_ms=%.1f",
+                                burst[0],
+                                burst[1],
+                            )
+                        self.async_update_listeners()
+                    elif lock_wait_ms >= 1000 or resync_wait_total_ms >= 1000 or (
                         interval_ms is not None and interval_ms >= 2000
                     ):
                         _LOGGER.debug(
