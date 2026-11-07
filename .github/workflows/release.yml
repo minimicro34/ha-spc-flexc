@@ -52,12 +52,15 @@ jobs:
           set -euo pipefail
           make check 2>&1 | tee "$RUNNER_TEMP/quality.log"
           make coverage 2>&1 | tee -a "$RUNNER_TEMP/quality.log"
+          python -m coverage json -o coverage.json
           cp "$RUNNER_TEMP/quality.log" quality.log
       - name: Preserve test and coverage results
         uses: actions/upload-artifact@v6
         with:
           name: signed-release-quality
-          path: quality.log
+          path: |
+            quality.log
+            coverage.json
           retention-days: 3
 
   release:
@@ -148,6 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import json
           import os
           import re
           from pathlib import Path
@@ -179,11 +183,12 @@ jobs:
 
           log = Path("quality.log").read_text(encoding="utf-8")
           pytest = re.findall(r"(?m)(\d+) passed\b", log)
-          coverage = re.findall(r"(?m)^TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%", log)
+          coverage_data = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+          coverage = coverage_data["totals"]["percent_covered"]
           js = re.findall(r"(?m)^\s*(?:#|ℹ)\s*pass\s+(\d+)\s*$", log)
-          if not pytest or not coverage or not js:
-              raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality.log artifact.")
-          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage[-1]}%.\n- SPC FlexC Card (JavaScript): {js[-1]} tests passed.\n- `make check` passed.\n"
+          if not pytest or not isinstance(coverage, (int, float)) or not js:
+              raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality artifacts.")
+          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage:.2f}%.\n- SPC FlexC Card (JavaScript): {js[-1]} tests passed.\n- `make check` passed.\n"
           if manual_checks:
               notes += "\n".join(manual_checks) + "\n"
           Path("release-notes.md").write_text(notes, encoding="utf-8")
