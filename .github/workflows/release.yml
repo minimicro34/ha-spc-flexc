@@ -1,0 +1,201 @@
+name: Signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag to create (for example v1.1.5-beta.15)"
+        required: true
+        type: string
+      prerelease:
+        description: "Publish as a pre-release"
+        required: true
+        type: boolean
+        default: true
+      dry_run:
+        description: "Validate signing without pushing a tag or publishing"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: signed-release
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Check bundled frontend distribution
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run check
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements_dev.txt
+      - name: Run quality checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          make check 2>&1 | tee "$RUNNER_TEMP/quality.log"
+          make coverage 2>&1 | tee -a "$RUNNER_TEMP/quality.log"
+          cp "$RUNNER_TEMP/quality.log" quality.log
+      - name: Preserve test and coverage results
+        uses: actions/upload-artifact@v6
+        with:
+          name: signed-release-quality
+          path: quality.log
+          retention-days: 3
+
+  release:
+    name: Sign tag and publish
+    needs: quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || inputs.dry_run == true
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.version }}
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+    steps:
+      - name: Check out the exact tested commit
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Retrieve validated test and coverage results
+        uses: actions/download-artifact@v7
+        with:
+          name: signed-release-quality
+
+      - name: Validate release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::Invalid tag format: $RELEASE_TAG"
+            exit 1
+          fi
+          if [[ "${{ inputs.dry_run }}" != "true" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Publishing releases is restricted to main"
+            exit 1
+          fi
+          manifest_version="$(python -c 'import json; print(json.load(open("custom_components/spc_flexc/manifest.json", encoding="utf-8"))["version"])')"
+          if [[ "$RELEASE_TAG" != "v$manifest_version" ]]; then
+            echo "::error::Tag $RELEASE_TAG does not match manifest version $manifest_version"
+            exit 1
+          fi
+          if [[ -z "$GPG_PRIVATE_KEY" || -z "$GPG_PASSPHRASE" ]]; then
+            echo "::error::Missing GPG_PRIVATE_KEY or GPG_PASSPHRASE secret"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null; then
+            echo "::error::Tag already exists: $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Import signing key and configure Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/release-gnupg"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          fingerprint="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1=="fpr" {print $10; exit}')"
+          if [[ -z "$fingerprint" ]]; then
+            echo "::error::No GPG secret key imported"
+            exit 1
+          fi
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          git config user.name "GitHub Releases - minimicro34"
+          git config user.email "minimicro34@gmail.com"
+          git config user.signingkey "$fingerprint"
+          git config tag.gpgSign true
+          printf '%s' "$GPG_PASSPHRASE" > "$RUNNER_TEMP/release-passphrase"
+          chmod 600 "$RUNNER_TEMP/release-passphrase"
+          cat > "$RUNNER_TEMP/gpg-sign" <<'SCRIPT'
+          #!/usr/bin/env bash
+          exec gpg --batch --yes --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/release-passphrase" "$@"
+          SCRIPT
+          chmod 700 "$RUNNER_TEMP/gpg-sign"
+          git config gpg.program "$RUNNER_TEMP/gpg-sign"
+
+      - name: Create and verify signed tag locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -s "$RELEASE_TAG" -m "$RELEASE_TAG"
+          git tag -v "$RELEASE_TAG"
+          echo "Signed tag verified locally: $RELEASE_TAG"
+
+      - name: Prepare release notes from changelog and test results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["RELEASE_TAG"]
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          section = re.search(
+              rf"(?ms)^## \[\s*{re.escape(version.removeprefix('v'))}\s*\][^\n]*\n(.*?)(?=^---\s*$|^## \[|\Z)",
+              changelog,
+          )
+          if not section:
+              raise SystemExit(f"No changelog entry for {version}")
+          notes = section.group(1).strip() + "\n"
+          notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip() + "\n"
+
+          log = Path("quality.log").read_text(encoding="utf-8")
+          pytest = re.findall(r"(?m)(\d+) passed\b", log)
+          coverage = re.findall(r"(?m)^TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%", log)
+          js = re.findall(r"(?m)^\s*(?:#|ℹ)\s*pass\s+(\d+)\s*$", log)
+          if not pytest or not coverage or not js:
+              raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality.log artifact.")
+          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage[-1]}%.\n- JavaScript: {js[-1]} tests passed.\n- `make check` passed.\n"
+          Path("release-notes.md").write_text(notes, encoding="utf-8")
+          PY
+
+      - name: Preserve generated release notes
+        uses: actions/upload-artifact@v6
+        with:
+          name: signed-release-notes
+          path: release-notes.md
+          retention-days: 7
+
+      - name: Publish tag and GitHub release
+        if: inputs.dry_run == false
+        shell: bash
+        env:
+          IS_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          git push origin "refs/tags/$RELEASE_TAG"
+          args=(--title "$RELEASE_TAG" --notes-file release-notes.md --verify-tag)
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          else
+            args+=(--latest)
+          fi
+          gh release create "$RELEASE_TAG" "${args[@]}"
+
+      - name: Simulation summary
+        if: inputs.dry_run == true
+        run: echo "Dry run succeeded; no tag pushed and no release published." >> "$GITHUB_STEP_SUMMARY"
