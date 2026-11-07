@@ -60,18 +60,23 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 
 ---
 
-## Upcoming beta: DRS door-release responsiveness
+## Upcoming beta: faster FlexC command synchronization
 
-In the unreleased v1.1.5-beta.14 development build, receiving FlexC event
-**#3012 (door release / DRS)** schedules a fresh status read for the matching
-access-control door. The integration uses `DOOR_ID` when available, falls back
-to doors in `AREA_ID`, and otherwise refreshes discovered doors. The returned
-`DRS_INPUT` state is published to Home Assistant only when it changes; the
-normal polling loop remains active.
+In the unreleased **v1.1.5-beta.15** development build, the receiver can
+reuse the transport context of an acknowledged unsolicited FlexC EVENT when
+no command is in flight. This avoids waiting for the next ATP supervision
+POLL (typically 10 seconds in Cat 5 or 8 seconds in Cat 6) before sending
+an arm/disarm or status command. If a command is already in flight, its
+DATA reply remains authoritative for the command context.
 
-The bundled SPC FlexC Card v1.0.27 development build displays seconds in FlexC
-event-history timestamps and uses tighter event rows. Actual DRS-to-automation
-latency and raw event identifiers still need testing on a physical SPC panel.
+**This transport change has passed automated regression tests but still
+requires validation against a physical SPC panel.** Test on a separate
+FlexC path before using it in production. Cat 5 supervision can remain
+enabled; changing to Cat 6 is not required for this improvement.
+
+The previous beta.14 introduced targeted door-status refreshes after
+door-release EVENT #3012. The bundled SPC FlexC Card remains at v1.0.27.
+
 
 ## Features
 
@@ -587,12 +592,12 @@ Zone polling remains enabled to reconcile state. If an EVENT arrives while a zon
 - `FlexC zone EVENT state`: motion state applied from event `2100` or `2101`.
 - `FlexC PIR diagnostic`: changes detected by polling, including logic input, actuation counters and timing.
 - `FlexC PIR publish diagnostic`: processing and Home Assistant publication timings.
-- `FlexC unsolicited EVENT between commands`: the command context was invalidated while idle.
-- `FlexC context resynchronized from SPC POLL`: a fresh POLL restored the command context; `wait_ms` measures the EVENT-to-POLL delay.
+- `FlexC command context refreshed from acknowledged unsolicited EVENT`: an idle session uses the acknowledged EVENT transport context without waiting for the next POLL.
+- `FlexC context resynchronized from SPC POLL`: a fallback diagnostic for a context restored by POLL; it is no longer the expected idle-EVENT path.
 
 A slow zone polling cycle emits `FlexC PIR poll slow` at `WARNING`, with `interval_ms`, `lock_wait_ms`, `read_ms` and per-batch durations. Command timeouts and connection/protocol errors retain their existing warning diagnostics.
 
-**Protocol safety:** An unsolicited EVENT between commands invalidates the existing command context. The next command waits for a fresh SPC POLL before proceeding. These beta diagnostics measure the remaining EVENT-to-POLL wait; the transport still requires a validated fresh POLL before the next command. Zone polling now releases the coordinator operation lock between batches, allowing other operations to run between batches rather than waiting for the full scan. This improves scheduling opportunities but does **not** shorten the panel's EVENT-to-POLL protocol interval. The `FlexC command context wait after EVENT` diagnostic measures how long an actual command was blocked; `lock_wait_ms` now sums lock acquisition delays across zone batches. EVENTs received while a command is in flight do not replace its reply context.
+**Protocol safety:** When no DATA command is pending, the receiver acknowledges an unsolicited EVENT and uses its validated transport context for the next command. An EVENT received during an in-flight command does not displace that command's DATA reply context. A new TCP session still requires a valid handshake and initial POLL. This improvement is pending real-panel validation; it does not alter the configured ATP supervision category or timeout. Zone polling releases the coordinator operation lock between batches to allow other operations to proceed. The `FlexC command context wait after EVENT` diagnostic and `lock_wait_ms` continue to distinguish transport synchronization from lock acquisition delays.
 
 For a hardware test, compare `2100` / `2101` timestamps with the Home Assistant motion entity transitions, then inspect `wait_ms` and `FlexC PIR poll slow` warnings. Do not share credentials, encryption keys or raw sensitive protocol payloads in logs or issues.
 
