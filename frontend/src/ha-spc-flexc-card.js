@@ -1684,8 +1684,48 @@ class SpcFlexCCard extends HTMLElement {
           <div class="muted">${this._t("system.event_enable_hint")}</div>
         </div>`;
 
+    const pirSensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      /pir[_\\s-]*slow[_\\s-]*reads/i.test(
+        `${entityId} ${stateObj.attributes?.friendly_name || ""}`
+      )
+    );
+    const pirState = pirSensor?.stateObj?.state;
+    const pirAvailable = pirState != null && pirState !== "unavailable" && pirState !== "unknown";
+    const pirReadings = pirAvailable && Array.isArray(pirSensor.stateObj.attributes?.slow_reads)
+      ? pirSensor.stateObj.attributes.slow_reads : [];
+    const pirCount = pirAvailable ? Number(pirState) : 0;
+    const pirRows = pirReadings.map((reading) => {
+      const duration = Number(reading.read_ms);
+      const timestamp = reading.timestamp ? this._formatEventDateTime(reading.timestamp) : "";
+      const timing = [
+        Number.isFinite(duration) ? `${duration.toFixed(1)} ms` : "",
+        Number.isFinite(Number(reading.lock_wait_ms)) ? `lock ${reading.lock_wait_ms} ms` : "",
+        Number.isFinite(Number(reading.resync_wait_ms)) ? `resync ${reading.resync_wait_ms} ms` : "",
+      ].filter(Boolean).join(" · ");
+      return `<div class="technical-line event-history-row">
+        <span>${this._escapeHtml(timestamp)}</span>
+        <span class="muted">${this._escapeHtml(timing)}</span>
+      </div>`;
+    }).join("");
+    const pirSection = `<div class="technical-section" data-technical-section="pir-diagnostics">
+      <div class="technical-section-title">${this._t("system.pir_diagnostics")}</div>
+      <details class="system-detail-card" data-system-detail-key="pir-diagnostics">
+        <summary>${pirAvailable && Number.isFinite(pirCount)
+          ? `${pirCount} ${this._t("system.pir_slow_reads")}`
+          : this._t(pirSensor ? "system.pir_unavailable" : "system.pir_disabled")}</summary>
+        <div class="system-detail-body">
+          ${pirAvailable
+            ? `<div class="muted">${this._t("system.pir_maximum")}: ${this._escapeHtml(String(pirSensor.stateObj.attributes?.max_read_ms ?? "—"))} ms</div>
+               ${pirRows || `<div class="muted">${this._t("system.pir_empty")}</div>`}`
+            : `<div class="muted">${this._t(pirSensor ? "system.pir_unavailable_hint" : "system.pir_enable_hint")}</div>`}
+        </div>
+      </details>
+    </div>`;
+
     const content = [
       eventSection,
+      pirSection,
       wirelessSection,
       identitySection,
       powerSection,
