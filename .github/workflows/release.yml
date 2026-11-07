@@ -158,8 +158,14 @@ jobs:
               rf"(?ms)^## \[\s*{re.escape(version.removeprefix('v'))}\s*\][^\n]*\n(.*?)(?=^---\s*$|^## \[|\Z)",
               changelog,
           )
+          if not section and re.fullmatch(r"v[0-9]+\\.[0-9]+\\.[0-9]+-beta[.-][0-9]+", version):
+              # Development betas share the cumulative Unreleased section.
+              section = re.search(
+                  r"(?ms)^## \\[Unreleased\\][^\\n]*\\n(.*?)(?=^---\\s*$|^## \\[|\\Z)",
+                  changelog,
+              )
           if not section:
-              raise SystemExit(f"No changelog entry for {version}")
+              raise SystemExit(f"No changelog entry for {version}; beta tags may use [Unreleased]")
           notes = section.group(1).strip() + "\n"
           notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip() + "\n"
 
