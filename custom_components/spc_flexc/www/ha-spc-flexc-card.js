@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.27";
+const CARD_VERSION = "1.0.28";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -1684,8 +1684,48 @@ class SpcFlexCCard extends HTMLElement {
           <div class="muted">${this._t("system.event_enable_hint")}</div>
         </div>`;
 
+    const pirSensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      /pir[_\\s-]*slow[_\\s-]*reads/i.test(
+        `${entityId} ${stateObj.attributes?.friendly_name || ""}`
+      )
+    );
+    const pirState = pirSensor?.stateObj?.state;
+    const pirAvailable = pirState != null && pirState !== "unavailable" && pirState !== "unknown";
+    const pirReadings = pirAvailable && Array.isArray(pirSensor.stateObj.attributes?.slow_reads)
+      ? pirSensor.stateObj.attributes.slow_reads : [];
+    const pirCount = pirAvailable ? Number(pirState) : 0;
+    const pirRows = pirReadings.map((reading) => {
+      const duration = Number(reading.read_ms);
+      const timestamp = reading.timestamp ? this._formatEventDateTime(reading.timestamp) : "";
+      const timing = [
+        Number.isFinite(duration) ? `${duration.toFixed(1)} ms` : "",
+        Number.isFinite(Number(reading.lock_wait_ms)) ? `lock ${reading.lock_wait_ms} ms` : "",
+        Number.isFinite(Number(reading.resync_wait_ms)) ? `resync ${reading.resync_wait_ms} ms` : "",
+      ].filter(Boolean).join(" · ");
+      return `<div class="technical-line event-history-row">
+        <span>${this._escapeHtml(timestamp)}</span>
+        <span class="muted">${this._escapeHtml(timing)}</span>
+      </div>`;
+    }).join("");
+    const pirSection = `<div class="technical-section" data-technical-section="pir-diagnostics">
+      <div class="technical-section-title">${this._t("system.pir_diagnostics")}</div>
+      <details class="system-detail-card" data-system-detail-key="pir-diagnostics">
+        <summary>${pirAvailable && Number.isFinite(pirCount)
+          ? `${pirCount} ${this._t("system.pir_slow_reads")}`
+          : this._t(pirSensor ? "system.pir_unavailable" : "system.pir_disabled")}</summary>
+        <div class="system-detail-body">
+          ${pirAvailable
+            ? `<div class="muted">${this._t("system.pir_maximum")}: ${this._escapeHtml(String(pirSensor.stateObj.attributes?.max_read_ms ?? "—"))} ms</div>
+               ${pirRows || `<div class="muted">${this._t("system.pir_empty")}</div>`}`
+            : `<div class="muted">${this._t(pirSensor ? "system.pir_unavailable_hint" : "system.pir_enable_hint")}</div>`}
+        </div>
+      </details>
+    </div>`;
+
     const content = [
       eventSection,
+      pirSection,
       wirelessSection,
       identitySection,
       powerSection,
@@ -4605,6 +4645,14 @@ SpcFlexCCard.prototype._render = function () {
 
 const SPC_FLEXC_CARD_TRANSLATIONS = {
   fr: {
+    "system.pir_diagnostics": "Diagnostic PIR",
+    "system.pir_slow_reads": "lectures lentes (1 h)",
+    "system.pir_maximum": "Durée maximale",
+    "system.pir_empty": "Aucune lecture PIR lente sur la dernière heure",
+    "system.pir_disabled": "Diagnostic PIR désactivé",
+    "system.pir_unavailable": "Diagnostic PIR indisponible",
+    "system.pir_unavailable_hint": "Le capteur de diagnostic PIR est actuellement indisponible.",
+    "system.pir_enable_hint": "Activez l’entité « PIR slow reads (1h) » dans Paramètres → Appareils et services → SPC FlexC → Entités.",
     "card.description": "Carte de contrôle visuelle pour l’intégration Home Assistant SPC FlexC.",
     "card.entity_not_found": "Entité introuvable : {entity}",
     "tab.general": "Général",
@@ -4765,6 +4813,14 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "editor.help": "Les secteurs sont récupérés depuis l'entité d'alarme. Les détecteurs SPC sont découverts automatiquement parmi les binary_sensor possédant les attributs zone_id, area_id et spc_zone_type. Les diagnostics et informations techniques sont rattachés à la même intégration via les registres Home Assistant quand ceux-ci sont disponibles.",
   },
   en: {
+    "system.pir_diagnostics": "PIR diagnostics",
+    "system.pir_slow_reads": "slow reads (1 h)",
+    "system.pir_maximum": "Maximum duration",
+    "system.pir_empty": "No slow PIR reads in the last hour",
+    "system.pir_disabled": "PIR diagnostics disabled",
+    "system.pir_unavailable": "PIR diagnostics unavailable",
+    "system.pir_unavailable_hint": "The PIR diagnostic sensor is currently unavailable.",
+    "system.pir_enable_hint": "Enable the « PIR slow reads (1h) » entity in Settings → Devices & services → SPC FlexC → Entities.",
     "card.description": "Visual alarm control card for the SPC FlexC Home Assistant integration.",
     "card.entity_not_found": "Entity not found: {entity}",
     "tab.general": "General",
