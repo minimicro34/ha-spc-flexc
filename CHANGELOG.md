@@ -37,6 +37,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
+- Beta15 production confirmation (Ludovic, Cat 5): PIR detections on garage zones 45/46 at 18:33:03 and 18:33:11; automation sent `Door 1 Mode normal` at 18:33:13.666; Door 1 returned to normal at 18:33:13.695 (29 ms). DRS response was immediate; the remaining 5–6 seconds were attributed to Nuki mechanical operation. This validates the beta15 command/polling correction in the reported production scenario, not the new beta16 diagnostics.
 - Development changes committed on `develop/v1.1.5`; not yet released.
 - GitHub Actions CI and hardware validation pending.
 
