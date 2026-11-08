@@ -284,7 +284,7 @@ class SpcPirSlowReadDiagnosticSensor(
             )
         )
 
-    def _async_refresh_history(self, _now: datetime) -> None:
+    async def _async_refresh_history(self, _now: datetime) -> None:
         self.async_write_ha_state()
 
     @property
