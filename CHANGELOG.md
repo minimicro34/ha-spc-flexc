@@ -26,7 +26,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
-- CI quality checks passed; signed-release dry run and live Home Assistant verification pending.
+- Signed-release dry run passed; live Home Assistant validation pending.
 
 ---
 
