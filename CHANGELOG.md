@@ -8,6 +8,28 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.5-beta.17]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.5-beta.17`
+- SPC FlexC Card: `1.0.28` (unchanged)
+
+### Fixed
+
+- Run the rolling PIR slow-read history refresh callback on the Home Assistant event loop, avoiding unsafe `async_write_ha_state()` calls from an executor thread and the resulting `RuntimeError` log flood.
+
+### Tests
+
+- CI: 465 Python tests passed; 91.76% coverage (80% minimum).
+- No dedicated regression test for the callback execution context added yet.
+
+### Validation
+
+- CI quality checks passed; signed-release dry run and live Home Assistant verification pending.
+
+---
+
 ## [1.1.5-beta.16]
 
 ### Version
