@@ -12,10 +12,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
-- Bundled SPC FlexC Card v1.0.28 with expanded System diagnostics, event history details, and a collapsible PIR slow-read section.
-- Optional zone tamper and trouble diagnostic entities, with event-driven updates and restoration handling.
-- Optional rolling PIR slow-read diagnostic sensor with a one-hour history, maximum duration, and timestamps.
-- Additional FlexC event metadata, including reception time and resolved area/zone names.
+- **SPC FlexC Card v1.0.28:** Bundled updated card with expanded System diagnostics, enhanced event history, and a collapsible PIR slow-read diagnostics section.
+- **Zone Tamper & Trouble sensors:** Added two diagnostic binary sensors per SPC zone to independently monitor tamper and trouble conditions, with event-driven updates and restore handling.
+- **PIR Slow-Read sensor:** Added an optional, disabled-by-default diagnostic sensor tracking slow PIR reads over a rolling one-hour window, including occurrence count, maximum read duration, and timestamps.
+- **Last FlexC Event ID sensor:** Added an optional, disabled-by-default diagnostic sensor exposing the latest FlexC event ID and a history of the 20 most recent events, with decoded event descriptions and zone/area identifiers for troubleshooting without enabling DEBUG logging.
+- **Enhanced FlexC event metadata:** Added event reception timestamps and resolved area/zone names to improve event history readability and diagnostics.
 
 ### Improved
 
@@ -32,17 +33,16 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Validation
 
-- Beta.17: 465 Python tests passed, 91.76% coverage; 20 JavaScript tests passed in the beta validation cycle.
-- Signed-release dry run reported successful for beta.17.
-- Independent production feedback on beta.17: occasional PIR slow reads of approximately 1.0–1.35 s, without repeated failures; frequency decreased after a second test VM/ATS was removed.
-- Beta.15 command-context and door-status behavior was validated on a production SPC installation; other hardware-specific features remain dependent on panel model and firmware.
+- **Signed release:** Signing and release workflow validated through successful dry-run testing.
+- **Real-world validation:** FlexC command-context synchronization and door-status updates validated on a production SPC installation.
+- **Hardware compatibility:** Additional validation across SPC panel models and firmware versions remains ongoing.
 
 ### Known limitations
 
 - Occasional PIR slow reads may still occur, especially when multiple FlexC ATS connections share a panel; the precise cause is not yet confirmed.
 - Automatic ATP account assignment when the panel sends account `0` has not been independently confirmed across all supported SPC firmware versions. An explicit nonzero account remains a workaround if the connection closes before the first POLL.
 
-**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.4...v1.1.5
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.4...v1.1.5
 
 ---
 
