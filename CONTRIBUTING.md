@@ -34,6 +34,7 @@ make lint
 make typecheck
 make test
 make coverage
+make card-test
 make check
 make clean
 ```
@@ -44,13 +45,14 @@ These commands have different purposes and should not be confused:
 
 - `make format` applies Ruff formatting and may modify Python files;
 - `make check` runs compilation, formatting verification, linting, type
-  checking and the standard test suite;
+  checking, Python tests and bundled Lovelace card Node.js regression tests;
+- `make card-test` runs the standalone Node.js checks in `tests/test_lovelace_card.mjs`;
 - `make coverage` runs the test suite with coverage measurement and enforces
   the repository minimum coverage threshold of 80%.
 
 `make check` does **not** run `make coverage`.
 
-Before submitting a Pull Request or preparing a release, run both:
+Before submitting a Pull Request or preparing a release, run both (the first also runs `make card-test`):
 
 ```bash
 make check

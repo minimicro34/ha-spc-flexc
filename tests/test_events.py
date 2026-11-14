@@ -1,5 +1,7 @@
 """Tests for SPC FlexC event parsing and state updates."""
 
+import pytest
+
 from custom_components.spc_flexc.flexc.events import (
     apply_area_event,
     apply_event,
@@ -450,3 +452,59 @@ def test_confirmed_entry_zone_intrusion_ignored_when_disarmed() -> None:
     )
     assert not area.alarm_event_active
     assert not area.triggered_alarm_zones
+
+
+def test_zone_alarm_zone_tamper_and_trouble_are_independent() -> None:
+    """A zone may report motion, tamper and trouble independently."""
+    zone = ZoneState(zone_id=2, area_id=1, logic_input=1)
+    zones = {2: zone}
+    assert apply_zone_event(zones, {"EV_ID": "1200", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_tamper is True
+    assert zone.logic_input == 1
+    assert apply_zone_event(zones, {"EV_ID": "1800", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_trouble is True
+    assert apply_zone_event(zones, {"EV_ID": "1300", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_tamper is False
+    assert zone.event_trouble is True
+    assert apply_zone_event(zones, {"EV_ID": "1900", "ZONE_ID": "2", "AREA_ID": "1"})
+    assert zone.event_trouble is False
+    assert zone.logic_input == 1
+
+
+def test_zone_alarm_event_wrong_area_is_ignored() -> None:
+    """Do not associate an event with a zone in another area."""
+    zone = ZoneState(zone_id=2, area_id=1)
+    assert not apply_zone_event(
+        {2: zone}, {"EV_ID": "1200", "ZONE_ID": "2", "AREA_ID": "3"}
+    )
+    assert zone.event_tamper is None
+
+
+@pytest.mark.parametrize(
+    ("tamper", "tamper_restore", "trouble", "trouble_restore"),
+    [
+        (1200, 1300, 1800, 1900),
+        (1201, 1301, 1801, 1901),
+        (1203, 1303, 1803, 1903),
+        (1208, 1308, 1808, 1908),
+        (1212, 1312, 1812, 1912),
+        (1215, 1315, 1815, 1915),
+        (1223, 1323, 1823, 1923),
+    ],
+)
+def test_zone_type_event_families(
+    tamper: int, tamper_restore: int, trouble: int, trouble_restore: int
+) -> None:
+    zone = ZoneState(zone_id=5, area_id=2, logic_input=1)
+    zones = {5: zone}
+    for event_id, field, expected in (
+        (tamper, "event_tamper", True),
+        (trouble, "event_trouble", True),
+        (tamper_restore, "event_tamper", False),
+        (trouble_restore, "event_trouble", False),
+    ):
+        assert apply_zone_event(
+            zones, {"EV_ID": str(event_id), "ZONE_ID": "5", "AREA_ID": "2"}
+        )
+        assert getattr(zone, field) is expected
+    assert zone.logic_input == 1

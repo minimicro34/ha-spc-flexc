@@ -374,7 +374,7 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
     )
 
     assert len(batches[0]) == len(PANEL) + len(FAULTS) + 1
-    assert [len(batch) for batch in batches[1:]] == [1, 1, 3]
+    assert [len(batch) for batch in batches[1:]] == [1, 3, 3]
     assert len(callbacks) == 1
     callbacks[0]()
     assert len(batches) == 4
@@ -385,7 +385,7 @@ async def test_setup_entry_adds_dynamic_binary_sensors_once() -> None:
         device_id=2, serial_number="XB2"
     )
     callbacks[0]()
-    assert [len(batch) for batch in batches[4:]] == [1, 1, 3]
+    assert [len(batch) for batch in batches[4:]] == [1, 3, 3]
 
 
 def test_zone_intrusion_attributes_follow_area_alarm_lifecycle() -> None:
@@ -419,3 +419,23 @@ def test_zone_intrusion_attributes_without_matching_area() -> None:
     attrs = sensor.extra_state_attributes
     assert attrs["intrusion_active"] is False
     assert attrs["intrusion_triggered"] is False
+
+
+@pytest.mark.parametrize(
+    ("logic_input", "tamper", "expected"),
+    [
+        (0, False, False),
+        (1, False, True),
+        (3, True, False),
+        (3, False, None),
+        (2, False, None),
+        (4, False, None),
+    ],
+)
+def test_zone_logic_input_is_not_boolean(
+    logic_input: int, tamper: bool, expected: bool | None
+) -> None:
+    """A disconnected tampered PIR must not be reported as motion."""
+    sensor, coordinator = _zone_sensor(logic_input=logic_input)
+    coordinator.data.zones[1].event_tamper = tamper
+    assert sensor.is_on is expected

@@ -24,10 +24,13 @@ from custom_components.spc_flexc.flexc.connection import (
     MSG_DATA_ACK,
     MSG_ERROR,
     MSG_EVENT,
+    MSG_KEY_ACK,
+    MSG_KEY_UPDATE,
     MSG_POLL,
     PROTOCOL_ID,
     PROTOCOL_VERSION,
     RCT_CONNECTION_ID,
+    FlexCAuthenticationError,
     FlexCClient,
     FlexCCommandError,
     FlexCConnectionError,
@@ -294,6 +297,7 @@ def test_build_connection_ack_preserves_validated_fields() -> None:
     assert parsed["message_id"] == MSG_CONNECTION_ACK_LEGACY
     assert parsed["connection_id"] == RCT_CONNECTION_ID
     assert parsed["spt_sequence"] == request["spt_sequence"]
+    assert parsed["spt_account"] == request["spt_account"]
     assert parsed["rct_identifier"] == request["rct_identifier"]
     assert parsed["sha1_ok"] is True
 
@@ -482,33 +486,111 @@ async def test_handle_message_poll_does_not_replace_active_command_context() -> 
 
 
 @pytest.mark.asyncio
-async def test_unsolicited_event_waits_for_fresh_poll_before_commands() -> None:
-    """An EVENT invalidates idle command context until a validated POLL."""
+async def test_unsolicited_event_refreshes_idle_command_context() -> None:
+    """An acknowledged EVENT provides a fresh context without a POLL."""
     client = _client()
     client._send_wire = AsyncMock()
     client._build_clone_ack = MagicMock(return_value=b"ack")
-    original = _message()
-    client._command_context = original
+    client._command_context = _message()
     client._context_event.set()
 
-    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
+    event = {
+        **_message(),
+        "message_id": MSG_EVENT,
+        "rct_sequence": 41,
+        "app_data": b"event",
+    }
     with patch(
         "custom_components.spc_flexc.flexc.connection.parse_event_payload",
         return_value=None,
     ):
         await client._handle_message(event)
 
-    assert client._command_context is None
-    assert not client._context_event.is_set()
-    assert client._awaiting_poll_after_event is True
-
-    poll = {**_message(), "message_id": MSG_POLL, "rct_sequence": 42}
-    await client._handle_message(poll)
-
-    assert client._command_context == poll
-    assert client._rct_sequence == 42
+    client._send_wire.assert_awaited_once_with(b"ack")
+    assert client._command_context == event
+    assert client._rct_sequence == 41
     assert client._context_event.is_set()
     assert client._awaiting_poll_after_event is False
+    assert await client.async_wait_for_event_resync() == 0.0
+
+
+@pytest.mark.asyncio
+async def test_event_ack_failure_does_not_promote_command_context() -> None:
+    """A failed EVENT ACK must never seed a new outbound DATA sequence."""
+    client = _client()
+    original = _message()
+    client._command_context = original
+    client._rct_sequence = int(original["rct_sequence"])
+    client._context_event.set()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._send_wire = AsyncMock(side_effect=OSError("connection lost"))
+
+    event = {
+        **_message(),
+        "message_id": MSG_EVENT,
+        "rct_sequence": 55,
+        "app_data": b"event",
+    }
+    with pytest.raises(OSError, match="connection lost"):
+        await client._handle_message(event)
+
+    assert client._command_context is original
+    assert client._rct_sequence == int(original["rct_sequence"])
+    assert client._context_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_successive_unsolicited_events_use_latest_context() -> None:
+    """A second EVENT supersedes the first before a new command."""
+    client = _client()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    for sequence in (41, 42):
+        event = {
+            **_message(),
+            "message_id": MSG_EVENT,
+            "rct_sequence": sequence,
+            "app_data": b"event",
+        }
+        with patch(
+            "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+            return_value=None,
+        ):
+            await client._handle_message(event)
+    assert client._command_context == event
+    assert client._rct_sequence == 42
+    assert client._context_event.is_set()
+    assert client._send_wire.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_command_after_event_sends_without_waiting_for_poll() -> None:
+    """Disarm can send immediately after a validated EVENT acknowledgment."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._send_wire = AsyncMock()
+    client._build_clone_ack = MagicMock(return_value=b"ack")
+    client._build_outbound_data = MagicMock(return_value=b"command")
+    event = {
+        **_message(),
+        "message_id": MSG_EVENT,
+        "rct_sequence": 41,
+        "app_data": b"event",
+    }
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+        return_value=None,
+    ):
+        await client._handle_message(event)
+
+    task = asyncio.create_task(client.async_send_flexml("<FLEXML/>"))
+    await asyncio.sleep(0)
+    client._build_outbound_data.assert_called_once()
+    assert client._build_outbound_data.call_args.args[0] == event
+    assert client._build_outbound_data.call_args.args[1] == 42
+    assert client._pending_reply is not None
+    client._pending_reply.set_result("<REPLY/>")
+    assert await task == "<REPLY/>"
 
 
 @pytest.mark.asyncio
@@ -596,6 +678,38 @@ async def test_handle_message_error_clears_context_and_fails_pending_reply() -> 
     assert isinstance(pending.exception(), FlexCCommandError)
 
 
+@pytest.mark.asyncio
+async def test_error_54_is_distinct_authentication_failure() -> None:
+    """Error 54 is classified without logging or returning credentials."""
+    client = _client()
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+    await client._handle_message(
+        {
+            **_message(),
+            "message_id": MSG_ERROR,
+            "data_header": b"\x00\x00\x00\x00\x00\x00\x00\x36",
+        }
+    )
+    error = pending.exception()
+    assert isinstance(error, FlexCAuthenticationError)
+    assert "Authentication failed" in str(error)
+    assert "54" in str(error)
+    assert client.command_password not in str(error)
+
+
+@pytest.mark.parametrize("code", [24, 25, 52])
+def test_other_panel_error_codes_remain_command_errors(code: int) -> None:
+    """Other SPC error codes remain distinguishable in the message."""
+    client = _client()
+    pending = asyncio.get_event_loop().create_future()
+    client._pending_reply = pending
+    client._handle_error({"data_header": b"\x00" * 4 + _put32(code)})
+    error = pending.exception()
+    assert type(error) is FlexCCommandError
+    assert f"code={code}" in str(error)
+
+
 def test_decode_application_extracts_reply_and_rejects_missing_reply() -> None:
     """Application decoding ignores framing/noise and returns FLEXML_REPLY."""
     reply = '<FLEXML_REPLY STATUS="OK" />'
@@ -651,34 +765,32 @@ def test_handle_incoming_data_propagates_malformed_reply() -> None:
 
 
 @pytest.mark.asyncio
-async def test_repeated_events_keep_first_resync_start_until_poll() -> None:
-    """Repeated unsolicited EVENTs must not restart the POLL wait timer."""
+async def test_repeated_events_do_not_require_poll_resync() -> None:
+    """Repeated EVENTs keep the latest acknowledged transport context."""
     client = _client()
     client._send_wire = AsyncMock()
     client._build_clone_ack = MagicMock(return_value=b"ack")
     client._command_context = _message()
     client._context_event.set()
-    event = {**_message(), "message_id": MSG_EVENT, "app_data": b"event"}
 
-    with patch(
-        "custom_components.spc_flexc.flexc.connection.parse_event_payload",
-        return_value=None,
-    ):
-        await client._handle_message(event)
-        started_at = client._event_resync_started_at
-        assert started_at is not None
-        await client._handle_message(event)
+    for sequence in (41, 42):
+        event = {
+            **_message(),
+            "message_id": MSG_EVENT,
+            "rct_sequence": sequence,
+            "app_data": b"event",
+        }
+        with patch(
+            "custom_components.spc_flexc.flexc.connection.parse_event_payload",
+            return_value=None,
+        ):
+            await client._handle_message(event)
+        assert client._event_resync_started_at is None
+        assert client._awaiting_poll_after_event is False
+        assert client._context_event.is_set()
 
-    assert client._event_resync_started_at == started_at
-    assert client._awaiting_poll_after_event is True
-    assert client._command_context is None
-
-    poll = {**_message(), "message_id": MSG_POLL}
-    await client._handle_message(poll)
-
-    assert client._event_resync_started_at is None
-    assert client._awaiting_poll_after_event is False
-    assert client._context_event.is_set()
+    assert client._command_context == event
+    assert client._rct_sequence == 42
 
 
 @pytest.mark.asyncio
@@ -697,7 +809,8 @@ async def test_data_reply_restores_context_after_unsolicited_event() -> None:
     ):
         await client._handle_message(event)
 
-    assert client._awaiting_poll_after_event is True
+    assert client._command_context == event
+    assert client._awaiting_poll_after_event is False
 
     data = {
         **_message(),
@@ -784,3 +897,329 @@ async def test_command_wait_after_event_timeout(caplog) -> None:
 
     client._send_wire.assert_not_awaited()
     assert "FlexC command context wait after EVENT" in caplog.text
+
+
+def test_session_identity_diagnostic_is_nonblocking_and_deduplicated(caplog) -> None:
+    """Identity changes are observed once per field without rejecting frames."""
+    client = _client()
+    client._session_generation = 3
+    connect = {**_message(), "message_id": MSG_CONNECTION_REQUEST}
+    client._diagnose_session_identity(connect)
+    assert client._session_identity == (
+        connect["spt_account"],
+        connect["connection_id"],
+        connect["rct_identifier"],
+    )
+
+    changed = {
+        **connect,
+        "message_id": MSG_POLL,
+        "spt_account": 999,
+        "connection_id": 123,
+        "rct_identifier": 456,
+    }
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(changed)
+        client._diagnose_session_identity(changed)
+    assert caplog.text.count("identity changed") == 2
+    assert "field=connection_id" not in caplog.text
+    assert "diagnostic only; frame accepted" in caplog.text
+    assert client._session_identity[0] == connect["spt_account"]
+
+
+def test_session_identity_diagnostic_waits_for_handshake() -> None:
+    """An unsolicited pre-handshake frame cannot establish identity."""
+    client = _client()
+    client._diagnose_session_identity({**_message(), "message_id": MSG_POLL})
+    assert client._session_identity is None
+    client._diagnose_session_identity(
+        {**_message(), "message_id": MSG_CONNECTION_REQUEST_LEGACY}
+    )
+    assert client._session_identity is not None
+
+
+@pytest.mark.asyncio
+async def test_new_session_fails_previous_pending_command() -> None:
+    """Replacing the TCP socket immediately fails an in-flight command."""
+    client = _client()
+    old_writer = MagicMock()
+    old_writer.wait_closed = AsyncMock()
+    client._writer = old_writer
+    pending = asyncio.get_running_loop().create_future()
+    client._pending_reply = pending
+
+    reader = MagicMock()
+    reader.readexactly = AsyncMock(side_effect=asyncio.IncompleteReadError(b"", 16))
+    writer = MagicMock()
+    writer.get_extra_info.return_value = ("192.0.2.10", 12345)
+    writer.wait_closed = AsyncMock()
+
+    await client._handle_client(reader, writer)
+
+    assert isinstance(pending.exception(), FlexCConnectionError)
+    assert "replaced" in str(pending.exception())
+    old_writer.close.assert_called_once_with()
+    assert client._session_generation == 1
+
+
+@pytest.mark.asyncio
+async def test_stale_command_timeout_does_not_close_new_connection() -> None:
+    """An old command timeout cannot disconnect a replacement TCP session."""
+    client = _client()
+    client.async_ensure_connected = AsyncMock()
+    client._send_wire = AsyncMock()
+    client._command_context = _message()
+    client._context_event.set()
+    client._session_generation = 1
+    old_writer = MagicMock()
+    client._writer = old_writer
+
+    async def send_and_replace(_wire: bytes) -> None:
+        client._session_generation = 2
+        client._writer = MagicMock()
+        client._command_context = _message()
+        client._context_event.set()
+
+    client._send_wire.side_effect = send_and_replace
+
+    with (
+        patch("custom_components.spc_flexc.flexc.connection.COMMAND_TIMEOUT", 0.001),
+        pytest.raises(FlexCConnectionError, match="session changed"),
+    ):
+        await client.async_send_flexml("<FLEXML/>")
+
+    assert client._session_generation == 2
+    assert client._writer is not old_writer
+    assert client._command_context is not None
+    client._writer.close.assert_not_called()
+    old_writer.close.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_idle_tcp_connection_is_closed() -> None:
+    """A half-open socket must not remain connected indefinitely."""
+    client = _client()
+    reader = MagicMock()
+
+    async def blocked_read(_size: int) -> bytes:
+        await asyncio.sleep(1)
+        return b""
+
+    reader.readexactly = AsyncMock(side_effect=blocked_read)
+    writer = MagicMock()
+    writer.get_extra_info.return_value = ("192.0.2.10", 12345)
+    writer.wait_closed = AsyncMock()
+
+    with patch(
+        "custom_components.spc_flexc.flexc.connection.FRAME_IDLE_TIMEOUT", 0.001
+    ):
+        await client._handle_client(reader, writer)
+
+    writer.close.assert_called_once_with()
+    assert client._writer is None
+    assert not client.connected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("message_id", [MSG_KEY_UPDATE, MSG_KEY_ACK])
+async def test_key_management_messages_are_observed_without_ack(
+    message_id: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Unknown key management must not falsely acknowledge a key rotation."""
+    client = _client()
+    client._session_generation = 3
+    client._send_wire = AsyncMock()
+
+    with caplog.at_level(logging.WARNING):
+        await client._handle_message({**_message(), "message_id": message_id})
+
+    client._send_wire.assert_not_awaited()
+    assert f"MSG_ID=0x{message_id:02X}" in caplog.text
+    assert "session #3" in caplog.text
+    assert "no key change or ACK sent" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("connect_id", "poll_id"),
+    [(0x3B9ACA00, 0x77359401), (0x11111111, 0x22222222)],
+)
+def test_session_identity_learns_first_poll_connection_id(
+    caplog: pytest.LogCaptureFixture, connect_id: int, poll_id: int
+) -> None:
+    """Learn a panel-independent active ID without flagging CONNECT transitions."""
+    client = _client()
+    base = _message()
+    with caplog.at_level(logging.INFO):
+        client._diagnose_session_identity(
+            {
+                **base,
+                "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+                "connection_id": connect_id,
+            }
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_EVENT, "connection_id": poll_id}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_POLL, "connection_id": poll_id}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_DATA, "connection_id": poll_id}
+        )
+    assert client._session_identity[1] == poll_id
+    assert "identity changed: field=connection_id" not in caplog.text
+
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_EVENT, "connection_id": poll_id + 1}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_EVENT, "connection_id": poll_id + 1}
+        )
+    assert caplog.text.count("identity changed: field=connection_id") == 1
+
+
+def test_connection_request_02_uses_first_poll_baseline(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A modern CONNECT also learns the active ID without hardcoded assumptions."""
+    client = _client()
+    base = _message()
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_CONNECTION_REQUEST, "connection_id": 11}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_POLL, "connection_id": 12}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_DATA, "connection_id": 12}
+        )
+    assert client._session_identity[1] == 12
+    assert "identity changed: field=connection_id" not in caplog.text
+
+
+def test_auto_assigned_atp_account_in_connect_ack(monkeypatch) -> None:
+    """An ATP account of zero receives a stable, nonzero assigned account."""
+    client = _client()
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: 12345677,
+    )
+    request = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 0,
+    }
+    client._learn_connect_account(request)
+    parsed = client._parse_frame(client._build_connection_ack(request))
+    assert parsed["spt_account"] == 12345678
+    assert parsed["sha1_ok"] is True
+    assert client._account_for_ack(request) == 12345678
+    poll = {**request, "message_id": MSG_POLL, "spt_account": 12345678}
+    assert client._account_for_ack(poll) == 12345678
+
+
+def test_explicit_atp_account_remains_unchanged() -> None:
+    """An explicit ATP account is echoed rather than reassigned."""
+    client = _client()
+    request = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 87654321,
+    }
+    client._learn_connect_account(request)
+    parsed = client._parse_frame(client._build_connection_ack(request))
+    assert parsed["spt_account"] == 87654321
+    assert client._assigned_spt_account == 87654321
+
+
+@pytest.mark.asyncio
+async def test_modern_connect_assigns_account_in_ack(monkeypatch) -> None:
+    """Modern CONNECT 0x02 also returns the assigned ATP account."""
+    client = _client()
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: 3456788,
+    )
+    client._send_wire = AsyncMock()
+    request = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST,
+        "spt_account": 0,
+    }
+    await client._handle_message(request)
+
+    client._send_wire.assert_awaited_once()
+    parsed = client._parse_frame(client._send_wire.await_args.args[0])
+    assert parsed["message_id"] == 0x03
+    assert parsed["spt_account"] == 3456789
+    assert parsed["sha1_ok"] is True
+
+
+def test_assigned_account_is_not_reused_for_unrelated_ack(monkeypatch) -> None:
+    """A later POLL ACK echoes the panel's active account, not stale CONNECT data."""
+    client = _client()
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: 2345677,
+    )
+    connect = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 0,
+    }
+    client._learn_connect_account(connect)
+    assert client._account_for_ack(connect) == 2345678
+
+    poll = {
+        **_message(),
+        "message_id": MSG_POLL,
+        "spt_account": 2345678,
+    }
+    parsed = client._parse_frame(client._build_clone_ack(poll, 0x21))
+    assert parsed["spt_account"] == 2345678
+    assert parsed["sha1_ok"] is True
+
+
+def test_auto_assigned_account_changes_for_next_connect(monkeypatch) -> None:
+    """A new CONNECT assignment replaces the previous session's account."""
+    client = _client()
+    generated = iter((1111110, 2222221))
+    monkeypatch.setattr(
+        "custom_components.spc_flexc.flexc.connection.secrets.randbelow",
+        lambda _: next(generated),
+    )
+    connect = {
+        **_message(),
+        "message_id": MSG_CONNECTION_REQUEST_LEGACY,
+        "spt_account": 0,
+    }
+    client._learn_connect_account(connect)
+    first = client._parse_frame(client._build_connection_ack(connect))
+    client._assigned_spt_account = None
+    client._learn_connect_account(connect)
+    second = client._parse_frame(client._build_connection_ack(connect))
+
+    assert first["spt_account"] == 1111111
+    assert second["spt_account"] == 2222222
+    assert first["sha1_ok"] is True
+    assert second["sha1_ok"] is True
+
+
+def test_auto_assigned_account_transition_on_first_poll_is_not_identity_warning(
+    caplog,
+) -> None:
+    """A nonzero account on first POLL may represent auto-assignment."""
+    client = _client()
+    base = _message()
+    with caplog.at_level(logging.WARNING):
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_CONNECTION_REQUEST, "spt_account": 0}
+        )
+        client._diagnose_session_identity(
+            {**base, "message_id": MSG_POLL, "spt_account": 12345678}
+        )
+    assert client._session_identity is not None
+    assert client._session_identity[0] == 12345678
+    assert "identity changed: field=spt_account" not in caplog.text

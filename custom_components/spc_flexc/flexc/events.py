@@ -114,24 +114,35 @@ def apply_zone_event(
     except (TypeError, ValueError):
         return False
 
-    # Zone tamper fault / restore.
-    if event_id == 1008:
-        value = True
-    elif event_id == 1108:
-        value = False
+    # SPC zone-event tables define 24 type-specific transitions per family.
+    # Keep these independent from physical zone input and intrusion state.
+    if event_id in (1008, 1108):
+        transition = ("event_tamper", event_id == 1008)
+    elif 1200 <= event_id <= 1223:
+        transition = ("event_tamper", True)
+    elif 1300 <= event_id <= 1323:
+        transition = ("event_tamper", False)
+    elif 1800 <= event_id <= 1823:
+        transition = ("event_trouble", True)
+    elif 1900 <= event_id <= 1923:
+        transition = ("event_trouble", False)
     else:
         return False
-
     zone = zones.get(zone_id)
-
     if zone is None:
         return False
-
-    previous = zone.event_tamper
-
-    zone.event_tamper = value
+    # Never attach an event from another area to a matching zone number.
+    raw_area_id = event.get("AREA_ID")
+    if raw_area_id is not None:
+        try:
+            if zone.area_id is not None and int(str(raw_area_id)) != zone.area_id:
+                return False
+        except (TypeError, ValueError):
+            return False
+    field, value = transition
+    previous = getattr(zone, field)
+    setattr(zone, field, value)
     zone.last_event = dict(event)
-
     return previous != value
 
 

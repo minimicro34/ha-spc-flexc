@@ -60,6 +60,16 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 
 ---
 
+## Release v1.1.5
+
+This release includes the FlexC communication and PIR diagnostics improvements validated during the v1.1.5 beta cycle. The bundled SPC FlexC Card is v1.0.28.
+
+The receiver can use the validated transport context of an acknowledged unsolicited FlexC EVENT for a subsequent command when no command is in flight, reducing unnecessary waits for the next supervision POLL. Commands already in flight retain their authoritative DATA reply context.
+
+Occasional slow PIR reads have been observed during testing, without repeated failures. Their frequency appeared higher with two FlexC ATS connections active on the same panel; this remains an observation rather than a confirmed root cause.
+
+See [CHANGELOG.md](CHANGELOG.md) for the stable release summary and the retained per-beta history.
+
 ## Features
 
 ### FlexC
@@ -211,7 +221,7 @@ Configure the ATP destination with:
 - FlexC encryption enabled;
 - the same AES-256 encryption key configured in Home Assistant.
 
-Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.
+Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.\n\nStarting with **v1.1.5**, an ATP client account set to `0` (automatic assignment) receives a nonzero account identifier in the FlexC CONNECT acknowledgement, following the behavior observed in the decompiled SPCLink receiver. Explicit nonzero ATP accounts are preserved. **This behavior still requires live validation on an SPC4300**; if the connection drops before the first POLL, use an explicit nonzero ATP account as a temporary workaround.
 
 ### Command Profile
 
@@ -233,6 +243,11 @@ Read permissions are required for the panel and hardware status used by the inte
 
 > [!IMPORTANT]
 > `SPC User Only / Utilisateur SPC seulement` has not been validated as the authentication mode for this integration.
+
+> [!NOTE]
+> **Firmware-specific authentication findings (SPC 3.14.1):** Henrik reported that FlexC accepts usernames of 4–16 characters and web passwords of 6–16 characters, using letters, digits and `. ! @ # $ % _ + - = ; < > ?`. A longer password may still work in the panel's web interface but fail over FlexC with error `54` (authentication failed). These limits have not been confirmed across all SPC firmware versions.
+>
+> If panel-user credentials produce error `54`, check **Communications → FlexC → ATS Command Profile**: the **Command User or Panel User** setting and the Command Profile's own credentials may affect authentication. This is distinct from the **Command User Only** configuration validated above. See [Henrik's SPC panel setup guide](https://github.com/henrikekblad/spc-flexc-home-assistant/blob/main/docs/panel-setup.md) for details.
 
 ---
 
@@ -286,6 +301,8 @@ X-BUS peripherals are dynamically grouped as Home Assistant devices. Tested devi
 
 Diagnostic entities are associated with the appropriate SPC devices and can include panel power/battery/tamper faults, modem/RF information, FlexC ATS/ATP state and X-BUS operational information.
 
+From **v1.1.5-beta.5**, each discovered SPC zone also exposes separate **tamper** and **trouble** diagnostic binary sensors. These are independent from the zone's physical input (motion, opening, etc.). FlexC zone-event families `1200–1223` / `1300–1323` (tamper / restore) and `1800–1823` / `1900–1923` (trouble / restore) update the corresponding diagnostic states. Event suffixes identify the zone type, not an additional physical detector; events for unknown zone IDs do not create phantom zones. Zone alarms may remain latched until their explicit restore event. A normal PIR motion/rest state does not clear a latched tamper/trouble event.
+
 Availability is hardware- and firmware-dependent.
 
 ### FlexC event ID diagnostics (optional)
@@ -296,8 +313,13 @@ enable the **Last FlexC event ID** diagnostic sensor in Home Assistant under
 **disabled by default** to avoid unnecessary state recording.
 
 Its state is the most recent numeric `EV_ID`; attributes expose the matching
-`area_id`, `zone_id`, and the **20 most recent** sets of these numeric
-identifiers. No raw EVENT XML, user names, passwords or device payloads are
+`area_id`, `zone_id`, a human-readable `event_description` when documented,
+`event_origin`, `alarm_type`, `alarm_transition`, and the **20 most recent**
+observed event identifiers with their decoded descriptions and classifications. Each recent event also includes its Home Assistant reception time (`received_at`) and, when discovered, the corresponding `area_name` and `zone_name` alongside the original numeric IDs.
+This includes the zone input events `2100/2101`, the observed `2103/2107`
+diagnostics, zone-type tamper/trouble and restore families, and selected
+Wireless / X-BUS events. Unknown events retain their numeric ID without an
+invented description. No raw EVENT XML, user names, passwords or device payloads are
 retained in this diagnostic history. The history is in memory only and resets
 when the integration reloads. It is intended for event discovery, not a
 permanent audit log or an implementation of additional devices.
@@ -310,15 +332,19 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 
 ## SPC FlexC Card
 
-Starting with **SPC FlexC v1.1.2**, the validated **SPC FlexC Card v1.0.18**
-is bundled with this integration. It is no longer distributed as a separate
-HACS Dashboard plugin.
+Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
+integration. **SPC FlexC v1.1.5 bundles Card v1.0.28**. It is no longer
+distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.18` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.28` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
-X-BUS and system diagnostics. Use the custom card type
+X-BUS and system diagnostics. The bundled card preserves the physical detector
+icon and displays separate tamper/trouble labels and counts in detector groups
+and the general view. The **System** tab can show the recent FlexC event history
+when the optional **Last FlexC event ID** sensor is enabled. The collapsible event panel shows a localized count (for example, **11 événements**) without repeating the section heading. If the sensor is disabled or missing, the card displays a localized activation hint. Recent events include their reception timestamp and discovered area/zone names alongside numeric IDs. The card maintains its own French/English JavaScript translations, separate from Home Assistant integration translations. These observations
+are not persistent alarm states. Use the custom card type
 `custom:spc-flexc-card` in your dashboard.
 
 ### Screenshots
@@ -546,7 +572,7 @@ Do not expose the FlexC listener directly to the Internet.
 
 ## Known limitations
 
-### PIR event updates and beta diagnostics
+### PIR event updates and diagnostics
 
 On supported motion zones (SPC zone types `0` and `2`), FlexC event `2100` updates the Home Assistant motion state immediately, while event `2101` restores it. The event must identify a known zone and match its area. This event-driven path does not wait for the next zone status poll.
 
@@ -558,12 +584,12 @@ Zone polling remains enabled to reconcile state. If an EVENT arrives while a zon
 - `FlexC zone EVENT state`: motion state applied from event `2100` or `2101`.
 - `FlexC PIR diagnostic`: changes detected by polling, including logic input, actuation counters and timing.
 - `FlexC PIR publish diagnostic`: processing and Home Assistant publication timings.
-- `FlexC unsolicited EVENT between commands`: the command context was invalidated while idle.
-- `FlexC context resynchronized from SPC POLL`: a fresh POLL restored the command context; `wait_ms` measures the EVENT-to-POLL delay.
+- `FlexC command context refreshed from acknowledged unsolicited EVENT`: an idle session uses the acknowledged EVENT transport context without waiting for the next POLL.
+- `FlexC context resynchronized from SPC POLL`: a fallback diagnostic for a context restored by POLL; it is no longer the expected idle-EVENT path.
 
 A slow zone polling cycle emits `FlexC PIR poll slow` at `WARNING`, with `interval_ms`, `lock_wait_ms`, `read_ms` and per-batch durations. Command timeouts and connection/protocol errors retain their existing warning diagnostics.
 
-**Protocol safety:** An unsolicited EVENT between commands invalidates the existing command context. The next command waits for a fresh SPC POLL before proceeding. These beta diagnostics measure the remaining EVENT-to-POLL wait; the transport still requires a validated fresh POLL before the next command. Zone polling now releases the coordinator operation lock between batches, allowing other operations to run between batches rather than waiting for the full scan. This improves scheduling opportunities but does **not** shorten the panel's EVENT-to-POLL protocol interval. The `FlexC command context wait after EVENT` diagnostic measures how long an actual command was blocked; `lock_wait_ms` now sums lock acquisition delays across zone batches. EVENTs received while a command is in flight do not replace its reply context.
+**Protocol safety:** When no DATA command is pending, the receiver acknowledges an unsolicited EVENT and uses its validated transport context for the next command. An EVENT received during an in-flight command does not displace that command's DATA reply context. A new TCP session still requires a valid handshake and initial POLL. This behavior was validated during the beta cycle on a production SPC installation; it does not alter the configured ATP supervision category or timeout. Zone polling releases the coordinator operation lock between batches to allow other operations to proceed. The `FlexC command context wait after EVENT` diagnostic and `lock_wait_ms` continue to distinguish transport synchronization from lock acquisition delays.
 
 For a hardware test, compare `2100` / `2101` timestamps with the Home Assistant motion entity transitions, then inspect `wait_ms` and `FlexC PIR poll slow` warnings. Do not share credentials, encryption keys or raw sensitive protocol payloads in logs or issues.
 
@@ -622,6 +648,7 @@ Check Home Assistant diagnostics and the raw SPC/FLEXML data first. Hardware-dep
 
 ## Development
 
+
 Development instructions are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The main validation commands are:
@@ -646,7 +673,7 @@ make coverage
 git diff --check
 ```
 
-The current coverage gate is 80%. The v1.1.1 release validation reached 90.08% total coverage.
+The coverage gate is 80%. The v1.1.5-beta.17 validation reported 465 Python tests passing with 91.76% coverage and 20 JavaScript tests passing. ATP account auto-assignment with account `0` remains pending independent validation across SPC firmware versions.
 
 ---
 
@@ -696,3 +723,14 @@ Bug reports, feature suggestions, contributions and GitHub stars are also apprec
 Copyright © 2026 minimicro34.
 
 This project is licensed under the [GNU General Public License v3.0 or later](LICENSE).
+
+
+### Bundled card regression checks
+
+The SPC FlexC Lovelace card is bundled with this integration, not installed as a separate HACS dashboard repository. Its canonical JavaScript sources live in `frontend/src/`, and the generated resource is `custom_components/spc_flexc/www/ha-spc-flexc-card.js`.
+
+The card version has one editable source: `frontend/package.json`. Run `cd frontend && npm run build` when changing the version or card sources; the build updates `package-lock.json` and generates the bundled JavaScript. The integration reads the version embedded in that JavaScript for its Lovelace cache-busting URL. Commit both the source changes and generated artifacts; CI checks consistency rather than rebuilding them.
+
+To validate the bundled card, use `make card-test` (Node.js regression tests) and `cd frontend && npm ci && npm run check` (JavaScript syntax and generated bundle consistency). `make check` includes the card regression tests alongside Python checks; CI also runs the frontend bundle check and `make coverage`.
+
+Diagnostic FlexC event classifications are historical observations, not persistent alarm states. The optional last-event diagnostic sensor may expose `alarm_type` and `alarm_transition` for validated keypad and user alarm events; these fields must not be interpreted as proof that an alarm is still active.

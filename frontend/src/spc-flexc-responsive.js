@@ -128,3 +128,27 @@ SpcFlexCCard.prototype._styles = function () {
       }
     </style>`;
 };
+
+/* Preserve expanded diagnostic sections across Home Assistant updates. */
+const spcSystemDetailsRender = SpcFlexCCard.prototype._render;
+SpcFlexCCard.prototype._render = function () {
+  const open = new Set(Array.from(this.querySelectorAll("details.system-detail-card[open]"))
+    .map((node) => node.dataset.systemDetailKey).filter(Boolean));
+  spcSystemDetailsRender.call(this);
+  this.querySelectorAll("details.system-detail-card").forEach((node) => {
+    if (open.has(node.dataset.systemDetailKey)) node.open = true;
+  });
+};
+
+const spcSystemDetailsStyles = SpcFlexCCard.prototype._styles;
+SpcFlexCCard.prototype._styles = function () {
+  return `${spcSystemDetailsStyles.call(this)}
+    <style>
+      .system-detail-card { border:1px solid var(--divider-color); border-radius:12px; padding:10px 12px; margin-top:8px; overflow:hidden; }
+      .system-detail-card > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; font-weight:600; }
+      .system-detail-card > summary::-webkit-details-marker { display:none; }
+      .system-detail-card > summary::before { content:"▸"; color:var(--secondary-text-color); transition:transform 120ms ease; }
+      .system-detail-card[open] > summary::before { transform:rotate(90deg); }
+      .system-detail-body { padding-top:10px; }
+    </style>`;
+};

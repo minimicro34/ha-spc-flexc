@@ -15,6 +15,7 @@ async def test_setup_entry_initializes_and_starts_discovery() -> None:
     hass = MagicMock()
     hass.config_entries.async_forward_entry_setups = AsyncMock()
     entry = MagicMock()
+    entry.entry_id = "spc-entry"
     entry.unique_id = None
 
     coordinator = MagicMock()
@@ -53,6 +54,7 @@ async def test_setup_entry_keeps_existing_serial() -> None:
     hass = MagicMock()
     hass.config_entries.async_forward_entry_setups = AsyncMock()
     entry = MagicMock()
+    entry.entry_id = "spc-entry"
     entry.unique_id = "SPC12345678"
 
     coordinator = MagicMock()
@@ -118,3 +120,333 @@ async def test_failed_first_refresh_closes_listener(failure: BaseException) -> N
 
     coordinator.async_shutdown.assert_awaited_once_with()
     assert entry.runtime_data is not coordinator
+
+
+@pytest.mark.asyncio
+async def test_orphan_zone_cleanup_requires_complete_discovery() -> None:
+    """Only stale zone entities belonging to this entry are removed."""
+    hass = MagicMock()
+    hass.states.get.return_value = None
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = False
+    coordinator._detected_zone_ids = {1, 2}
+
+    entities = [
+        MagicMock(
+            entity_id="binary_sensor.zone_1", unique_id="spc-entry_zone_1_motion"
+        ),
+        MagicMock(
+            entity_id="binary_sensor.zone_13", unique_id="spc-entry_zone_13_motion"
+        ),
+        MagicMock(entity_id="switch.zone_13", unique_id="spc-entry_zone_13_isolation"),
+        MagicMock(entity_id="button.zone_13", unique_id="spc-entry_zone_13_restore"),
+        MagicMock(entity_id="sensor.unrelated", unique_id="other-entry_zone_13_motion"),
+        MagicMock(entity_id="sensor.door", unique_id="spc-entry_door_13_status"),
+    ]
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=entities,
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        listener = coordinator.async_add_listener.call_args.args[0]
+        listener()
+        registry.async_remove.assert_not_called()
+        coordinator._discovery_complete = True
+        listener()
+        assert {call.args[0] for call in registry.async_remove.call_args_list} == {
+            "binary_sensor.zone_13",
+            "switch.zone_13",
+            "button.zone_13",
+        }
+        listener()
+        assert registry.async_remove.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_orphan_zone_cleanup_skips_empty_discovery() -> None:
+    """An unexpectedly empty scan cannot wipe the zone registry."""
+    hass = MagicMock()
+    hass.states.get.return_value = None
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = set()
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+    ):
+        assert await async_setup_entry(hass, entry)
+        listener = coordinator.async_add_listener.call_args.args[0]
+        listener()
+        registry.async_remove.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_orphan_cleanup_preserves_active_entities() -> None:
+    """Never remove an entity that is still present in the HA state machine."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="on")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    registry = MagicMock()
+    stale = MagicMock(
+        entity_id="binary_sensor.zone_13",
+        unique_id="spc-entry_zone_13_motion",
+    )
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[stale],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_orphan_cleanup_removes_unavailable_entities() -> None:
+    """Remove a stale zone when its HA state is unavailable."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="unavailable")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    registry = MagicMock()
+    stale = MagicMock(
+        entity_id="binary_sensor.zone_13",
+        unique_id="spc-entry_zone_13_motion",
+    )
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[stale],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_called_once_with("binary_sensor.zone_13")
+
+
+@pytest.mark.asyncio
+async def test_orphan_area_cleanup_removes_unavailable_area_only() -> None:
+    """Remove a missing area without touching discovered or unrelated entities."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="unavailable")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._detected_area_ids = {1, 2}
+    entities = [
+        MagicMock(entity_id="alarm_control_panel.test", unique_id="spc-entry_area_13"),
+        MagicMock(entity_id="alarm_control_panel.home", unique_id="spc-entry_area_1"),
+        MagicMock(entity_id="alarm_control_panel.other", unique_id="other_area_13"),
+    ]
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=entities,
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_called_once_with("alarm_control_panel.test")
+
+
+@pytest.mark.asyncio
+async def test_orphan_area_cleanup_skips_empty_area_discovery() -> None:
+    """Do not prune areas if discovery returned no area IDs."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    hass.states.get.return_value = MagicMock(state="unavailable")
+    entry = MagicMock()
+    entry.entry_id = "spc-entry"
+    entry.unique_id = "SPC12345678"
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._detected_area_ids = set()
+    registry = MagicMock()
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[
+                MagicMock(
+                    entity_id="alarm_control_panel.test",
+                    unique_id="spc-entry_area_13",
+                )
+            ],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        registry.async_remove.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_orphan_area_device_cleanup_removes_empty_device() -> None:
+    """Remove an undiscovered area device once its entity registry is empty."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    entry = MagicMock(entry_id="spc-entry", unique_id="SPC12345678")
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._detected_area_ids = {1}
+    registry = MagicMock()
+    device_registry = MagicMock()
+    orphan = MagicMock(
+        id="device-3",
+        identifiers={("spc_flexc", "SPC12345678_area_3")},
+        config_entries={"spc-entry"},
+    )
+    device_registry.devices = {"device-3": orphan}
+    orphan.via_device_id = None
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get", return_value=registry),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_device", return_value=[]
+        ),
+        patch("custom_components.spc_flexc.dr.async_get", return_value=device_registry),
+        patch(
+            "custom_components.spc_flexc.dr.async_entries_for_config_entry",
+            return_value=[orphan],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        device_registry.async_remove_device.assert_called_once_with("device-3")
+
+
+@pytest.mark.asyncio
+async def test_orphan_area_device_cleanup_keeps_device_with_entities() -> None:
+    """Never delete an area device while any entity remains registered."""
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    entry = MagicMock(entry_id="spc-entry", unique_id="SPC12345678")
+    coordinator = MagicMock()
+    coordinator.async_restore_panel_tamper = AsyncMock()
+    coordinator.async_restore_area_history = AsyncMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.data.panel.serial_number = "SPC12345678"
+    coordinator._discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._detected_area_ids = {1}
+    device_registry = MagicMock()
+    orphan = MagicMock(
+        id="device-3",
+        identifiers={("spc_flexc", "SPC12345678_area_3")},
+        config_entries={"spc-entry"},
+    )
+    with (
+        patch(
+            "custom_components.spc_flexc.SpcFlexCMappingGateCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.spc_flexc.er.async_get"),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_config_entry",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.spc_flexc.er.async_entries_for_device",
+            return_value=[MagicMock(device_id="device-3")],
+        ),
+        patch("custom_components.spc_flexc.dr.async_get", return_value=device_registry),
+        patch(
+            "custom_components.spc_flexc.dr.async_entries_for_config_entry",
+            return_value=[orphan],
+        ),
+    ):
+        assert await async_setup_entry(hass, entry)
+        coordinator.async_add_listener.call_args.args[0]()
+        device_registry.async_remove_device.assert_not_called()

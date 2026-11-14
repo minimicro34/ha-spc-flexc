@@ -1,5 +1,5 @@
 PYTHON ?= python3.14
-.PHONY: help compile format format-check lint typecheck test coverage check clean
+.PHONY: help compile format format-check lint typecheck test coverage card-test check clean
 
 help:
 	@echo "Available targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  typecheck     Run mypy"
 	@echo "  test          Run pytest"
 	@echo "  coverage      Run pytest with coverage (minimum 80%)"
+	@echo "  card-test     Run bundled Lovelace card Node.js tests"
 	@echo "  check         Run the complete CI locally"
 	@echo "  clean         Remove Python cache files"
 
@@ -34,7 +35,10 @@ test:
 coverage:
 	$(PYTHON) -m pytest -q --cov=custom_components.spc_flexc --cov-report=term-missing --cov-fail-under=80
 
-check: compile format-check lint typecheck test
+card-test:
+	node --test tests/test_lovelace_card.mjs
+
+check: compile format-check lint typecheck test card-test
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

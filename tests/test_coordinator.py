@@ -19,6 +19,7 @@ from custom_components.spc_flexc.coordinator import (
     _float_value,
     _int_value,
     _panel_state_from_summary,
+    _pir_slow_poll_log_level,
     _reconcile_zone_event_state,
     _spc_datetime,
     _xbus_device_state_from_status,
@@ -1283,3 +1284,20 @@ def test_untimestamped_unset_event_still_clears_latched_alarm() -> None:
     assert not area.active_alarm_zones
     assert not area.triggered_alarm_zones
     coordinator.async_set_updated_data.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("elapsed_seconds", "expected_level"),
+    [
+        (0.0, logging.DEBUG),
+        (10.0, logging.DEBUG),
+        (29.999, logging.DEBUG),
+        (30.0, logging.WARNING),
+        (60.0, logging.WARNING),
+    ],
+)
+def test_pir_slow_poll_warning_grace_period(
+    elapsed_seconds: float, expected_level: int
+) -> None:
+    """Startup-only slow zone polls stay diagnostic, not warning-level."""
+    assert _pir_slow_poll_log_level(elapsed_seconds) == expected_level

@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.19";
+const CARD_VERSION = "1.0.28";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -50,6 +50,7 @@ class SpcFlexCCard extends HTMLElement {
       this._diagnosticScope = null;
       this._diagnosticScopeForEntity = null;
       this._diagnosticScopeLoading = false;
+      this._diagnosticScopeRetryAt = 0;
     }
 
     this._render();
@@ -260,6 +261,16 @@ class SpcFlexCCard extends HTMLElement {
     } catch {
       return date.toLocaleString(this._locale());
     }
+  }
+
+  _formatEventDateTime(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat(this._locale(), {
+      dateStyle: "short",
+      timeStyle: "medium",
+    }).format(date);
   }
 
   _stateLabel(state) {
@@ -490,6 +501,7 @@ class SpcFlexCCard extends HTMLElement {
           procState: attrs.proc_state,
           alarmState: attrs.alarm_state,
           eventTamper: attrs.event_tamper,
+          eventTrouble: attrs.event_trouble,
           lastEvent: attrs.last_event,
           actuationsSinceLastRead:
             attrs.actuations_since_last_read,
@@ -556,6 +568,10 @@ class SpcFlexCCard extends HTMLElement {
       return "mdi:shield-alert-outline";
     }
 
+    if (zone.eventTamper === true) {
+      return "mdi:shield-alert";
+    }
+
     switch (zone.deviceClass) {
       case "motion":
       case "occupancy":
@@ -617,6 +633,13 @@ class SpcFlexCCard extends HTMLElement {
           ? this._t("zone.tamper")
           : this._t("state.normal"),
         className: tamperActive ? "danger" : "ok",
+      };
+    }
+
+    if (zone.eventTamper === true) {
+      return {
+        label: this._t("zone.alert_tamper"),
+        className: "danger",
       };
     }
 
@@ -739,13 +762,18 @@ class SpcFlexCCard extends HTMLElement {
     }
 
     if (
-      this._diagnosticScopeForEntity ===
-        this._config.entity &&
-      this._diagnosticScope
+      this._diagnosticScopeForEntity === this._config.entity &&
+      this._diagnosticScope?.selected?.config_entry_id
     ) {
       return;
     }
 
+    // Retry a failed or incomplete registry lookup on subsequent HA updates,
+    // without flooding the websocket while the panel is temporarily unavailable.
+    if (Date.now() < (this._diagnosticScopeRetryAt || 0)) {
+      return;
+    }
+    this._diagnosticScopeRetryAt = Date.now() + 15000;
     this._diagnosticScopeLoading = true;
     const generation = this._scopeGeneration || 0;
     const requestedEntity = this._config.entity;
@@ -1530,7 +1558,7 @@ class SpcFlexCCard extends HTMLElement {
     ].join("");
 
     const rfEntities = this._scopedStates(true).filter(({ entityId, stateObj }) =>
-      /\brf\b|radio/i.test(
+      /\brf\b|radio|jamming|brouillage/i.test(
         `${entityId} ${stateObj.attributes?.friendly_name || ""}`
       )
     );
@@ -1573,12 +1601,136 @@ class SpcFlexCCard extends HTMLElement {
         </div>`
       : "";
 
+    const eventSensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      /last[_\\s-]*flexc[_\\s-]*event[_\\s-]*id/i.test(
+        `${entityId} ${stateObj.attributes?.friendly_name || ""}`
+      )
+    );
+    const recentEvents = eventSensor?.stateObj?.attributes?.recent_events;
+    const eventMetadata = (event) => [
+      event.received_at ? this._formatEventDateTime(event.received_at) : null,
+      event.origin,
+      event.alarm_type,
+      event.alarm_transition,
+      event.area_id != null
+        ? `${this._t("system.area")} ${event.area_id}${event.area_name ? ` — ${event.area_name}` : ""}`
+        : null,
+      event.zone_id != null
+        ? `${this._t("system.zone")} ${event.zone_id}${event.zone_name ? ` — ${event.zone_name}` : ""}`
+        : null,
+    ].filter(Boolean).join(" · ");
+    const eventRows = Array.isArray(recentEvents)
+      ? recentEvents.slice(-20).reverse().map((event) => {
+          const description = event.description || this._t("system.event_unknown");
+          const title = `#${event.event_id} — ${description}`;
+          const metadata = eventMetadata(event);
+          return `<div class="technical-line event-history-row">
+            <span>${this._escapeHtml(String(title))}</span>
+            <span class="muted">${this._escapeHtml(String(metadata))}</span>
+          </div>`;
+        }).join("")
+      : "";
+    const wirelessEvents = Array.isArray(recentEvents)
+      ? recentEvents.filter((event) =>
+          event.origin === "wireless_keypad" || event.origin === "wireless_device"
+        ).slice(-20).reverse()
+      : [];
+    const wirelessRows = wirelessEvents.map((event) => {
+      const description = event.description || this._t("system.event_unknown");
+      const metadata = eventMetadata(event);
+      return `<div class="technical-line">
+        <span>${this._escapeHtml(`#${event.event_id} — ${description}`)}</span>
+        <span class="muted">${this._escapeHtml(metadata)}</span>
+      </div>`;
+    }).join("");
+    const wirelessDiagnostics = rfEntities.map(({ entityId, stateObj }) => {
+      const label = stateObj.attributes?.friendly_name || entityId;
+      const state = String(stateObj.state ?? "unknown").toLowerCase();
+      const isJamming = /jamming|brouillage/i.test(`${entityId} ${label}`);
+      const display = isJamming
+        ? this._t(state === "on" ? "state.fault" : state === "off" ? "state.ok" : "state.unknown")
+        : this._valueWithUnit(stateObj) || this._t("state.unknown");
+      const tone = isJamming && state === "on" ? "danger" : isJamming && state === "off" ? "ok" : "muted";
+      return `<div class="technical-row"><span class="technical-label">${this._escapeHtml(label)}</span><span class="technical-value ${tone}">${this._escapeHtml(display)}</span></div>`;
+    }).join("");
+    const wirelessCount = rfEntities.length + wirelessEvents.length;
+    const wirelessSection = wirelessCount
+      ? `<div class="technical-section" data-technical-section="wireless-events">
+          <div class="technical-section-title">${this._t("system.rf")}</div>
+          <details class="system-detail-card" data-system-detail-key="wireless-rf">
+            <summary>${wirelessCount} ${this._t("system.rf")}</summary>
+            <div class="system-detail-body">
+              ${wirelessDiagnostics}
+              ${wirelessRows ? `<div class="muted">${this._t("system.wireless_events")}</div>${wirelessRows}` : ""}
+            </div>
+          </details>
+        </div>`
+      : "";
+
+    const eventSection = eventSensor && eventSensor.stateObj.state !== "unavailable"
+      ? `<div class="technical-section" data-technical-section="flexc-events">
+          <div class="technical-section-title">${this._t("system.event_history")}</div>
+          <details class="system-detail-card" data-system-detail-key="flexc-events">
+            <summary>${Array.isArray(recentEvents) ? Math.min(recentEvents.length, 20) : 0} ${this._t(Array.isArray(recentEvents) && recentEvents.length === 1 ? "system.event_count_one" : "system.event_count_many")}</summary>
+            <div class="system-detail-body">
+              <div class="muted">${this._t("system.event_observation")}</div>
+              ${eventRows || `<div class="muted">${this._t("system.no_recent_events")}</div>`}
+            </div>
+          </details>
+        </div>`
+      : `<div class="technical-section" data-technical-section="flexc-events">
+          <div class="technical-section-title">${this._t("system.event_history")}</div>
+          <div class="muted">${this._t("system.event_enable_hint")}</div>
+        </div>`;
+
+    const pirSensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      /pir[_\\s-]*slow[_\\s-]*reads/i.test(
+        `${entityId} ${stateObj.attributes?.friendly_name || ""}`
+      )
+    );
+    const pirState = pirSensor?.stateObj?.state;
+    const pirAvailable = pirState != null && pirState !== "unavailable" && pirState !== "unknown";
+    const pirReadings = pirAvailable && Array.isArray(pirSensor.stateObj.attributes?.slow_reads)
+      ? pirSensor.stateObj.attributes.slow_reads : [];
+    const pirCount = pirAvailable ? Number(pirState) : 0;
+    const pirRows = pirReadings.map((reading) => {
+      const duration = Number(reading.read_ms);
+      const timestamp = reading.timestamp ? this._formatEventDateTime(reading.timestamp) : "";
+      const timing = [
+        Number.isFinite(duration) ? `${duration.toFixed(1)} ms` : "",
+        Number.isFinite(Number(reading.lock_wait_ms)) ? `lock ${reading.lock_wait_ms} ms` : "",
+        Number.isFinite(Number(reading.resync_wait_ms)) ? `resync ${reading.resync_wait_ms} ms` : "",
+      ].filter(Boolean).join(" · ");
+      return `<div class="technical-line event-history-row">
+        <span>${this._escapeHtml(timestamp)}</span>
+        <span class="muted">${this._escapeHtml(timing)}</span>
+      </div>`;
+    }).join("");
+    const pirSection = `<div class="technical-section" data-technical-section="pir-diagnostics">
+      <div class="technical-section-title">${this._t("system.pir_diagnostics")}</div>
+      <details class="system-detail-card" data-system-detail-key="pir-diagnostics">
+        <summary>${pirAvailable && Number.isFinite(pirCount)
+          ? `${pirCount} ${this._t("system.pir_slow_reads")}`
+          : this._t(pirSensor ? "system.pir_unavailable" : "system.pir_disabled")}</summary>
+        <div class="system-detail-body">
+          ${pirAvailable
+            ? `<div class="muted">${this._t("system.pir_maximum")}: ${this._escapeHtml(String(pirSensor.stateObj.attributes?.max_read_ms ?? "—"))} ms</div>
+               ${pirRows || `<div class="muted">${this._t("system.pir_empty")}</div>`}`
+            : `<div class="muted">${this._t(pirSensor ? "system.pir_unavailable_hint" : "system.pir_enable_hint")}</div>`}
+        </div>
+      </details>
+    </div>`;
+
     const content = [
+      eventSection,
+      pirSection,
+      wirelessSection,
       identitySection,
       powerSection,
       this._renderFlexcCommunication(),
       this._renderXBusDevices(),
-      renderEntityList(this._t("system.rf"), rfEntities),
       renderEntityList(this._t("system.modem"), modemEntities),
     ].join("");
 
@@ -1983,6 +2135,9 @@ class SpcFlexCCard extends HTMLElement {
         zone.eventTamper === true
     ).length;
 
+    const zoneTamperAlerts = this._getZones().filter((zone) => zone.eventTamper === true).length;
+    const zoneTroubleAlerts = this._getZones().filter((zone) => zone.eventTrouble === true).length;
+
     const controls =
       this._config.show_controls
         ? `
@@ -2031,6 +2186,8 @@ class SpcFlexCCard extends HTMLElement {
 
           <div class="system-summary">
             ${areaSummary} · ${detectorSummary}
+            ${zoneTamperAlerts ? `<span class="zone-tamper-alert"> · ${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+            ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"> · ${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
           </div>
         </div>
 
@@ -2074,6 +2231,10 @@ class SpcFlexCCard extends HTMLElement {
           </div>
         </div>
 
+        ${zoneTamperAlerts || zoneTroubleAlerts ? `<div class="technical-section">
+          ${zoneTamperAlerts ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> ${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+          ${zoneTroubleAlerts ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> ${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
+        </div>` : ""}
         ${this._renderSystemDiagnostics()}
         ${controls}
       </div>
@@ -2219,10 +2380,11 @@ class SpcFlexCCard extends HTMLElement {
               (zone) => zone.state === "on"
             ).length;
 
-            const activeTampers = tampers.filter(
+            const activeTampers = areaZones.filter(
               (zone) =>
-                zone.state === "on" ||
-                zone.eventTamper === true
+                zone.eventTamper === true ||
+                ((zone.zoneType === "tamper" || zone.deviceClass === "tamper") &&
+                  zone.state === "on")
             ).length;
 
             const areaEntity = this._getAreaAlarmEntity(area.id);
@@ -2303,6 +2465,8 @@ class SpcFlexCCard extends HTMLElement {
         <div class="zone-main">
           <div class="zone-name">${this._escapeHtml(zone.name)}</div>
           <div class="zone-area">${this._escapeHtml(this._areaName(zone.areaId))}</div>
+          ${zone.eventTamper === true ? `<span class="zone-tamper-alert"><ha-icon icon="mdi:shield-alert-outline"></ha-icon> ${this._t("zone.alert_tamper")}</span>` : ""}
+          ${zone.eventTrouble === true ? `<span class="zone-trouble-alert"><ha-icon icon="mdi:alert-outline"></ha-icon> ${this._t("zone.alert_trouble")}</span>` : ""}
         </div>
 
         <div class="zone-state ${stateInfo.className}">
@@ -2315,6 +2479,13 @@ class SpcFlexCCard extends HTMLElement {
   _renderZones() {
     const zones = this._getNormalZones();
     const tampers = this._getTamperZones();
+
+    if (!zones.length && !tampers.length && !this._panelEntityIds()) {
+      return `<div class="empty-state">
+        <ha-icon icon="mdi:progress-clock"></ha-icon>
+        <div>${this._t("zone.loading", {}, "Chargement des entités SPC…")}</div>
+      </div>`;
+    }
 
     if (!zones.length && !tampers.length) {
       return `
@@ -2733,6 +2904,11 @@ class SpcFlexCCard extends HTMLElement {
 
         .technical-section {
           padding-top: 15px;
+        }
+
+        .event-history-row {
+          padding: 3px 0;
+          line-height: 1.3;
         }
 
         .technical-section-title {
@@ -3809,14 +3985,15 @@ SpcFlexCCard.prototype._renderTabs = function () {
   const hasDoors = this._getDoors().length > 0;
   const hasOutputs = this._getMappingGates().length > 0;
   if (this._activeTab === "doors" && !hasDoors) this._activeTab = "system";
-  if (this._activeTab === "outputs" && !hasOutputs) this._activeTab = "system";
+  const scopePending = !this._panelEntityIds();
+  if (this._activeTab === "outputs" && !hasOutputs && !scopePending) this._activeTab = "system";
 
   const tabs = [
     ["system", this._t("tab.general")],
     ["areas", this._t("tab.areas")],
     ["zones", this._t("tab.detectors")],
     ...(hasDoors ? [["doors", this._t("tab.doors")]] : []),
-    ...(hasOutputs ? [["outputs", this._t("tab.outputs")]] : []),
+    ...(hasOutputs || (scopePending && this._activeTab === "outputs") ? [["outputs", this._t("tab.outputs")]] : []),
     ["technical", this._t("tab.system")],
   ];
 
@@ -3832,7 +4009,9 @@ SpcFlexCCard.prototype._renderActiveView = function () {
     case "areas": return this._renderAreas();
     case "zones": return this._renderZones();
     case "doors": return this._getDoors().length ? this._renderDoors() : this._renderSystem();
-    case "outputs": return this._getMappingGates().length ? this._renderOutputs() : this._renderSystem();
+    case "outputs": return !this._panelEntityIds()
+      ? `<div class="empty-state"><ha-icon icon="mdi:progress-clock"></ha-icon><div>${this._t("zone.loading", {}, "Chargement des entités SPC…")}</div></div>`
+      : this._renderOutputs();
     case "technical": return this._renderTechnicalSystem();
     case "system":
     default: return this._renderSystem();
@@ -4345,6 +4524,8 @@ SpcFlexCCard.prototype._renderZones = function () {
               this._zoneIsIsolated?.(zone) !== true &&
               (zone.state === "on" || zone.eventTamper === true)
           ).length;
+          const zoneTamperAlerts = group.zones.filter((zone) => zone.eventTamper === true).length;
+          const zoneTroubleAlerts = group.zones.filter((zone) => zone.eventTrouble === true).length;
           const unavailable = group.zones.filter(
             (zone) => ["unknown", "unavailable"].includes(zone.state)
           ).length;
@@ -4371,12 +4552,14 @@ SpcFlexCCard.prototype._renderZones = function () {
                 </div>
 
                 <div class="zone-group-summary">
+                  ${zoneTamperAlerts ? `<span class="zone-tamper-alert">${zoneTamperAlerts} ${this._t("zone.alert_tamper")}</span>` : ""}
+                  ${zoneTroubleAlerts ? `<span class="zone-trouble-alert">${zoneTroubleAlerts} ${this._t("zone.alert_trouble")}</span>` : ""}
                   ${isolatedZones ? `<span class="danger">${isolatedZones} ${this._t("state.isolated")}</span>` : ""}
                   ${inhibitedZones ? `<span class="zone-inhibited">${this._tCount("group.inhibited_count", inhibitedZones)}</span>` : ""}
                   ${activeZones ? `<span class="warning">${this._tCount("group.active_count", activeZones)}</span>` : ""}
                   ${activeTampers ? `<span class="danger">${this._tCount("group.fault_count", activeTampers)}</span>` : ""}
                   ${unavailable ? `<span class="muted">${this._tCount("group.unavailable_count", unavailable)}</span>` : ""}
-                  ${!isolatedZones && !inhibitedZones && !activeZones && !activeTampers && !unavailable ? `<span class="ok">${this._t("group.rest")}</span>` : ""}
+                  ${!isolatedZones && !inhibitedZones && !activeZones && !activeTampers && !zoneTamperAlerts && !zoneTroubleAlerts && !unavailable ? `<span class="ok">${this._t("group.rest")}</span>` : ""}
                 </div>
               </button>
 
@@ -4424,6 +4607,9 @@ SpcFlexCCard.prototype._styles = function () {
       .zone-group-meta { margin-top:2px; color:var(--secondary-text-color); font-size:11px; }
       .zone-group-summary { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:4px 9px; font-size:12px; font-weight:700; text-align:right; }
       .zone-group-content { display:grid; gap:8px; padding:9px; }
+      .zone-tamper-alert { color:#fb923c; font-weight:600; }
+      .zone-trouble-alert { color:#c4b5fd; font-weight:600; }
+      .zone-tamper-alert ha-icon, .zone-trouble-alert ha-icon { --mdc-icon-size:16px; vertical-align:middle; }
       .zone-group-content .tamper-title { margin:8px 3px 0; }
       @media (max-width:520px) {
         .zone-group-header { grid-template-columns:24px minmax(0,1fr); }
@@ -4459,6 +4645,14 @@ SpcFlexCCard.prototype._render = function () {
 
 const SPC_FLEXC_CARD_TRANSLATIONS = {
   fr: {
+    "system.pir_diagnostics": "Diagnostic PIR",
+    "system.pir_slow_reads": "lectures lentes (1 h)",
+    "system.pir_maximum": "Durée maximale",
+    "system.pir_empty": "Aucune lecture PIR lente sur la dernière heure",
+    "system.pir_disabled": "Diagnostic PIR désactivé",
+    "system.pir_unavailable": "Diagnostic PIR indisponible",
+    "system.pir_unavailable_hint": "Le capteur de diagnostic PIR est actuellement indisponible.",
+    "system.pir_enable_hint": "Activez l’entité « PIR slow reads (1h) » dans Paramètres → Appareils et services → SPC FlexC → Entités.",
     "card.description": "Carte de contrôle visuelle pour l’intégration Home Assistant SPC FlexC.",
     "card.entity_not_found": "Entité introuvable : {entity}",
     "tab.general": "Général",
@@ -4494,6 +4688,18 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "state.not_inhibited": "Non inhibé",
     "state.isolated": "Isolé",
     "state.not_isolated": "Non isolé",
+    "zone.alert_tamper": "Sabotage",
+    "zone.alert_trouble": "Défaut",
+    "system.event_history": "Historique des événements FlexC",
+    "system.event_count_one": "événement",
+    "system.event_count_many": "événements",
+    "system.area": "Secteur",
+    "system.zone": "Zone",
+    "system.event_enable_hint": "Pour afficher l’historique, activez l’entité de diagnostic « Last FlexC event ID » dans Paramètres → Appareils et services → Entités, puis rechargez l’intégration si nécessaire.",
+    "system.wireless_events": "Événements Wireless",
+    "system.event_observation": "Événements observés uniquement — pas des états d’alarme permanents.",
+    "system.no_recent_events": "Aucun événement récent",
+    "system.event_unknown": "Événement non documenté",
     "zone.motion": "Mouvement",
     "zone.rest": "Repos",
     "zone.open": "Ouvert",
@@ -4504,6 +4710,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.tamper": "AUTOPROTECTION",
     "zone.inhibited": "Inhibé",
     "zone.none": "Aucune zone SPC découverte.",
+    "zone.loading": "Chargement des entités SPC…",
     "zone.name": "Zone {id}",
     "area.none": "Aucun secteur SPC disponible.",
     "area.name": "Secteur {id}",
@@ -4606,6 +4813,14 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "editor.help": "Les secteurs sont récupérés depuis l'entité d'alarme. Les détecteurs SPC sont découverts automatiquement parmi les binary_sensor possédant les attributs zone_id, area_id et spc_zone_type. Les diagnostics et informations techniques sont rattachés à la même intégration via les registres Home Assistant quand ceux-ci sont disponibles.",
   },
   en: {
+    "system.pir_diagnostics": "PIR diagnostics",
+    "system.pir_slow_reads": "slow reads (1 h)",
+    "system.pir_maximum": "Maximum duration",
+    "system.pir_empty": "No slow PIR reads in the last hour",
+    "system.pir_disabled": "PIR diagnostics disabled",
+    "system.pir_unavailable": "PIR diagnostics unavailable",
+    "system.pir_unavailable_hint": "The PIR diagnostic sensor is currently unavailable.",
+    "system.pir_enable_hint": "Enable the « PIR slow reads (1h) » entity in Settings → Devices & services → SPC FlexC → Entities.",
     "card.description": "Visual alarm control card for the SPC FlexC Home Assistant integration.",
     "card.entity_not_found": "Entity not found: {entity}",
     "tab.general": "General",
@@ -4641,6 +4856,18 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "state.not_inhibited": "Not inhibited",
     "state.isolated": "Isolated",
     "state.not_isolated": "Not isolated",
+    "zone.alert_tamper": "Tamper",
+    "zone.alert_trouble": "Trouble",
+    "system.event_history": "FlexC event history",
+    "system.event_count_one": "event",
+    "system.event_count_many": "events",
+    "system.area": "Area",
+    "system.zone": "Zone",
+    "system.event_enable_hint": "To display event history, enable the diagnostic entity “Last FlexC event ID” under Settings → Devices & services → Entities, then reload the integration if needed.",
+    "system.wireless_events": "Wireless events",
+    "system.event_observation": "Observed events only — not persistent alarm states.",
+    "system.no_recent_events": "No recent events",
+    "system.event_unknown": "Undocumented event",
     "zone.motion": "Motion",
     "zone.rest": "Idle",
     "zone.open": "Open",
@@ -4651,6 +4878,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "zone.tamper": "TAMPER",
     "zone.inhibited": "Inhibited",
     "zone.none": "No SPC zone discovered.",
+    "zone.loading": "Loading SPC entities…",
     "zone.name": "Zone {id}",
     "area.none": "No SPC area available.",
     "area.name": "Area {id}",
@@ -5674,6 +5902,30 @@ SpcFlexCCard.prototype._styles = function () {
           text-align: right;
         }
       }
+    </style>`;
+};
+
+/* Preserve expanded diagnostic sections across Home Assistant updates. */
+const spcSystemDetailsRender = SpcFlexCCard.prototype._render;
+SpcFlexCCard.prototype._render = function () {
+  const open = new Set(Array.from(this.querySelectorAll("details.system-detail-card[open]"))
+    .map((node) => node.dataset.systemDetailKey).filter(Boolean));
+  spcSystemDetailsRender.call(this);
+  this.querySelectorAll("details.system-detail-card").forEach((node) => {
+    if (open.has(node.dataset.systemDetailKey)) node.open = true;
+  });
+};
+
+const spcSystemDetailsStyles = SpcFlexCCard.prototype._styles;
+SpcFlexCCard.prototype._styles = function () {
+  return `${spcSystemDetailsStyles.call(this)}
+    <style>
+      .system-detail-card { border:1px solid var(--divider-color); border-radius:12px; padding:10px 12px; margin-top:8px; overflow:hidden; }
+      .system-detail-card > summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; font-weight:600; }
+      .system-detail-card > summary::-webkit-details-marker { display:none; }
+      .system-detail-card > summary::before { content:"▸"; color:var(--secondary-text-color); transition:transform 120ms ease; }
+      .system-detail-card[open] > summary::before { transform:rotate(90deg); }
+      .system-detail-body { padding-top:10px; }
     </style>`;
 };
 

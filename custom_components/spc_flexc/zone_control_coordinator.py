@@ -45,6 +45,8 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
         """Initialize SPC zone-control and door-status extensions."""
         super().__init__(hass, entry)
         self._door_poll_task: asyncio.Task[None] | None = None
+        self._door_event_refresh_task: asyncio.Task[None] | None = None
+        self._pending_event_door_ids: set[int] = set()
 
     async def _async_discover_panel_objects(self) -> None:
         """Run standard discovery and start polling any detected doors."""
@@ -115,6 +117,76 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
                 if self._should_run_polling():
                     _LOGGER.warning("SPC door polling stopped unexpectedly; restarting")
                     self._schedule_door_polling()
+
+    def _handle_flexc_event(self, event: dict[str, str]) -> None:
+        """Schedule a fresh door read when a live DRS release is received."""
+        super()._handle_flexc_event(event)
+        if _int_or_none(event.get("EV_ID")) != 3012:
+            return
+        if not self._door_discovery_complete or not self._detected_door_ids:
+            return
+
+        door_id = _int_or_none(event.get("DOOR_ID"))
+        area_id = _int_or_none(event.get("AREA_ID"))
+        if door_id in self._detected_door_ids:
+            door_ids = {door_id}
+        elif area_id is not None:
+            door_ids = {
+                candidate
+                for candidate in self._detected_door_ids
+                if (door := self.state.doors.get(candidate)) is not None
+                and area_id in (door.area_id, door.area_side_1)
+            }
+            # Unknown event mapping: refresh known doors rather than lose DRS.
+            if not door_ids:
+                door_ids = set(self._detected_door_ids)
+        else:
+            door_ids = set(self._detected_door_ids)
+
+        _LOGGER.debug(
+            "FlexC DRS EVENT refresh: EV_ID=3012 DOOR_ID=%s AREA_ID=%s "
+            "selected_doors=%s",
+            door_id,
+            area_id,
+            sorted(door_ids),
+        )
+        self._pending_event_door_ids.update(door_ids)
+        if (
+            self._door_event_refresh_task is None
+            or self._door_event_refresh_task.done()
+        ):
+            self._door_event_refresh_task = self.entry.async_create_background_task(
+                self.hass,
+                self._async_refresh_doors_after_event(),
+                name="spc_flexc DRS event door refresh",
+                eager_start=False,
+            )
+
+    async def _async_refresh_doors_after_event(self) -> None:
+        """Read confirmed door states after EVENT/POLL transport resynchronization."""
+        try:
+            while self._pending_event_door_ids:
+                door_ids = sorted(self._pending_event_door_ids)
+                self._pending_event_door_ids.difference_update(door_ids)
+                try:
+                    raw_doors = await self._async_read_doors(door_ids)
+                    if self._update_door_states(raw_doors):
+                        self.async_set_updated_data(self.state)
+                    _LOGGER.debug(
+                        "FlexC DRS EVENT door refresh completed: requested=%s returned=%s",
+                        door_ids,
+                        [door.get("DOOR_ID") for door in raw_doors],
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except (FlexCError, FlexMLError) as err:
+                    _LOGGER.debug("FlexC DRS EVENT door refresh failed: %s", err)
+                except Exception:
+                    _LOGGER.exception(
+                        "Unexpected error refreshing doors after DRS EVENT"
+                    )
+        finally:
+            self._door_event_refresh_task = None
 
     async def _async_read_doors(self, door_ids: list[int]) -> list[dict[str, str]]:
         """Read current FlexC status for the requested doors."""
@@ -512,6 +584,13 @@ class SpcFlexCZoneControlCoordinator(SpcFlexCCoordinator):
     async def async_shutdown(self) -> None:
         """Stop door polling and shut down the base coordinator."""
         self._discovery_requested = False
+        event_task = self._door_event_refresh_task
+        self._door_event_refresh_task = None
+        self._pending_event_door_ids.clear()
+        if event_task is not None and not event_task.done():
+            event_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await event_task
         door_task = self._door_poll_task
         self._door_poll_task = None
         if door_task is not None and not door_task.done():

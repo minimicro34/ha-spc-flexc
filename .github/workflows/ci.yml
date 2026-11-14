@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop/v1.1.5
   pull_request:
 
 jobs:

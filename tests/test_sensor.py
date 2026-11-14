@@ -20,6 +20,7 @@ from custom_components.spc_flexc.sensor import (
     SpcDoorStatusSensor,
     SpcLastEventDiagnosticSensor,
     SpcPanelSensor,
+    SpcPirSlowReadDiagnosticSensor,
     SpcXBusAuxCurrentSensor,
     SpcXBusAuxVoltageSensor,
     SpcXBusDiagnosticSensor,
@@ -192,7 +193,11 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     await async_setup_entry(
         MagicMock(), entry, lambda entities: batches.append(list(entities))
     )
-    assert len(batches[0]) == 5
+    assert len(batches[0]) == 6
+    assert (
+        sum(isinstance(entity, SpcPirSlowReadDiagnosticSensor) for entity in batches[0])
+        == 1
+    )
     assert len(batches[1]) == 10
     assert len(listeners) == 1
     listeners[0]()
@@ -218,5 +223,191 @@ def test_last_event_diagnostic_sensor_identifiers_only() -> None:
     assert sensor.extra_state_attributes == {
         "area_id": 1,
         "zone_id": 3,
-        "recent_events": [event],
+        "event_description": "Zone input active",
+        "event_origin": None,
+        "alarm_type": None,
+        "alarm_transition": None,
+        "recent_events": [
+            {
+                **event,
+                "area_name": None,
+                "zone_name": None,
+                "description": "Zone input active",
+                "origin": None,
+                "alarm_type": None,
+                "alarm_transition": None,
+            }
+        ],
     }
+
+
+def test_last_event_diagnostic_sensor_describes_validated_alarm_ids() -> None:
+    coordinator = _coordinator()
+    event = {"event_id": 8030, "zone_id": None, "area_id": 1}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [
+        {"event_id": 4002, "zone_id": None, "area_id": None},
+        event,
+    ]
+    sensor = SpcLastEventDiagnosticSensor(coordinator)
+
+    assert sensor.native_value == 8030
+    attributes = sensor.extra_state_attributes
+    assert attributes["event_description"] == "Wireless keypad panic alarm"
+    assert attributes["event_origin"] == "wireless_keypad"
+    assert attributes["alarm_type"] == "panic"
+    assert attributes["alarm_transition"] == "trigger"
+    assert attributes["recent_events"] == [
+        {
+            "event_id": 4002,
+            "zone_id": None,
+            "area_id": None,
+            "area_name": None,
+            "zone_name": None,
+            "description": "User panic",
+            "origin": "user",
+            "alarm_type": "panic",
+            "alarm_transition": "trigger",
+        },
+        {
+            **event,
+            "area_name": None,
+            "zone_name": None,
+            "description": "Wireless keypad panic alarm",
+            "origin": "wireless_keypad",
+            "alarm_type": "panic",
+            "alarm_transition": "trigger",
+        },
+    ]
+    # Diagnostic descriptions must not alter the original event history.
+    assert coordinator._recent_event_identifiers[-1] == event
+
+
+@pytest.mark.parametrize(
+    ("event_id", "description"),
+    [
+        (1200, "Zone tamper [Alarm Zone]"),
+        (1300, "Zone tamper restored [Alarm Zone]"),
+        (1201, "Zone tamper [Entry / Exit]"),
+        (1301, "Zone tamper restored [Entry / Exit]"),
+        (1801, "Zone trouble [Entry / Exit]"),
+        (1901, "Zone trouble restored [Entry / Exit]"),
+        (1212, "Zone tamper [Unused Zone]"),
+        (1312, "Zone tamper restored [Unused Zone]"),
+        (1812, "Zone trouble [Unused Zone]"),
+        (1912, "Zone trouble restored [Unused Zone]"),
+        (1223, "Zone tamper [Glass Break]"),
+        (1923, "Zone trouble restored [Glass Break]"),
+        (5350, "X-BUS keypad fire alarm"),
+        (5351, "X-BUS keypad fire restore"),
+        (5352, "X-BUS keypad medical alarm"),
+        (5353, "X-BUS keypad medical restore"),
+        (8006, "Wireless device tamper"),
+        (8007, "Wireless device tamper restore"),
+        (8012, "Wireless device low battery"),
+        (8013, "Wireless device battery restore"),
+        (8014, "Wireless device fault"),
+        (8015, "Wireless device fault restore"),
+        (6002, "FlexC path down"),
+        (6003, "FlexC path restored"),
+        (6004, "ATS down"),
+        (6005, "ATS restored"),
+    ],
+)
+def test_last_event_diagnostic_sensor_extended_descriptions(
+    event_id: int, description: str
+) -> None:
+    coordinator = _coordinator()
+    event = {"event_id": event_id, "area_id": None, "zone_id": None}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+
+    attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
+
+    assert attributes["event_description"] == description
+    assert attributes["recent_events"] == [
+        {
+            **event,
+            "area_name": None,
+            "zone_name": None,
+            "description": description,
+            "origin": attributes["event_origin"],
+            "alarm_type": attributes["alarm_type"],
+            "alarm_transition": attributes["alarm_transition"],
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("event_id", "origin"),
+    [
+        (4002, "user"),
+        (3523, "user"),
+        (8030, "wireless_keypad"),
+        (8028, "wireless_keypad"),
+        (5348, "xbus_keypad"),
+        (5352, "xbus_keypad"),
+        (8012, "wireless_device"),
+        (6002, "communication"),
+        (7011, "configuration"),
+        (9999, None),
+    ],
+)
+def test_last_event_diagnostic_sensor_origin(event_id: int, origin: str | None) -> None:
+    coordinator = _coordinator()
+    event = {"event_id": event_id, "area_id": None, "zone_id": None}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+
+    attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
+
+    assert attributes["event_origin"] == origin
+    assert attributes["recent_events"] == [
+        {
+            **event,
+            "area_name": None,
+            "zone_name": None,
+            "description": attributes["event_description"],
+            "origin": origin,
+            "alarm_type": attributes["alarm_type"],
+            "alarm_transition": attributes["alarm_transition"],
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("event_id", "alarm_type", "transition"),
+    [
+        (4002, "panic", "trigger"),
+        (4009, "medical", "trigger"),
+        (4011, "hold_up", "trigger"),
+        (3523, "hold_up", "confirmed"),
+        (8026, "medical", "trigger"),
+        (8027, "medical", "restore"),
+        (8028, "fire", "trigger"),
+        (8029, "fire", "restore"),
+        (8030, "panic", "trigger"),
+        (8031, "panic", "restore"),
+        (5348, "panic", "trigger"),
+        (5349, "panic", "restore"),
+        (5350, "fire", "trigger"),
+        (5351, "fire", "restore"),
+        (5352, "medical", "trigger"),
+        (5353, "medical", "restore"),
+        (7011, None, None),
+    ],
+)
+def test_last_event_alarm_classification(
+    event_id: int, alarm_type: str | None, transition: str | None
+) -> None:
+    coordinator = _coordinator()
+    event = {"event_id": event_id, "area_id": None, "zone_id": None}
+    coordinator._last_event_identifiers = event
+    coordinator._recent_event_identifiers = [event]
+
+    attributes = SpcLastEventDiagnosticSensor(coordinator).extra_state_attributes
+
+    assert attributes["alarm_type"] == alarm_type
+    assert attributes["alarm_transition"] == transition
+    assert attributes["recent_events"][0]["alarm_type"] == alarm_type
+    assert attributes["recent_events"][0]["alarm_transition"] == transition

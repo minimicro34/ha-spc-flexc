@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -10,7 +11,23 @@ from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _CARD_PATH = "/spc_flexc/ha-spc-flexc-card.js"
-_CARD_URL = f"{_CARD_PATH}?v=1.0.18"
+_CARD_FILE = Path(__file__).parent / "www" / "ha-spc-flexc-card.js"
+
+
+def _bundled_card_version() -> str:
+    """Read the card version embedded by the frontend build."""
+    with _CARD_FILE.open(encoding="utf-8") as card:
+        first_line = card.readline()
+    match = re.fullmatch(
+        r'const CARD_VERSION = "([0-9]+[.][0-9]+[.][0-9]+)";\n?', first_line
+    )
+    if match is None:
+        raise ValueError("Bundled SPC FlexC card version is missing or invalid")
+    return match.group(1)
+
+
+_CARD_VERSION = _bundled_card_version()
+_CARD_URL = f"{_CARD_PATH}?v={_CARD_VERSION}"
 _LEGACY_PATHS = {
     "/hacsfiles/ha-spc-flexc-card/ha-spc-flexc-card.js",
     "/local/community/ha-spc-flexc-card/ha-spc-flexc-card.js",
@@ -27,7 +44,7 @@ async def async_register_card(hass: HomeAssistant) -> None:
                 [
                     StaticPathConfig(
                         _CARD_PATH,
-                        str(Path(__file__).parent / "www" / "ha-spc-flexc-card.js"),
+                        str(_CARD_FILE),
                         False,
                     )
                 ]

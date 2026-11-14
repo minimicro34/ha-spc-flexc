@@ -57,6 +57,7 @@ from .models import (
     XBusDeviceState,
     ZoneState,
 )
+from .pir_diagnostics import PirSlowReadHistory, slow_read_log_level
 from .user_names import display_user_name
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,6 +71,11 @@ def poll_delay_for_phase(phase: float, interval: float) -> float:
     if delay < 0.001:
         return interval
     return delay
+
+
+def _pir_slow_poll_log_level(elapsed_seconds: float) -> int:
+    """Suppress startup-only slow-poll warnings without hiding diagnostics."""
+    return logging.DEBUG if elapsed_seconds < 30.0 else logging.WARNING
 
 
 def _float_value(value: Any, suffix: str = "") -> float | None:
@@ -230,8 +236,13 @@ def _reconcile_zone_event_state(zone: ZoneState, previous: ZoneState | None) -> 
 
     zone.last_event = previous.last_event
     zone.event_tamper = previous.event_tamper
+    zone.event_trouble = previous.event_trouble
+    # Alarm-zone tamper remains latched until an explicit 1300 restore.
+    # A normal PIR snapshot does not prove the panel alarm was restored.
+    last_event_id = (previous.last_event or {}).get("EV_ID")
     if (
-        zone.event_tamper is True
+        str(last_event_id) not in ("1200", "1800")
+        and zone.event_tamper is True
         and all(
             value == 0
             for value in (
@@ -353,6 +364,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # Monotonic generation for PIR EVENT transitions; used to reject
         # in-flight polling snapshots older than a received live EVENT.
         self._pir_event_generation: dict[int, int] = {}
+        self.pir_slow_reads = PirSlowReadHistory()
         self._detected_door_ids: set[int] = set()
         self._door_discovery_complete = False
         self._detected_xbus_serials: set[str] = set()
@@ -959,8 +971,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     interval_display = (
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
-                    if lock_wait_ms >= 1000 or read_ms >= 1000:
-                        _LOGGER.warning(
+                    level = slow_read_log_level(read_ms)
+                    if level is not None:
+                        burst = self.pir_slow_reads.record(
+                            read_ms,
+                            interval_ms=interval_ms,
+                            lock_wait_ms=lock_wait_ms,
+                            resync_wait_ms=resync_wait_total_ms,
+                            batches=batch_timings,
+                        )
+                        _LOGGER.log(
+                            level,
                             "FlexC PIR poll slow: interval_ms=%s lock_wait_ms=%.1f "
                             "read_ms=%.1f resync_wait_ms=%.1f batches=%s",
                             interval_display,
@@ -969,8 +990,18 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             resync_wait_total_ms,
                             batch_timings,
                         )
-                    elif resync_wait_total_ms >= 1000 or (
-                        interval_ms is not None and interval_ms >= 2000
+                        if burst is not None:
+                            _LOGGER.warning(
+                                "FlexC PIR repeated slow reads: count=%d "
+                                "window_seconds=60 max_read_ms=%.1f",
+                                burst[0],
+                                burst[1],
+                            )
+                        self.async_update_listeners()
+                    elif (
+                        lock_wait_ms >= 1000
+                        or resync_wait_total_ms >= 1000
+                        or (interval_ms is not None and interval_ms >= 2000)
                     ):
                         _LOGGER.debug(
                             "FlexC PIR poll delayed: interval_ms=%s "
@@ -1327,6 +1358,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                 "event_id": event_id,
                 "area_id": area_id,
                 "zone_id": zone_id,
+                "received_at": datetime.now(UTC).isoformat(),
             }
             self._recent_event_identifiers = (
                 getattr(self, "_recent_event_identifiers", [])

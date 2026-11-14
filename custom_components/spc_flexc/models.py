@@ -143,6 +143,7 @@ class ZoneState:
     proc_state: int | None = None
     alarm_state: int | None = None
     event_tamper: bool | None = None
+    event_trouble: bool | None = None
     last_event: dict[str, Any] | None = None
     inhibit_allowed: bool | None = None
     isolate_allowed: bool | None = None

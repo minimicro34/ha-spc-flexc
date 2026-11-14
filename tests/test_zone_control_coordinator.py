@@ -556,6 +556,8 @@ async def test_shutdown_cancels_door_poller_before_base_shutdown() -> None:
     coordinator._discovery_requested = True
     door_task = asyncio.create_task(asyncio.sleep(60))
     coordinator._door_poll_task = door_task
+    coordinator._door_event_refresh_task = None
+    coordinator._pending_event_door_ids = set()
 
     with patch(
         "custom_components.spc_flexc.zone_control_coordinator.SpcFlexCCoordinator.async_shutdown",
