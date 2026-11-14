@@ -8,7 +8,32 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
-## [1.1.6-beta.1] - 2026-11-14
+## [1.1.6] - 2026-11-14
+
+### Fixed
+
+- Added automatic AES-CBC IV compatibility detection for SPC panels using a key-derived IV, including SPC4300 firmware 3.12.0.
+- Preserved compatibility with the historical FlexC IV; the alternative is selected only after successful SHA-1 validation of an incoming frame.
+- Reuse the detected IV for outgoing frames during the TCP session and reset detection on each new connection.
+
+### Validation
+
+- **SPC4300 firmware 3.12.0:** Automatic IV switching confirmed with Fixed Encryption enabled; handshake and discovery completed successfully.
+- **Reconnection:** Integration reload and panel reconnection validated in under 3 seconds.
+- **Historical-IV compatibility:** Connection, discovery and state reconciliation validated on another SPC4300.
+- No invalid SHA-1 warnings or other SPC FlexC errors reported during hardware testing.
+
+### Acknowledgements
+
+Special thanks to **[@psyclan](https://github.com/psyclan)** for his valuable technical feedback, investigation of the SPC4300 firmware-specific AES IV behavior, and real-world validation of the compatibility improvements.
+
+Thanks to everyone who continues to help improve SPC FlexC!
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.5...v1.1.6
+
+---
+
+## [1.1.6-beta.1]
 
 ### Fixed
 
