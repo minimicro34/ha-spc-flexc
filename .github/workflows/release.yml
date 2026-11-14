@@ -175,9 +175,9 @@ jobs:
               raise SystemExit(f"No changelog entry for {version}")
           notes = section.group(1).strip() + "\n"
           # The workflow owns CI metrics; changelog validation is for manual checks.
-          notes = re.sub(r"(?ms)^### Tests\\n.*?(?=^### |\\Z)", "", notes)
+          notes = re.sub(r"(?ms)^### Tests\n.*?(?=^### |\Z)", "", notes)
           manual_validation = re.search(
-              r"(?ms)^### Validation\\n(.*?)(?=^### |\\Z)", notes
+              r"(?ms)^### Validation\n(.*?)(?=^### |\Z)", notes
           )
           manual_checks = []
           if manual_validation:
@@ -186,27 +186,27 @@ jobs:
                       continue
                   # Ignore legacy CI metrics so they cannot appear twice.
                   if re.search(
-                      r"(?i)(\\b\\d+\\s+(?:python|javascript|js)?\\s*tests?\\s+passed\\b|"
-                      r"\\bcoverage\\s+\\d|\\bmake check\\b|\\bquality checks\\b|"
-                      r"\\bautomated tests\\b|\\bfrontend tests\\b)",
+                      r"(?i)(\b\d+\s+(?:python|javascript|js)?\s*tests?\s+passed\b|"
+                      r"\bcoverage\s+\d|\bmake check\b|\bquality checks\b|"
+                      r"\bautomated tests\b|\bfrontend tests\b)",
                       line,
                   ):
                       continue
                   manual_checks.append(line)
-          notes = re.sub(r"(?ms)^### Validation\\n.*?(?=^### |\\Z)", "", notes).strip()
+          notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip()
 
           # Remove any pre-existing comparison footer, regardless of position.
-          footer = re.search(r"(?m)^\\*\\*Full Changelog\\*\\*:?\\s*(https?://\\S+)\\s*$", notes)
+          footer = re.search(r"(?m)^\*\*Full Changelog\*\*:?\s*(https?://\S+)\s*$", notes)
           if not footer:
               raise SystemExit("Missing **Full Changelog** comparison link in changelog section")
           comparison_url = footer.group(1)
-          notes = re.sub(r"(?m)^\\*\\*Full Changelog\\*\\*:?[^\\n]*\\n?", "", notes).strip()
+          notes = re.sub(r"(?m)^\*\*Full Changelog\*\*:?[^\n]*\n?", "", notes).strip()
 
           log = Path("quality.log").read_text(encoding="utf-8")
-          pytest = re.findall(r"(?m)(\\d+) passed\\b", log)
+          pytest = re.findall(r"(?m)(\d+) passed\b", log)
           coverage_data = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
           coverage = coverage_data["totals"]["percent_covered"]
-          js = re.findall(r"(?m)^\\s*(?:#|ℹ)\\s*pass\\s+(\\d+)\\s*$", log)
+          js = re.findall(r"(?m)^\s*(?:#|ℹ)\s*pass\s+(\d+)\s*$", log)
           if not pytest or not isinstance(coverage, (int, float)) or not js:
               raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality artifacts.")
 
@@ -217,17 +217,17 @@ jobs:
               *manual_checks,
           ]
           # Insert Validation before Known limitations rather than appending it.
-          validation_section = "### Validation\\n\\n" + "\\n".join(validation)
-          if re.search(r"(?m)^### Known limitations\\s*$", notes):
+          validation_section = "### Validation\n\n" + "\n".join(validation)
+          if re.search(r"(?m)^### Known limitations\s*$", notes):
               notes = re.sub(
-                  r"(?m)^### Known limitations\\s*$",
-                  lambda _: validation_section + "\\n\\n### Known limitations",
+                  r"(?m)^### Known limitations\s*$",
+                  lambda _: validation_section + "\n\n### Known limitations",
                   notes,
                   count=1,
               )
           else:
-              notes += "\\n\\n" + validation_section
-          notes = notes.strip() + f"\\n\\n---\\n\\n**Full Changelog:** {comparison_url}\\n"
+              notes += "\n\n" + validation_section
+          notes = notes.strip() + f"\n\n---\n\n**Full Changelog:** {comparison_url}\n"
           Path("release-notes.md").write_text(notes, encoding="utf-8")
           PY
 
