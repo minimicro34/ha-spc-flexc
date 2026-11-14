@@ -60,23 +60,15 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 
 ---
 
-## Upcoming beta: faster FlexC command synchronization
+## Release v1.1.5
 
-In the unreleased **v1.1.5-beta.15** development build, the receiver can
-reuse the transport context of an acknowledged unsolicited FlexC EVENT when
-no command is in flight. This avoids waiting for the next ATP supervision
-POLL (typically 10 seconds in Cat 5 or 8 seconds in Cat 6) before sending
-an arm/disarm or status command. If a command is already in flight, its
-DATA reply remains authoritative for the command context.
+This release includes the FlexC communication and PIR diagnostics improvements validated during the v1.1.5 beta cycle. The bundled SPC FlexC Card is v1.0.28.
 
-**This transport change has passed automated regression tests but still
-requires validation against a physical SPC panel.** Test on a separate
-FlexC path before using it in production. Cat 5 supervision can remain
-enabled; changing to Cat 6 is not required for this improvement.
+The receiver can use the validated transport context of an acknowledged unsolicited FlexC EVENT for a subsequent command when no command is in flight, reducing unnecessary waits for the next supervision POLL. Commands already in flight retain their authoritative DATA reply context.
 
-The previous beta.14 introduced targeted door-status refreshes after
-door-release EVENT #3012. The bundled SPC FlexC Card remains at v1.0.27.
+Occasional slow PIR reads have been observed during testing, without repeated failures. Their frequency appeared higher with two FlexC ATS connections active on the same panel; this remains an observation rather than a confirmed root cause.
 
+See [CHANGELOG.md](CHANGELOG.md) for the stable release summary and the retained per-beta history.
 
 ## Features
 
@@ -229,7 +221,7 @@ Configure the ATP destination with:
 - FlexC encryption enabled;
 - the same AES-256 encryption key configured in Home Assistant.
 
-Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.\n\nStarting with **v1.1.5-beta.13**, an ATP client account set to `0` (automatic assignment) receives a nonzero account identifier in the FlexC CONNECT acknowledgement, following the behavior observed in the decompiled SPCLink receiver. Explicit nonzero ATP accounts are preserved. **This behavior still requires live validation on an SPC4300**; if the connection drops before the first POLL, use an explicit nonzero ATP account as a temporary workaround.
+Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.\n\nStarting with **v1.1.5**, an ATP client account set to `0` (automatic assignment) receives a nonzero account identifier in the FlexC CONNECT acknowledgement, following the behavior observed in the decompiled SPCLink receiver. Explicit nonzero ATP accounts are preserved. **This behavior still requires live validation on an SPC4300**; if the connection drops before the first POLL, use an explicit nonzero ATP account as a temporary workaround.
 
 ### Command Profile
 
@@ -341,11 +333,11 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **SPC FlexC v1.1.5-beta.13 bundles Card v1.0.26**. It is no longer
+integration. **SPC FlexC v1.1.5 bundles Card v1.0.28**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.26` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.28` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
 X-BUS and system diagnostics. The bundled card preserves the physical detector
@@ -580,7 +572,7 @@ Do not expose the FlexC listener directly to the Internet.
 
 ## Known limitations
 
-### PIR event updates and beta diagnostics
+### PIR event updates and diagnostics
 
 On supported motion zones (SPC zone types `0` and `2`), FlexC event `2100` updates the Home Assistant motion state immediately, while event `2101` restores it. The event must identify a known zone and match its area. This event-driven path does not wait for the next zone status poll.
 
@@ -597,7 +589,7 @@ Zone polling remains enabled to reconcile state. If an EVENT arrives while a zon
 
 A slow zone polling cycle emits `FlexC PIR poll slow` at `WARNING`, with `interval_ms`, `lock_wait_ms`, `read_ms` and per-batch durations. Command timeouts and connection/protocol errors retain their existing warning diagnostics.
 
-**Protocol safety:** When no DATA command is pending, the receiver acknowledges an unsolicited EVENT and uses its validated transport context for the next command. An EVENT received during an in-flight command does not displace that command's DATA reply context. A new TCP session still requires a valid handshake and initial POLL. This improvement is pending real-panel validation; it does not alter the configured ATP supervision category or timeout. Zone polling releases the coordinator operation lock between batches to allow other operations to proceed. The `FlexC command context wait after EVENT` diagnostic and `lock_wait_ms` continue to distinguish transport synchronization from lock acquisition delays.
+**Protocol safety:** When no DATA command is pending, the receiver acknowledges an unsolicited EVENT and uses its validated transport context for the next command. An EVENT received during an in-flight command does not displace that command's DATA reply context. A new TCP session still requires a valid handshake and initial POLL. This behavior was validated during the beta cycle on a production SPC installation; it does not alter the configured ATP supervision category or timeout. Zone polling releases the coordinator operation lock between batches to allow other operations to proceed. The `FlexC command context wait after EVENT` diagnostic and `lock_wait_ms` continue to distinguish transport synchronization from lock acquisition delays.
 
 For a hardware test, compare `2100` / `2101` timestamps with the Home Assistant motion entity transitions, then inspect `wait_ms` and `FlexC PIR poll slow` warnings. Do not share credentials, encryption keys or raw sensitive protocol payloads in logs or issues.
 
@@ -681,7 +673,7 @@ make coverage
 git diff --check
 ```
 
-The current coverage gate is 80%. The v1.1.5-beta.13 candidate passed 451 Python tests locally with 92.08% coverage (minimum: 80%). GitHub Actions validation and live SPC4300 testing of ATP account auto-assignment remain pending.
+The coverage gate is 80%. The v1.1.5-beta.17 validation reported 465 Python tests passing with 91.76% coverage and 20 JavaScript tests passing. ATP account auto-assignment with account `0` remains pending independent validation across SPC firmware versions.
 
 ---
 
