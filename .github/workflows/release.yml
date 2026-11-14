@@ -174,11 +174,16 @@ jobs:
           if not section:
               raise SystemExit(f"No changelog entry for {version}")
           notes = section.group(1).strip() + "\n"
-          # Capture the comparison link before removing optional subsections.
-          footer = re.search(r"(?m)^\\*\\*Full Changelog:?\\*\\*:?[ \\t]*(https?://\\S+)", notes)
-          if not footer:
+          # Read the comparison URL from the changelog footer without regex escaping.
+          footer_line = next(
+              (line for line in notes.splitlines() if line.startswith("**Full Changelog:** ")),
+              None,
+          )
+          if footer_line is None:
               raise SystemExit(f"Missing Full Changelog comparison link in {version} section")
-          comparison_url = footer.group(1)
+          comparison_url = footer_line.partition("**Full Changelog:** ")[2].strip()
+          if not comparison_url.startswith(("https://", "http://")):
+              raise SystemExit(f"Invalid Full Changelog URL in {version} section")
           # The workflow owns CI metrics; changelog validation is for manual checks.
           notes = re.sub(r"(?ms)^### Tests\n.*?(?=^### |\Z)", "", notes)
           manual_validation = re.search(
@@ -201,7 +206,10 @@ jobs:
           notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip()
 
           # Remove the original comparison footer; re-add it at the end.
-          notes = re.sub(r"(?m)^\\*\\*Full Changelog:?\\*\\*:?[^^\\n]*\\n?", "", notes).strip()
+          notes = "\\n".join(
+              line for line in notes.splitlines()
+              if not line.startswith("**Full Changelog:** ")
+          ).strip()
 
           log = Path("quality.log").read_text(encoding="utf-8")
           pytest = re.findall(r"(?m)(\d+) passed\b", log)
