@@ -7,7 +7,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/minimicro34/ha-spc-flexc)](https://github.com/minimicro34/ha-spc-flexc/releases)
 [![CI](https://github.com/minimicro34/ha-spc-flexc/actions/workflows/ci.yml/badge.svg)](https://github.com/minimicro34/ha-spc-flexc/actions/workflows/ci.yml)
 [![Hassfest](https://github.com/minimicro34/ha-spc-flexc/actions/workflows/hassfest.yml/badge.svg)](https://github.com/minimicro34/ha-spc-flexc/actions/workflows/hassfest.yml)
-[![HACS](https://img.shields.io/badge/HACS-Custom-blue.svg)](https://hacs.xyz/)
+[![HACS](https://img.shields.io/badge/HACS-Default-blue.svg)](https://hacs.xyz/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.8%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-FFDD00?logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/minimicro34)
 [![License](https://img.shields.io/github/license/minimicro34/ha-spc-flexc)](LICENSE)
@@ -195,12 +195,10 @@ Home Assistant must be reachable by the SPC panel on the configured FlexC TCP po
 
 ### HACS
 
-1. Open **HACS → Integrations**.
-2. Open the **⋮** menu and select **Custom repositories**.
-3. Add `https://github.com/minimicro34/ha-spc-flexc` as an **Integration** repository.
-4. Install **SPC FlexC**.
-5. Restart Home Assistant.
-6. Open **Settings → Devices & services → Add integration → SPC FlexC**.
+1. Open **HACS → Integrations** and search for **SPC FlexC** in the default HACS catalog.
+2. Install **SPC FlexC**.
+3. Restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration → SPC FlexC**.
 
 ### Manual installation
 
