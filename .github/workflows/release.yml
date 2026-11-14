@@ -52,22 +52,19 @@ jobs:
           set -euo pipefail
           make check 2>&1 | tee "$RUNNER_TEMP/quality.log"
           make coverage 2>&1 | tee -a "$RUNNER_TEMP/quality.log"
-          python -m coverage json -o coverage.json
           cp "$RUNNER_TEMP/quality.log" quality.log
       - name: Preserve test and coverage results
         uses: actions/upload-artifact@v6
         with:
           name: signed-release-quality
-          path: |
-            quality.log
-            coverage.json
+          path: quality.log
           retention-days: 3
 
   release:
     name: Sign tag and publish
     needs: quality
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop/v1.1.5'
+    if: github.ref == 'refs/heads/main' || inputs.dry_run == true
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.version }}
@@ -93,17 +90,8 @@ jobs:
             echo "::error::Invalid tag format: $RELEASE_TAG"
             exit 1
           fi
-          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != "refs/heads/develop/v1.1.5" ]]; then
-            echo "::error::Signed releases are restricted to main and develop/v1.1.5"
-            exit 1
-          fi
-          if [[ "$GITHUB_REF" == "refs/heads/develop/v1.1.5" ]]; then
-            if [[ "${{ inputs.prerelease }}" != "true" || ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
-              echo "::error::Development branch permits only beta prereleases (vX.Y.Z-beta.N with prerelease=true)"
-              exit 1
-            fi
-          elif [[ "${{ inputs.dry_run }}" != "true" && "$RELEASE_TAG" == *-* ]]; then
-            echo "::error::Prerelease tags must be published from develop/v1.1.5"
+          if [[ "${{ inputs.dry_run }}" != "true" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Publishing releases is restricted to main"
             exit 1
           fi
           manifest_version="$(python -c 'import json; print(json.load(open("custom_components/spc_flexc/manifest.json", encoding="utf-8"))["version"])')"
@@ -160,7 +148,6 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
           import os
           import re
           from pathlib import Path
@@ -174,32 +161,15 @@ jobs:
           if not section:
               raise SystemExit(f"No changelog entry for {version}")
           notes = section.group(1).strip() + "\n"
-          # Keep release notes concise: CI metrics belong in Validation only.
-          notes = re.sub(r"(?ms)^### Tests\n.*?(?=^### |\Z)", "", notes)
-          manual_validation = re.search(
-              r"(?ms)^### Validation\n(.*?)(?=^### |\Z)", notes
-          )
-          manual_checks = (
-              [
-                  line
-                  for line in manual_validation.group(1).splitlines()
-                  if line.strip().startswith("- ")
-              ]
-              if manual_validation
-              else []
-          )
           notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip() + "\n"
 
           log = Path("quality.log").read_text(encoding="utf-8")
           pytest = re.findall(r"(?m)(\d+) passed\b", log)
-          coverage_data = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
-          coverage = coverage_data["totals"]["percent_covered"]
+          coverage = re.findall(r"(?m)^TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%", log)
           js = re.findall(r"(?m)^\s*(?:#|ℹ)\s*pass\s+(\d+)\s*$", log)
-          if not pytest or not isinstance(coverage, (int, float)) or not js:
-              raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality artifacts.")
-          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage:.2f}%.\n- SPC FlexC Card (JavaScript): {js[-1]} tests passed.\n- `make check` passed.\n"
-          if manual_checks:
-              notes += "\n".join(manual_checks) + "\n"
+          if not pytest or not coverage or not js:
+              raise SystemExit(f"Unable to extract validated metrics: Python={pytest}, coverage={coverage}, JS={js}. Inspect quality.log artifact.")
+          notes += f"\n### Validation\n\n- Python: {pytest[-1]} tests passed; coverage {coverage[-1]}%.\n- JavaScript: {js[-1]} tests passed.\n- `make check` passed.\n"
           Path("release-notes.md").write_text(notes, encoding="utf-8")
           PY
 
