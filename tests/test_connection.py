@@ -291,7 +291,7 @@ def test_digest_and_encryption_round_trip() -> None:
 def test_key_derived_iv_is_detected_and_used_for_outgoing_frames() -> None:
     """An authenticated incoming frame selects the panel's IV variant."""
     client = _client()
-    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\\x00" * 14
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
     plain = bytearray(48)
     plain[18] = MSG_CONNECTION_REQUEST_LEGACY
     plain[28:48] = client._digest_for(clear, plain)
@@ -316,7 +316,7 @@ def test_key_derived_iv_is_detected_and_used_for_outgoing_frames() -> None:
 def test_invalid_digest_does_not_select_alternative_iv() -> None:
     """An unauthenticated frame must not change the session IV."""
     client = _client()
-    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\\x00" * 14
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
     wire = clear + AES.new(client._key, AES.MODE_CBC, client._iv_candidates[1]).encrypt(
         bytes(48)
     )
@@ -330,7 +330,7 @@ def test_invalid_digest_does_not_select_alternative_iv() -> None:
 def test_standard_iv_keeps_existing_behavior() -> None:
     """The existing panel IV remains selected when its SHA-1 is valid."""
     client = _client()
-    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\\x00" * 14
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
     wire = client._encrypt_message(clear, bytearray(48))
 
     assert client._parse_frame(wire)["sha1_ok"] is True
