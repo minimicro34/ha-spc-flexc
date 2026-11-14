@@ -60,6 +60,14 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 
 ---
 
+## Testing v1.1.6-beta.1 (prerelease)
+
+This beta adds automatic AES-CBC IV compatibility detection for FlexC panels, including the key-derived IV variant reported on SPC4300 firmware 3.12.0 ([issue #17](https://github.com/minimicro34/ha-spc-flexc/issues/17)). The existing historical IV remains the default, and the receiver switches only when an incoming frame validates with the alternative IV. The selected IV is reused for outgoing traffic until the next TCP connection.
+
+**Hardware validation is still pending.** Testers with both historical-IV panels and affected SPC4300 firmware are invited to check initial connection, reconnects, area and zone discovery, commands, events and diagnostics. Enable INFO logging for `custom_components.spc_flexc` to observe the IV compatibility switch on affected panels; no switch message is expected on panels using the historical IV. Please report results on [issue #17](https://github.com/minimicro34/ha-spc-flexc/issues/17).
+
+The bundled SPC FlexC Card remains v1.0.28. The current stable release remains v1.1.5.
+
 ## Release v1.1.5
 
 This release includes the FlexC communication and PIR diagnostics improvements validated during the v1.1.5 beta cycle. The bundled SPC FlexC Card is v1.0.28.
