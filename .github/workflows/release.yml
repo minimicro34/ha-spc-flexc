@@ -102,8 +102,8 @@ jobs:
               echo "::error::Development branch permits only beta prereleases (vX.Y.Z-beta.N with prerelease=true)"
               exit 1
             fi
-          elif [[ "${{ inputs.dry_run }}" != "true" && "$RELEASE_TAG" == *-* ]]; then
-            echo "::error::Prerelease tags must be published from develop/v1.1.5"
+          elif [[ "$RELEASE_TAG" == *-* && "${{ inputs.prerelease }}" != "true" ]]; then
+            echo "::error::Prerelease tags require prerelease=true"
             exit 1
           fi
           manifest_version="$(python -c 'import json; print(json.load(open("custom_components/spc_flexc/manifest.json", encoding="utf-8"))["version"])')"
