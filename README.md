@@ -60,30 +60,12 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 
 ---
 
-## Testing v1.1.6-beta.1 (prerelease)
-
-This beta adds automatic AES-CBC IV compatibility detection for FlexC panels, including the key-derived IV variant reported on SPC4300 firmware 3.12.0 ([issue #17](https://github.com/minimicro34/ha-spc-flexc/issues/17)). The existing historical IV remains the default, and the receiver switches only when an incoming frame validates with the alternative IV. The selected IV is reused for outgoing traffic until the next TCP connection.
-
-**Hardware validation is still pending.** Testers with both historical-IV panels and affected SPC4300 firmware are invited to check initial connection, reconnects, area and zone discovery, commands, events and diagnostics. Enable INFO logging for `custom_components.spc_flexc` to observe the IV compatibility switch on affected panels; no switch message is expected on panels using the historical IV. Please report results on [issue #17](https://github.com/minimicro34/ha-spc-flexc/issues/17).
-
-The bundled SPC FlexC Card remains v1.0.28. The current stable release remains v1.1.5.
-
-## Release v1.1.5
-
-This release includes the FlexC communication and PIR diagnostics improvements validated during the v1.1.5 beta cycle. The bundled SPC FlexC Card is v1.0.28.
-
-The receiver can use the validated transport context of an acknowledged unsolicited FlexC EVENT for a subsequent command when no command is in flight, reducing unnecessary waits for the next supervision POLL. Commands already in flight retain their authoritative DATA reply context.
-
-Occasional slow PIR reads have been observed during testing, without repeated failures. Their frequency appeared higher with two FlexC ATS connections active on the same panel; this remains an observation rather than a confirmed root cause.
-
-See [CHANGELOG.md](CHANGELOG.md) for the stable release summary and the retained per-beta history.
-
 ## Features
 
 ### FlexC
 
 - 📡 Native FlexC receiver implemented directly in Home Assistant
-- 🔐 AES-256 encrypted FlexC communication
+- 🔐 AES-256 encrypted FlexC communication with automatic compatibility detection for historical and key-derived AES-CBC IV variants
 - 🔄 FlexC connection lifecycle management
 - 💓 FlexC polling and acknowledgements
 - 📥 FLEXML command/reply handling
@@ -165,6 +147,7 @@ Actual feature availability depends on the panel model, firmware, installed modu
 | HACS | ✅ |
 | SPC FlexC | ✅ |
 | AES-256 FlexC encryption | ✅ |
+| Automatic AES-CBC IV compatibility detection | ✅ Historical and key-derived IV variants (SPC4300 firmware 3.12.0 tested) |
 | Areas | ✅ |
 | Zones | ✅ |
 | Full Set / Unset | ✅ |
@@ -309,7 +292,7 @@ X-BUS peripherals are dynamically grouped as Home Assistant devices. Tested devi
 
 Diagnostic entities are associated with the appropriate SPC devices and can include panel power/battery/tamper faults, modem/RF information, FlexC ATS/ATP state and X-BUS operational information.
 
-From **v1.1.5-beta.5**, each discovered SPC zone also exposes separate **tamper** and **trouble** diagnostic binary sensors. These are independent from the zone's physical input (motion, opening, etc.). FlexC zone-event families `1200–1223` / `1300–1323` (tamper / restore) and `1800–1823` / `1900–1923` (trouble / restore) update the corresponding diagnostic states. Event suffixes identify the zone type, not an additional physical detector; events for unknown zone IDs do not create phantom zones. Zone alarms may remain latched until their explicit restore event. A normal PIR motion/rest state does not clear a latched tamper/trouble event.
+Each discovered SPC zone also exposes separate **tamper** and **trouble** diagnostic binary sensors. These are independent from the zone's physical input (motion, opening, etc.). FlexC zone-event families `1200–1223` / `1300–1323` (tamper / restore) and `1800–1823` / `1900–1923` (trouble / restore) update the corresponding diagnostic states. Event suffixes identify the zone type, not an additional physical detector; events for unknown zone IDs do not create phantom zones. Zone alarms may remain latched until their explicit restore event. A normal PIR motion/rest state does not clear a latched tamper/trouble event.
 
 Availability is hardware- and firmware-dependent.
 
@@ -341,7 +324,7 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **SPC FlexC v1.1.5 bundles Card v1.0.28**. It is no longer
+integration. **The bundled SPC FlexC Card is v1.0.28**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
@@ -640,6 +623,12 @@ Unknown values are retained for diagnostics rather than assigned guessed semanti
 
 Check the Home Assistant destination configured in the SPC ATP, FlexC TCP port, firewall rules, ATS / ATP enabled state, AES-256 configuration and network connectivity. Remember that the SPC panel initiates the connection to Home Assistant.
 
+### AES encryption or SHA-1 validation errors
+
+SPC FlexC automatically detects the historical FlexC AES-CBC IV and the key-derived IV variant observed on SPC4300 firmware 3.12.0. The receiver keeps the historical IV unless an incoming frame passes SHA-1 validation with the alternative IV; the selected IV is used for the current TCP session and detected again on reconnect. Both variants have been validated on SPC4300 hardware. With INFO logging enabled for `custom_components.spc_flexc`, affected panels may log `FlexC: switching AES IV variant (panel firmware compatibility)`; no switch is expected for the historical variant.
+
+If SHA-1 validation errors persist, verify that the AES-256 key matches the SPC configuration, inspect connection logs and report the panel model, firmware and relevant redacted diagnostics in [GitHub Issues](https://github.com/minimicro34/ha-spc-flexc/issues). Never publish the encryption key or raw sensitive protocol payloads.
+
 ### FlexC connects but FLEXML commands fail
 
 Check the Command Profile authentication mode, command username/password and command permissions.
@@ -681,7 +670,7 @@ make coverage
 git diff --check
 ```
 
-The coverage gate is 80%. For the v1.1.5 stable release, validation reported 465 Python tests passing with 91.76% coverage and 20 JavaScript tests passing. ATP account auto-assignment with account `0` remains pending independent validation across SPC firmware versions.
+The coverage gate is 80%. Current test results and release-specific validation are documented in [CHANGELOG.md](CHANGELOG.md) and [GitHub Releases](https://github.com/minimicro34/ha-spc-flexc/releases). ATP account auto-assignment with account `0` remains pending independent validation across SPC firmware versions.
 
 ---
 
