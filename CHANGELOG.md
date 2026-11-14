@@ -98,7 +98,7 @@ Special thanks to the community members who helped improve and validate this rel
 
 - **[@henrikekblad](https://github.com/henrikekblad) (Henrik)** — for technical discussions and valuable feedback.
 - **@Ruffy121** — for feedback and contributions throughout the beta cycle.
-- **Ludovic (choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
+- **[@choupfamily](https://github.com/choupfamily) (Ludovic, choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
 
 Thanks to everyone who helped make SPC FlexC v1.1.5 possible!
 
