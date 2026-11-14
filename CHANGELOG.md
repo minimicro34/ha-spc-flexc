@@ -25,7 +25,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Acknowledgements
 
-Special thanks to **[@psyclan](https://github.com/psyclan)** for his valuable technical feedback, investigation of the SPC4300 firmware-specific AES IV behavior, and real-world validation of the compatibility improvements.
+Special thanks to **@psyclan** for his valuable technical feedback, investigation of the SPC4300 firmware-specific AES IV behavior, and real-world validation of the compatibility improvements.
 
 Thanks to everyone who continues to help improve SPC FlexC!
 
@@ -51,7 +51,7 @@ Thanks to everyone who continues to help improve SPC FlexC!
 
 ### Acknowledgements
 
-- Thanks to [@psyclan](https://github.com/psyclan) for reporting issue #17 and providing the key-derived IV workaround.
+- Thanks to @psyclan for reporting issue #17 and providing the key-derived IV workaround.
 
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.5...v1.1.6-beta.1
 
@@ -96,9 +96,9 @@ Thanks to everyone who continues to help improve SPC FlexC!
 
 Special thanks to the community members who helped improve and validate this release:
 
-- **[@henrikekblad](https://github.com/henrikekblad) (Henrik)** — for technical discussions and valuable feedback.
+- **@henrikekblad (Henrik)** — for technical discussions and valuable feedback.
 - **@Ruffy121** — for feedback and contributions throughout the beta cycle.
-- **[@choupfamily](https://github.com/choupfamily) (Ludovic, choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
+- **@choupfamily (Ludovic, choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
 
 Thanks to everyone who helped make SPC FlexC v1.1.5 possible!
 
