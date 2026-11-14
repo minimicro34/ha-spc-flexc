@@ -317,9 +317,9 @@ def test_invalid_digest_does_not_select_alternative_iv() -> None:
     """An unauthenticated frame must not change the session IV."""
     client = _client()
     clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\\x00" * 14
-    wire = clear + AES.new(
-        client._key, AES.MODE_CBC, client._iv_candidates[1]
-    ).encrypt(bytes(48))
+    wire = clear + AES.new(client._key, AES.MODE_CBC, client._iv_candidates[1]).encrypt(
+        bytes(48)
+    )
 
     parsed = client._parse_frame(wire)
 
