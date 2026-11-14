@@ -206,7 +206,7 @@ jobs:
           notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip()
 
           # Remove the original comparison footer; re-add it at the end.
-          notes = "\\n".join(
+          notes = "\n".join(
               line for line in notes.splitlines()
               if not line.startswith("**Full Changelog:** ")
           ).strip()
