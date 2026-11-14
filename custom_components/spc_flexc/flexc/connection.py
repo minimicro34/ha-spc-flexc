@@ -164,6 +164,12 @@ class FlexCClient:
         if len(self._key) != 32:
             raise ValueError("FlexC encryption key must contain exactly 32 bytes")
 
+        self._iv_candidates = (
+            INTERNAL_IV,
+            self._key.hex().upper()[:16].encode("ascii"),
+        )
+        self._iv = INTERNAL_IV
+
         self.command_username = str(config[CONF_COMMAND_USERNAME])
         self.command_password = str(config[CONF_COMMAND_PASSWORD])
 
@@ -298,6 +304,7 @@ class FlexCClient:
         self._session_identity = None
         self._session_poll_identity_seen = False
         self._assigned_spt_account = None
+        self._iv = INTERNAL_IV
         self._reported_identity_changes.clear()
         self._command_context = None
         self._context_event.clear()
@@ -503,11 +510,23 @@ class FlexCClient:
 
         clear = frame[:16]
 
-        plaintext = AES.new(
-            self._key,
-            AES.MODE_CBC,
-            INTERNAL_IV,
-        ).decrypt(frame[16:])
+        # Select the IV only after SHA-1 validation. The selected variant is
+        # reused for outgoing acknowledgements within this TCP session.
+        plaintext = AES.new(self._key, AES.MODE_CBC, self._iv).decrypt(frame[16:])
+        if plaintext[28:48] != self._digest_for(clear, plaintext):
+            for candidate_iv in self._iv_candidates:
+                if candidate_iv == self._iv:
+                    continue
+                candidate = AES.new(self._key, AES.MODE_CBC, candidate_iv).decrypt(
+                    frame[16:]
+                )
+                if candidate[28:48] == self._digest_for(clear, candidate):
+                    self._iv = candidate_iv
+                    plaintext = candidate
+                    _LOGGER.info(
+                        "FlexC: switching AES IV variant (panel firmware compatibility)"
+                    )
+                    break
 
         data_header = plaintext[20:28]
 
@@ -580,7 +599,7 @@ class FlexCClient:
         ciphertext = AES.new(
             self._key,
             AES.MODE_CBC,
-            INTERNAL_IV,
+            self._iv,
         ).encrypt(bytes(plain))
 
         return clear + ciphertext

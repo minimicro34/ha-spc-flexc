@@ -7,6 +7,7 @@ import zlib
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
+from Crypto.Cipher import AES
 from homeassistant.const import CONF_HOST
 
 from custom_components.spc_flexc.const import (
@@ -285,6 +286,55 @@ def test_digest_and_encryption_round_trip() -> None:
     logical = bytearray(clear + parsed["plain"])
     logical[44:64] = b"\x00" * 20
     assert parsed["recv_sha1"] == hashlib.sha1(logical).digest()
+
+
+def test_key_derived_iv_is_detected_and_used_for_outgoing_frames() -> None:
+    """An authenticated incoming frame selects the panel's IV variant."""
+    client = _client()
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
+    plain = bytearray(48)
+    plain[18] = MSG_CONNECTION_REQUEST_LEGACY
+    plain[28:48] = client._digest_for(clear, plain)
+    alternative_iv = client._key.hex().upper()[:16].encode("ascii")
+    wire = clear + AES.new(client._key, AES.MODE_CBC, alternative_iv).encrypt(
+        bytes(plain)
+    )
+
+    parsed = client._parse_frame(wire)
+
+    assert parsed["sha1_ok"] is True
+    assert parsed["message_id"] == MSG_CONNECTION_REQUEST_LEGACY
+    assert client._iv == alternative_iv
+
+    response = client._encrypt_message(clear, plain)
+    decrypted = AES.new(client._key, AES.MODE_CBC, alternative_iv).decrypt(
+        response[16:]
+    )
+    assert decrypted[28:48] == client._digest_for(clear, decrypted)
+
+
+def test_invalid_digest_does_not_select_alternative_iv() -> None:
+    """An unauthenticated frame must not change the session IV."""
+    client = _client()
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
+    wire = clear + AES.new(client._key, AES.MODE_CBC, client._iv_candidates[1]).encrypt(
+        bytes(48)
+    )
+
+    parsed = client._parse_frame(wire)
+
+    assert parsed["sha1_ok"] is False
+    assert client._iv == client._iv_candidates[0]
+
+
+def test_standard_iv_keeps_existing_behavior() -> None:
+    """The existing panel IV remains selected when its SHA-1 is valid."""
+    client = _client()
+    clear = bytes((PROTOCOL_ID, PROTOCOL_VERSION)) + b"\x00" * 14
+    wire = client._encrypt_message(clear, bytearray(48))
+
+    assert client._parse_frame(wire)["sha1_ok"] is True
+    assert client._iv == client._iv_candidates[0]
 
 
 def test_build_connection_ack_preserves_validated_fields() -> None:
