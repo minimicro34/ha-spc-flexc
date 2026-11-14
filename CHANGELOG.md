@@ -47,7 +47,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 Special thanks to the community members who helped improve and validate this release:
 
-- **@henrikeblad (Henrik)** — for technical discussions and valuable feedback.
+- **[@henrikekblad](https://github.com/henrikekblad) (Henrik)** — for technical discussions and valuable feedback.
 - **@Ruffy121** — for feedback and contributions throughout the beta cycle.
 - **Ludovic (choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
 
