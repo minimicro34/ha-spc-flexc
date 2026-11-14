@@ -201,7 +201,7 @@ jobs:
           notes = re.sub(r"(?ms)^### Validation\n.*?(?=^### |\Z)", "", notes).strip()
 
           # Remove the original comparison footer; re-add it at the end.
-          notes = re.sub(r"(?m)^\\*\\*Full Changelog\\*\\*:?[^\\n]*\\n?", "", notes).strip()
+          notes = re.sub(r"(?m)^\\*\\*Full Changelog:?\\*\\*:?[^^\\n]*\\n?", "", notes).strip()
 
           log = Path("quality.log").read_text(encoding="utf-8")
           pytest = re.findall(r"(?m)(\d+) passed\b", log)
