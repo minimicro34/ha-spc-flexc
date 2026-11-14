@@ -219,7 +219,9 @@ Configure the ATP destination with:
 - FlexC encryption enabled;
 - the same AES-256 encryption key configured in Home Assistant.
 
-Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.\n\nStarting with **v1.1.5**, an ATP client account set to `0` (automatic assignment) receives a nonzero account identifier in the FlexC CONNECT acknowledgement, following the behavior observed in the decompiled SPCLink receiver. Explicit nonzero ATP accounts are preserved. **This behavior still requires live validation on an SPC4300**; if the connection drops before the first POLL, use an explicit nonzero ATP account as a temporary workaround.
+Make sure the destination is reachable, the TCP port is not blocked and the ATS / ATP is enabled.
+
+Starting with **v1.1.5**, an ATP client account set to `0` (automatic assignment) receives a nonzero account identifier in the FlexC CONNECT acknowledgement, following the behavior observed in the decompiled SPCLink receiver. Explicit nonzero ATP accounts are preserved. **This behavior still requires live validation on an SPC4300**; if the connection drops before the first POLL, use an explicit nonzero ATP account as a temporary workaround.
 
 ### Command Profile
 
@@ -671,7 +673,7 @@ make coverage
 git diff --check
 ```
 
-The coverage gate is 80%. The v1.1.5-beta.17 validation reported 465 Python tests passing with 91.76% coverage and 20 JavaScript tests passing. ATP account auto-assignment with account `0` remains pending independent validation across SPC firmware versions.
+The coverage gate is 80%. For the v1.1.5 stable release, validation reported 465 Python tests passing with 91.76% coverage and 20 JavaScript tests passing. ATP account auto-assignment with account `0` remains pending independent validation across SPC firmware versions.
 
 ---
 
