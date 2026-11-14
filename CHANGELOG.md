@@ -17,6 +17,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - **PIR Slow-Read sensor:** Added an optional, disabled-by-default diagnostic sensor tracking slow PIR reads over a rolling one-hour window, including occurrence count, maximum read duration, and timestamps.
 - **Last FlexC Event ID sensor:** Added an optional, disabled-by-default diagnostic sensor exposing the latest FlexC event ID and a history of the 20 most recent events, with decoded event descriptions and zone/area identifiers for troubleshooting without enabling DEBUG logging.
 - **Enhanced FlexC event metadata:** Added event reception timestamps and resolved area/zone names to improve event history readability and diagnostics.
+- **Automatic ATP account assignment:** Added support for FlexC CONNECT requests with ATP client account `0` by generating a nonzero account identifier in the encrypted acknowledgement, while preserving explicitly configured nonzero accounts. Hardware compatibility remains subject to the limitation noted below.
 
 ### Improved
 
