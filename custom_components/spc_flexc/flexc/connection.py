@@ -164,7 +164,10 @@ class FlexCClient:
         if len(self._key) != 32:
             raise ValueError("FlexC encryption key must contain exactly 32 bytes")
 
-        self._iv_candidates = (INTERNAL_IV, self._key.hex().upper()[:16].encode("ascii"))
+        self._iv_candidates = (
+            INTERNAL_IV,
+            self._key.hex().upper()[:16].encode("ascii"),
+        )
         self._iv = INTERNAL_IV
 
         self.command_username = str(config[CONF_COMMAND_USERNAME])
@@ -514,9 +517,9 @@ class FlexCClient:
             for candidate_iv in self._iv_candidates:
                 if candidate_iv == self._iv:
                     continue
-                candidate = AES.new(
-                    self._key, AES.MODE_CBC, candidate_iv
-                ).decrypt(frame[16:])
+                candidate = AES.new(self._key, AES.MODE_CBC, candidate_iv).decrypt(
+                    frame[16:]
+                )
                 if candidate[28:48] == self._digest_for(clear, candidate):
                     self._iv = candidate_iv
                     plaintext = candidate
