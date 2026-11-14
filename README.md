@@ -116,6 +116,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - Home Assistant switch entities for discovered Mapping Gates
 - Resulting output state verification after commands
 - Door status monitoring for discovered access-control doors
+- More responsive access-control door status updates after FlexC DRS event `3012`.
 - Validated door actions: temporary open, permanent open/free access, normal mode and forced lock
 - Persistent door-mode verification and bounded timeout recovery
 
@@ -270,6 +271,8 @@ After a successful panel refresh, the SPC panel serial number is used as the sta
 
 ## Available entities
 
+After a complete discovery, the integration removes orphaned area, zone and empty area-device registry entries that are no longer reported by the panel.
+
 The exact entities depend on the SPC panel, its configuration, capabilities and installed hardware.
 
 ### Alarm control panels
@@ -295,6 +298,12 @@ Diagnostic entities are associated with the appropriate SPC devices and can incl
 Each discovered SPC zone also exposes separate **tamper** and **trouble** diagnostic binary sensors. These are independent from the zone's physical input (motion, opening, etc.). FlexC zone-event families `1200–1223` / `1300–1323` (tamper / restore) and `1800–1823` / `1900–1923` (trouble / restore) update the corresponding diagnostic states. Event suffixes identify the zone type, not an additional physical detector; events for unknown zone IDs do not create phantom zones. Zone alarms may remain latched until their explicit restore event. A normal PIR motion/rest state does not clear a latched tamper/trouble event.
 
 Availability is hardware- and firmware-dependent.
+
+### PIR slow-read diagnostics (optional)
+
+The **PIR Slow-Read** diagnostic sensor is disabled by default. Enable it under **Settings → Devices & services → SPC FlexC → Entities** to monitor slow PIR zone reads. It tracks the number of slow reads over a rolling one-hour window, the maximum observed read duration, and timestamped readings. The bundled SPC FlexC Card displays these diagnostics in a collapsible section of the **System** tab when available.
+
+Read duration is measured separately from command synchronization and operation-lock waits, so a delayed operation does not automatically imply a slow SPC zone read. Occasional slow reads have been observed, particularly with multiple FlexC ATS connections to the same panel; the cause is not yet confirmed.
 
 ### FlexC event ID diagnostics (optional)
 
