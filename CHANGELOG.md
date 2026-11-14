@@ -8,6 +8,44 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.5] - 2026-11-14
+
+### Added
+
+- Bundled SPC FlexC Card v1.0.28 with expanded System diagnostics, event history details, and a collapsible PIR slow-read section.
+- Optional zone tamper and trouble diagnostic entities, with event-driven updates and restoration handling.
+- Optional rolling PIR slow-read diagnostic sensor with a one-hour history, maximum duration, and timestamps.
+- Additional FlexC event metadata, including reception time and resolved area/zone names.
+
+### Improved
+
+- Faster command handling after unsolicited FlexC EVENT acknowledgements, avoiding unnecessary waits for the next supervision POLL when no command is in flight.
+- More responsive access-control door status updates after DRS event #3012.
+- Zone polling, event reconciliation, and PIR timing diagnostics; read durations are distinguished from lock and synchronization waits.
+- Automatic cleanup of orphaned area, zone, and empty area-device registry entries after complete discovery.
+
+### Fixed
+
+- Schedule PIR diagnostic sensor state updates on the Home Assistant event loop, preventing executor-thread state-write errors.
+- Corrected FlexC command-context synchronization and preserved the authoritative DATA reply context for commands already in flight.
+- Addressed card display and event-history presentation issues identified during the beta cycle.
+
+### Validation
+
+- Beta.17: 465 Python tests passed, 91.76% coverage; 20 JavaScript tests passed in the beta validation cycle.
+- Signed-release dry run reported successful for beta.17.
+- Independent production feedback on beta.17: occasional PIR slow reads of approximately 1.0–1.35 s, without repeated failures; frequency decreased after a second test VM/ATS was removed.
+- Beta.15 command-context and door-status behavior was validated on a production SPC installation; other hardware-specific features remain dependent on panel model and firmware.
+
+### Known limitations
+
+- Occasional PIR slow reads may still occur, especially when multiple FlexC ATS connections share a panel; the precise cause is not yet confirmed.
+- Automatic ATP account assignment when the panel sends account `0` has not been independently confirmed across all supported SPC firmware versions. An explicit nonzero account remains a workaround if the connection closes before the first POLL.
+
+**Full Changelog**: https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.4...v1.1.5
+
+---
+
 ## [1.1.5-beta.17]
 
 ### Version
