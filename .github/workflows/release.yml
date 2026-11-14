@@ -175,7 +175,7 @@ jobs:
               raise SystemExit(f"No changelog entry for {version}")
           notes = section.group(1).strip() + "\n"
           # Capture the comparison link before removing optional subsections.
-          footer = re.search(r"(?m)^\\*\\*Full Changelog\\*\\*:?[^\\S\\n]*(https?://[^\\s]+)", notes)
+          footer = re.search(r"(?m)^\\*\\*Full Changelog:?\\*\\*:?[ \\t]*(https?://\\S+)", notes)
           if not footer:
               raise SystemExit(f"Missing Full Changelog comparison link in {version} section")
           comparison_url = footer.group(1)
