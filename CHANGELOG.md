@@ -43,6 +43,16 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Occasional PIR slow reads may still occur, especially when multiple FlexC ATS connections share a panel; the precise cause is not yet confirmed.
 - Automatic ATP account assignment when the panel sends account `0` has not been independently confirmed across all supported SPC firmware versions. An explicit nonzero account remains a workaround if the connection closes before the first POLL.
 
+### Acknowledgements
+
+Special thanks to the community members who helped improve and validate this release:
+
+- **@henrikeblad (Henrik)** — for technical discussions and valuable feedback.
+- **@Ruffy121** — for feedback and contributions throughout the beta cycle.
+- **Ludovic (choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
+
+Thanks to everyone who helped make SPC FlexC v1.1.5 possible!
+
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.4...v1.1.5
 
 ---
