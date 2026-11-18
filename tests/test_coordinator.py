@@ -1286,7 +1286,6 @@ def test_untimestamped_unset_event_still_clears_latched_alarm() -> None:
     coordinator.async_set_updated_data.assert_called_once()
 
 
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("startup_level", "expected_log_level"),
