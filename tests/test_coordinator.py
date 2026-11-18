@@ -1336,8 +1336,9 @@ async def test_zone_poll_slow_read_honors_startup_grace_in_real_loop(
     assert len(slow_logs) == 1
     assert slow_logs[0].levelno == expected_log_level
     coordinator.pir_slow_reads.record.assert_called_once()
-    assert coordinator.pir_slow_reads.record.call_args.kwargs["log_level"] == expected_log_level
-    assert coordinator.pir_slow_reads.record.call_args.kwargs["startup_grace"] is (startup_level == logging.DEBUG)
+    recorded = coordinator.pir_slow_reads.record.call_args.kwargs
+    assert recorded["log_level"] == expected_log_level
+    assert recorded["startup_grace"] is (startup_level == logging.DEBUG)
 
 
 @pytest.mark.parametrize(
