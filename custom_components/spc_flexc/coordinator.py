@@ -904,6 +904,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         """Poll zones without allowing one malformed reply to stop live updates."""
         _LOGGER.debug("SPC zone polling started")
         previous_poll_started: float | None = None
+        poll_loop_started = asyncio.get_running_loop().time()
         try:
             while True:
                 await asyncio.sleep(
@@ -972,6 +973,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
                     level = slow_read_log_level(read_ms)
+                    if level is not None and _pir_slow_poll_log_level(
+                        clock.time() - poll_loop_started
+                    ) == logging.DEBUG:
+                        # Keep slow-read history, but avoid startup-only warnings.
+                        level = logging.DEBUG
                     if level is not None:
                         burst = self.pir_slow_reads.record(
                             read_ms,
