@@ -44,6 +44,8 @@ class PirSlowReadHistory:
         lock_wait_ms: float,
         resync_wait_ms: float,
         batches: list[tuple[int, int, float]],
+        log_level: int | None = None,
+        startup_grace: bool = False,
         now: float | None = None,
     ) -> tuple[int, float] | None:
         """Record a slow read; return (burst count, max ms) if warning is due."""
@@ -57,6 +59,13 @@ class PirSlowReadHistory:
                 {
                     "timestamp": datetime.now(UTC).isoformat(),
                     "read_ms": round(read_ms, 1),
+                    "log_level": (
+                        f"{logging.getLevelName(log_level)} (startup grace)"
+                        if startup_grace and log_level == logging.DEBUG
+                        else logging.getLevelName(log_level)
+                        if log_level is not None
+                        else None
+                    ),
                     "interval_ms": round(interval_ms, 1)
                     if interval_ms is not None
                     else None,
