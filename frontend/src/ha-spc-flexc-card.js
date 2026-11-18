@@ -1706,6 +1706,7 @@ class SpcFlexCCard extends HTMLElement {
       return `<div class="technical-line event-history-row">
         <span>${this._escapeHtml(timestamp)}</span>
         <span class="muted">${this._escapeHtml(timing)}</span>
+        ${reading.log_level ? `<span class="muted">${this._escapeHtml(reading.log_level)}</span>` : ""}
       </div>`;
     }).join("");
     const pirSection = `<div class="technical-section" data-technical-section="pir-diagnostics">
