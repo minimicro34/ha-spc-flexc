@@ -987,6 +987,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             lock_wait_ms=lock_wait_ms,
                             resync_wait_ms=resync_wait_total_ms,
                             batches=batch_timings,
+                            log_level=level,
+                            startup_grace=in_startup_grace,
                         )
                         _LOGGER.log(
                             level,
