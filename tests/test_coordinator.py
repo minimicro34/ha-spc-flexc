@@ -1286,6 +1286,59 @@ def test_untimestamped_unset_event_still_clears_latched_alarm() -> None:
     coordinator.async_set_updated_data.assert_called_once()
 
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("startup_level", "expected_log_level"),
+    [
+        (logging.DEBUG, logging.DEBUG),
+        (logging.WARNING, logging.WARNING),
+    ],
+)
+async def test_zone_poll_slow_read_honors_startup_grace_in_real_loop(
+    startup_level: int,
+    expected_log_level: int,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The polling loop must apply the startup grace to slow-read warnings."""
+    coordinator = _coordinator_stub()
+    coordinator._zone_discovery_complete = True
+    coordinator._detected_zone_ids = {1}
+    coordinator._zone_poll_task = asyncio.current_task()
+    coordinator.client.async_get_zone_status = AsyncMock(
+        return_value=[{"ZONE_ID": "1", "INPUT": "0"}]
+    )
+    coordinator.pir_slow_reads.record.return_value = None
+    sleep = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+
+    with (
+        caplog.at_level(
+            logging.DEBUG, logger="custom_components.spc_flexc.coordinator"
+        ),
+        patch("custom_components.spc_flexc.coordinator.asyncio.sleep", sleep),
+        patch(
+            "custom_components.spc_flexc.coordinator.slow_read_log_level",
+            return_value=logging.WARNING,
+        ),
+        patch(
+            "custom_components.spc_flexc.coordinator._pir_slow_poll_log_level",
+            return_value=startup_level,
+        ) as grace_level,
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await SpcFlexCCoordinator._async_zone_poll_loop(coordinator)
+
+    grace_level.assert_called()
+    slow_logs = [
+        record
+        for record in caplog.records
+        if record.message.startswith("FlexC PIR poll slow:")
+    ]
+    assert len(slow_logs) == 1
+    assert slow_logs[0].levelno == expected_log_level
+    coordinator.pir_slow_reads.record.assert_called_once()
+
+
 @pytest.mark.parametrize(
     ("elapsed_seconds", "expected_level"),
     [
