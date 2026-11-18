@@ -8,6 +8,17 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.7] - 2026-11-18
+
+### Fixed
+
+- Apply the existing 30-second PIR slow-poll startup grace period to actual zone polling logs, preventing isolated startup reads above 2 seconds from raising misleading warnings.
+- Preserve PIR slow-read diagnostic history and normal warning thresholds after the grace period; polling behavior is unchanged.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.6...v1.1.7
+
+---
+
 ## [1.1.6] - 2026-11-14
 
 ### Fixed
