@@ -2,6 +2,8 @@
 
 import logging
 
+import pytest
+
 from custom_components.spc_flexc.pir_diagnostics import (
     PirSlowReadHistory,
     slow_read_log_level,
@@ -57,3 +59,27 @@ def test_fast_reads_are_not_recorded():
     history = PirSlowReadHistory()
     assert _record(history, 1, 999) is None
     assert history.snapshot(now=1)["count"] == 0
+
+
+@pytest.mark.parametrize(
+    ("level", "grace", "expected"),
+    [
+        (logging.DEBUG, False, "DEBUG"),
+        (logging.DEBUG, True, "DEBUG (startup grace)"),
+        (logging.INFO, False, "INFO"),
+        (logging.WARNING, False, "WARNING"),
+    ],
+)
+def test_history_stores_effective_log_level(level, grace, expected):
+    history = PirSlowReadHistory()
+    history.record(
+        2100,
+        now=10,
+        interval_ms=1000,
+        lock_wait_ms=0,
+        resync_wait_ms=0,
+        batches=[(1, 8, 2100)],
+        log_level=level,
+        startup_grace=grace,
+    )
+    assert history.snapshot(now=10)["slow_reads"][0]["log_level"] == expected
