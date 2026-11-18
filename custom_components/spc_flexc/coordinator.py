@@ -973,9 +973,11 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                         round(interval_ms, 1) if interval_ms is not None else None
                     )
                     level = slow_read_log_level(read_ms)
-                    if level is not None and _pir_slow_poll_log_level(
-                        clock.time() - poll_loop_started
-                    ) == logging.DEBUG:
+                    in_startup_grace = (
+                        _pir_slow_poll_log_level(clock.time() - poll_loop_started)
+                        == logging.DEBUG
+                    )
+                    if level is not None and in_startup_grace:
                         # Keep slow-read history, but avoid startup-only warnings.
                         level = logging.DEBUG
                     if level is not None:
@@ -996,7 +998,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                             resync_wait_total_ms,
                             batch_timings,
                         )
-                        if burst is not None:
+                        if burst is not None and not in_startup_grace:
                             _LOGGER.warning(
                                 "FlexC PIR repeated slow reads: count=%d "
                                 "window_seconds=60 max_read_ms=%.1f",
