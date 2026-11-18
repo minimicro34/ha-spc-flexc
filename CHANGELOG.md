@@ -8,6 +8,22 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.8] - 2026-11-18
+
+### Added
+
+- **SPC FlexC Card v1.0.29:** Display the effective logging level alongside each PIR slow-read diagnostic entry.
+- Record four PIR diagnostic logging states: DEBUG, DEBUG (startup grace), INFO and WARNING, reflecting the level actually used after the 30-second startup grace is applied.
+- Expose the effective log level in the optional PIR slow-read sensor history attributes, while keeping existing timing details and one-hour history.
+
+### Tests
+
+- Added parameterized coverage for all four PIR log-level states and assertions that the polling loop passes the effective level and startup-grace flag to diagnostic history.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.7...v1.1.8
+
+---
+
 ## [1.1.7] - 2026-11-18
 
 ### Fixed
