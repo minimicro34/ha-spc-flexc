@@ -237,7 +237,7 @@ Read permissions are required for the panel and hardware status used by the inte
 > `SPC User Only / Utilisateur SPC seulement` has not been validated as the authentication mode for this integration.
 
 > [!NOTE]
-> **Firmware-specific authentication findings (SPC 3.14.1):** Henrik reported that FlexC accepts usernames of 4–16 characters and web passwords of 6–16 characters, using letters, digits and `. ! @ # $ % _ + - = ; < > ?`. A longer password may still work in the panel's web interface but fail over FlexC with error `54` (authentication failed). These limits have not been confirmed across all SPC firmware versions.
+> **Firmware-specific authentication findings (SPC 3.14.1):** Authentication error `54` may occur when credentials accepted by the panel's web interface are rejected over FlexC. If authentication fails, verify the configured credentials and command-user settings. Behavior may vary across SPC firmware versions.
 >
 > If panel-user credentials produce error `54`, check **Communications → FlexC → ATS Command Profile**: the **Command User or Panel User** setting and the Command Profile's own credentials may affect authentication. This is distinct from the **Command User Only** configuration validated above. See [Henrik's SPC panel setup guide](https://github.com/henrikekblad/spc-flexc-home-assistant/blob/main/docs/panel-setup.md) for details.
 
