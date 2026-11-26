@@ -6,13 +6,48 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
+---
+
+## [1.1.10-beta.2]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.10-beta.2`
+- SPC FlexC Card: `1.0.29` (unchanged)
+
 ### Added
 
-- Read the panel's current system alert states with `CMD_STATUS_PANEL` once per panel poll, so the mains fault, panel battery fault and panel tamper entities have a known state after start-up instead of staying Unknown until a fault or restore event arrives (#15). FlexC events still update them in real time. The read is best effort and the last command of the poll: a reply with `RESULT` 17, 65 or 103 (not available, not permitted, unknown) turns it off until the next FlexC session; any other failure, including a timeout, leaves the faults as they are and does not fail the update. A fault or restore event received during the read wins over the older snapshot. The faults take the alert's `INPUT` bit (the condition now), not the `ALERT` bit, which stays set until the alert is restored at the panel. `FlexMLReplyError` now keeps the reply's `RESULT` code.
+- Initialize and reconcile existing mains fault, panel battery fault and panel tamper entities using `CMD_STATUS_PANEL` once per panel poll, while preserving real-time FlexC event updates (#15, #21).
+- Use the SYSALERT INPUT mask for current fault conditions rather than latched ALERT states.
+- Preserve known and unknown states when masks are missing or malformed, and prioritize fault or restore events received during a status read.
+
+### Improved
+
+- Keep the optional status read best effort and last in the poll; transient failures do not invalidate otherwise successful updates.
+- Disable the optional read only for explicit unsupported or permission result codes 17, 65 and 103, scoped to the current FlexC session.
+- Preserve FlexML reply result codes for error handling.
 
 ### Tests
 
-- Added coverage for the `SYSALERT` masks, the polled fault states, real-time event updates after a poll, events during the read, unsupported replies and a new session re-enabling the read, transient failures, missing or malformed masks, the read's place at the end of the poll and panel tamper persistence.
+- Added regression coverage for masks, event reconciliation, session changes, unsupported replies, transient failures, command ordering and tamper persistence.
+
+### Validation
+
+- Beta.1: independent SPC4300 startup, handshake, discovery and state reconciliation succeeded without integration warnings or errors; long fragmented replies remain unverified on that installation.
+- Contributor validation on SPC4300 firmware 3.14.1 confirmed cabinet tamper INPUT behavior and approximately 50 ms additional polling time per 60-second panel poll.
+- Independent beta.2 hardware validation pending.
+
+### Known limitations
+
+- AIC1200 support for CMD_STATUS_PANEL remains unconfirmed.
+- Mains and battery fault mask behavior has not been independently confirmed by physical fault testing.
+- RF jamming equivalence with existing FlexC events is unconfirmed and is not included in polling. AC frequency remains outside this change.
+
+### Acknowledgements
+
+- Special thanks to **@ToFinToFun** for system alert polling, regression tests, hardware measurements and careful review follow-up.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.10-beta.1...v1.1.10-beta.2
 
 ---
 
