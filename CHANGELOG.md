@@ -19,6 +19,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 - Align panel system alert labels and Ethernet values in two columns, with spacing and wrapping for narrow cards.
 - Display each active, latched, inhibited or isolated flag with its own color; use neutral wording for clear masks.
+- Show active SYSALERT faults in system health without duplicating existing mains, battery or cabinet tamper faults; keep RF sources distinct.
 - Preserve all existing diagnostic semantics and zone tamper states.
 
 ### Validation
