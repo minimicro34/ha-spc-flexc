@@ -8,6 +8,41 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.10-beta.3]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.10-beta.3`
+- SPC FlexC Card: `1.0.30`
+
+### Added
+
+- Read-only panel status diagnostic sensor with the latest SYSALERT snapshot and reported Ethernet settings.
+- Collapsible System card section displaying the 17 mapped alert flags separately from existing real-time fault entities, with French and English labels.
+- Display reported IP address, netmask, gateway and DHCP configuration without additional FlexC commands.
+
+### Fixed
+
+- Reject out-of-range SYSALERT masks and treat unrecognized permission flags as unknown.
+- Clear diagnostic snapshots on failed reads without clearing existing event-driven fault states.
+
+### Tests
+
+- Added Python regression tests for snapshot handling and mask bounds, and frontend tests for flag rendering, unknown states and HTML escaping.
+
+### Validation
+
+- Hardware validation pending.
+
+### Known limitations
+
+- System alert flags are a polled snapshot, not live event states or proof of hardware presence. RF jamming is not merged with the existing event-driven entity.
+- No inhibition, isolation or network configuration commands are exposed.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.10-beta.2...v1.1.10-beta.3
+
+---
+
 ## [1.1.10-beta.2]
 
 ### Version
