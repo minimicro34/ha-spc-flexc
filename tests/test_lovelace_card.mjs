@@ -251,3 +251,9 @@ test("unknown panel snapshot does not display stale flags", () => {
   assert.match(card._renderPanelStatus(), /panel_status\.unknown/);
   assert.doesNotMatch(card._renderPanelStatus(), /panel_status\.network_fault/);
 });
+
+test("panel status rows have scoped alignment and wrapping styles", () => {
+  assert.match(frontend, /\[data-technical-section="panel-status"\] \.technical-line \{\s*display: grid;/);
+  assert.match(frontend, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
+  assert.match(frontend, /\[data-technical-section="panel-status"\] \.technical-line > span:last-child \{\s*text-align: right;/);
+});
