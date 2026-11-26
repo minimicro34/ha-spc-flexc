@@ -19,8 +19,6 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 - Clarify firmware-specific FlexC authentication troubleshooting for error `54` and remove unverified credential length and character restrictions from the README.
 
----
-
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.8...v1.1.9
 
 ---
