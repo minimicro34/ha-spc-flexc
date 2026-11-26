@@ -1,5 +1,6 @@
 """Home Assistant device helpers for SPC FlexC."""
 
+from dataclasses import is_dataclass
 from typing import Any, cast
 
 from homeassistant.const import CONF_HOST
@@ -196,7 +197,7 @@ def _set_parent_device(
     )
 
     if parent_device_id is not None:
-        if hasattr(device_info, "via_device_id"):
-            setattr(device_info, "via_device_id", parent_device_id)
+        if is_dataclass(device_info):
+            cast(Any, device_info).via_device_id = parent_device_id
         else:
             cast(dict[str, Any], device_info)["via_device_id"] = parent_device_id
