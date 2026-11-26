@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from contextlib import suppress
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta, tzinfo
 from functools import partial
 from typing import Any
@@ -412,6 +413,10 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         - A fault event received while the read was waiting wins over the
           older snapshot.
         """
+        # The diagnostic snapshot is current only after a successful read.
+        self.state.system_alerts = {}
+        self.state.panel_ethernet = {}
+        self.state.panel_status_at = None
         generation = self.client.session_generation
         if self._panel_status_unsupported_generation == generation:
             return
@@ -437,6 +442,17 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         except FlexCError as err:
             _LOGGER.debug("Skipping CMD_STATUS_PANEL in this update: %s", err)
             return
+        self.state.system_alerts = {
+            key: asdict(alert) for key, alert in status.alerts.items()
+        }
+        self.state.panel_ethernet = {
+            key: value
+            for key, value in status.ethernet.items()
+            if key
+            in ("FITTED", "STATE", "DHCP_ENABLED", "IP_ADDRESS", "NETMASK", "GATEWAY")
+        }
+        if self.state.system_alerts or self.state.panel_ethernet:
+            self.state.panel_status_at = datetime.now(UTC)
         faults = self.state.faults
         tamper_before = faults.panel_tamper
         for field, alert_key in PANEL_FAULT_ALERTS.items():

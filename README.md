@@ -299,6 +299,10 @@ Each discovered SPC zone also exposes separate **tamper** and **trouble** diagno
 
 Availability is hardware- and firmware-dependent.
 
+### Panel status diagnostics
+
+The **Panel status diagnostics** sensor exposes the timestamp of the latest successful `CMD_STATUS_PANEL` snapshot, with `system_alerts` and `ethernet` attributes. The bundled card shows these in a collapsible System section. Active conditions, latched alerts, inhibition and isolation are separate flags; a clear bit is not proof that the corresponding hardware is installed. This snapshot is distinct from real-time event-driven fault entities. Missing or failed reads leave the snapshot unknown without clearing existing fault entities. Ethernet values are reported configuration, not a connectivity test. No additional polling command or configuration write is introduced.
+
 ### PIR slow-read diagnostics (optional)
 
 The **PIR Slow-Read** diagnostic sensor is disabled by default. Enable it under **Settings → Devices & services → SPC FlexC → Entities** to monitor slow PIR zone reads. It tracks the number of slow reads over a rolling one-hour window, the maximum observed read duration, and timestamped readings. The bundled SPC FlexC Card displays these diagnostics in a collapsible section of the **System** tab when available.
@@ -333,11 +337,11 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **The bundled SPC FlexC Card is v1.0.28**. It is no longer
+integration. **The bundled SPC FlexC Card is v1.0.30**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.28` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.0.30` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
 X-BUS and system diagnostics. The bundled card preserves the physical detector

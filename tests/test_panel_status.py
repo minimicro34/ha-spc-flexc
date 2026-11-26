@@ -344,3 +344,25 @@ async def test_status_read_is_the_last_command_and_a_timeout_keeps_the_update() 
     assert order == ["summary", "alerts", "areas", "status_panel"]
     assert state.areas[1].name == "Home"
     assert state.faults.mains_fault is None
+
+
+@pytest.mark.parametrize("mask", ["-1", "100000000"])
+def test_out_of_range_mask_is_unknown(mask: str) -> None:
+    assert not parse_status_panel(_status(mask)).alerts
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_snapshot_cleared_on_failed_read() -> None:
+    coordinator = _coordinator()
+    await _read(coordinator)
+    assert coordinator.state.panel_status_at is not None
+    assert coordinator.state.system_alerts["network_fault"]["isolated"] is True
+    assert coordinator.state.panel_ethernet["IP_ADDRESS"] == "192.0.2.10"
+    coordinator.client.async_get_panel_status = AsyncMock(
+        side_effect=FlexMLError("invalid reply")
+    )
+    await _read(coordinator)
+    assert coordinator.state.panel_status_at is None
+    assert coordinator.state.system_alerts == {}
+    assert coordinator.state.panel_ethernet == {}
+    assert coordinator.state.faults.mains_fault is True

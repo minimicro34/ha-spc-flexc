@@ -214,3 +214,40 @@ test("disabled event sensor has a localized activation hint", () => {
   assert.match(translations, /"system\.event_enable_hint": "Pour afficher/);
   assert.match(translations, /"system\.event_enable_hint": "To display/);
 });
+
+
+test("panel status snapshot distinguishes flags and escapes Ethernet data", () => {
+  const Card = cardClass();
+  const card = new Card();
+  card._t = (key) => key;
+  card._scopedStates = () => [{
+    entityId: "sensor.panel_status_diagnostics",
+    stateObj: {
+      state: "2026-11-26T20:00:00+00:00",
+      attributes: {
+        system_alerts: { network_fault: { active: false, alerted: true, isolated: true } },
+        ethernet: { IP_ADDRESS: "<img>", DHCP_ENABLED: "1" },
+      },
+    },
+  }];
+  const html = card._renderPanelStatus();
+  assert.match(html, /panel_status\.alerted/);
+  assert.match(html, /panel_status\.isolated/);
+  assert.doesNotMatch(html, /panel_status\.active/);
+  assert.match(html, /&lt;img&gt;/);
+  assert.doesNotMatch(html, /<img>/);
+});
+
+test("unknown panel snapshot does not display stale flags", () => {
+  const Card = cardClass();
+  const card = new Card();
+  card._t = (key) => key;
+  card._scopedStates = () => [{
+    entityId: "sensor.panel_status_diagnostics",
+    stateObj: { state: "unknown", attributes: {
+      system_alerts: { network_fault: { active: true } }, ethernet: {},
+    } },
+  }];
+  assert.match(card._renderPanelStatus(), /panel_status\.unknown/);
+  assert.doesNotMatch(card._renderPanelStatus(), /panel_status\.network_fault/);
+});

@@ -1727,6 +1727,7 @@ class SpcFlexCCard extends HTMLElement {
     const content = [
       eventSection,
       pirSection,
+      this._renderPanelStatus(),
       wirelessSection,
       identitySection,
       powerSection,
@@ -2114,6 +2115,42 @@ class SpcFlexCCard extends HTMLElement {
         ${this._escapeHtml(label)}
       </button>
     `).join("")}</div>`;
+  }
+
+  _renderPanelStatus() {
+    const sensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      Object.hasOwn(stateObj.attributes || {}, "system_alerts") &&
+      Object.hasOwn(stateObj.attributes || {}, "ethernet")
+    );
+    if (!sensor) return "";
+    const { state, attributes } = sensor.stateObj;
+    const available = state && state !== "unknown" && state !== "unavailable";
+    const alerts = available ? Object.entries(attributes.system_alerts || {}) : [];
+    const ethernet = available ? attributes.ethernet || {} : {};
+    const rows = alerts.map(([key, flags]) => {
+      const states = ["active", "alerted", "inhibited", "isolated"]
+        .filter((flag) => flags?.[flag] === true)
+        .map((flag) => this._t(`panel_status.${flag}`));
+      return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span class="${flags?.active ? "danger" : states.length ? "warning" : "muted"}">${this._escapeHtml(states.join(" · ") || this._t("panel_status.clear"))}</span></div>`;
+    }).join("");
+    const network = [["IP_ADDRESS", "ip"], ["NETMASK", "mask"], ["GATEWAY", "gateway"], ["DHCP_ENABLED", "dhcp"]]
+      .filter(([key]) => ethernet[key] != null && ethernet[key] !== "")
+      .map(([key, label]) => {
+        const value = key === "DHCP_ENABLED" ? this._t(`panel_status.${ethernet[key] === "1" ? "enabled" : ethernet[key] === "0" ? "disabled" : "unknown"}`) : ethernet[key];
+        return `<div class="technical-line"><span>${this._t(`panel_status.${label}`)}</span><span>${this._escapeHtml(String(value))}</span></div>`;
+      }).join("");
+    return `<div class="technical-section" data-technical-section="panel-status">
+      <div class="technical-section-title">${this._t("panel_status.title")}</div>
+      <details class="system-detail-card" data-system-detail-key="panel-status">
+        <summary>${available ? this._t("panel_status.snapshot") : this._t("panel_status.unknown")}</summary>
+        <div class="system-detail-body">
+          ${available ? `<div class="muted">${this._escapeHtml(this._formatEventDateTime(state))}</div>` : ""}
+          ${rows || `<div class="muted">${this._t("panel_status.unknown")}</div>`}
+          ${network ? `<div class="technical-section-title">${this._t("panel_status.ethernet")}</div>${network}` : ""}
+        </div>
+      </details>
+    </div>`;
   }
 
   _renderSystem() {
