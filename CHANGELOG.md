@@ -6,6 +6,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
+### Added
+
+- Read the panel's current system alert states with `CMD_STATUS_PANEL` once per panel poll, so the mains fault, panel battery fault and panel tamper entities have a known state after start-up instead of staying Unknown until a fault or restore event arrives (#15). FlexC events still update them in real time. A panel or command profile that does not answer `CMD_STATUS_PANEL` keeps the event-only behaviour, and the command is not sent again in that session.
+
+### Tests
+
+- Added coverage for the `SYSALERT` masks, the polled fault states, real-time event updates after a poll, panels without `CMD_STATUS_PANEL` and panel tamper persistence.
+
 ---
 
 ## [1.1.9] - 2026-11-26

@@ -45,6 +45,7 @@ from .flexc.events import (
     apply_zone_event,
 )
 from .flexc.flexml import FlexMLError
+from .flexc.panel_status import PANEL_FAULT_ALERTS
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
 from .models import (
@@ -370,6 +371,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self._detected_xbus_serials: set[str] = set()
         self._xbus_discovery_complete = False
         self._discovery_requested = False
+        # Set once a panel answers CMD_STATUS_PANEL with an error.
+        self._panel_status_unsupported = False
         self._client_operation_lock = asyncio.Lock()
         self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
@@ -388,6 +391,36 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         if isinstance(saved, dict) and type(saved.get("panel_tamper")) is bool:
             self.state.faults.panel_tamper = saved["panel_tamper"]
             _LOGGER.debug("Restored last known panel tamper state")
+
+    async def _async_read_system_alerts_locked(self) -> None:
+        """Set panel faults from CMD_STATUS_PANEL; best effort, lock held.
+
+        FlexC events keep updating these faults in real time. This read gives
+        them their current state at start-up and once per panel poll, so they
+        are not Unknown until a fault or restore event arrives. A panel or
+        command profile without CMD_STATUS_PANEL keeps the event-only
+        behaviour; the command is then not sent again in this session.
+        """
+        if self._panel_status_unsupported:
+            return
+        try:
+            status = await async_retry_read_once(
+                self.client.async_get_panel_status,
+                description="reading panel status",
+            )
+        except FlexMLError as err:
+            _LOGGER.info("CMD_STATUS_PANEL not available, using events only: %s", err)
+            self._panel_status_unsupported = True
+            return
+        faults = self.state.faults
+        tamper_before = faults.panel_tamper
+        for field, alert_key in PANEL_FAULT_ALERTS.items():
+            alert = status.alerts.get(alert_key)
+            if alert is not None:
+                setattr(faults, field, alert.active)
+        tamper = faults.panel_tamper
+        if tamper is not None and tamper != tamper_before:
+            self._tamper_store.async_delay_save(lambda: {"panel_tamper": tamper}, 1)
 
     async def async_restore_area_history(self) -> None:
         """Restore persisted area history, never stale operating modes."""
@@ -687,6 +720,7 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
                     self.client.async_get_alert_status,
                     description="reading panel alerts",
                 )
+                await self._async_read_system_alerts_locked()
                 if not alerts:
                     self.state.faults.modem_1_fault = False
                     self.state.faults.modem_1_line_fault = False

@@ -38,6 +38,7 @@ from .flexml import (
     parse_user_config_name,
     parse_zone_status,
 )
+from .panel_status import PanelStatus, build_status_panel_command, parse_status_panel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1337,6 +1338,15 @@ class FlexCClient:
         response = await self.async_send_flexml(command)
 
         return parse_alert_status(response)
+
+    async def async_get_panel_status(self) -> PanelStatus:
+        """Read CMD_STATUS_PANEL: current system alert masks (read-only)."""
+        command = build_status_panel_command(
+            self.command_username,
+            self.command_password,
+        )
+        response = await self.async_send_flexml(command)
+        return parse_status_panel(response)
 
     async def async_get_area_status(
         self,
