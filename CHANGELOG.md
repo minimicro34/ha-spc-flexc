@@ -8,6 +8,23 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.9] - 2026-11-26
+
+### Fixed
+
+- Resolve the Home Assistant 2026.12 `DeviceInfo` deprecation by assigning `via_device_id` as a dataclass attribute, while retaining compatibility with older dictionary-based versions.
+- Preserve parent-device relationships for SPC areas, doors and X-BUS peripherals.
+
+### Documentation
+
+- Clarify firmware-specific FlexC authentication troubleshooting for error `54` and remove unverified credential length and character restrictions from the README.
+
+---
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.8...v1.1.9
+
+---
+
 ## [1.1.8] - 2026-11-18
 
 ### Added
