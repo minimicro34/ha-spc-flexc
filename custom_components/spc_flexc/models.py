@@ -276,6 +276,9 @@ class SpcState:
     """Complete SPC state."""
 
     panel: PanelState = field(default_factory=PanelState)
+    system_alerts: dict[str, dict[str, bool | None]] = field(default_factory=dict)
+    panel_ethernet: dict[str, str] = field(default_factory=dict)
+    panel_status_at: datetime | None = None
     faults: FaultState = field(default_factory=FaultState)
     areas: dict[int, AreaState] = field(default_factory=dict)
     zones: dict[int, ZoneState] = field(default_factory=dict)
