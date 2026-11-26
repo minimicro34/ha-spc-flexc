@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.29";
+const CARD_VERSION = "1.0.30";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -1727,6 +1727,7 @@ class SpcFlexCCard extends HTMLElement {
     const content = [
       eventSection,
       pirSection,
+      this._renderPanelStatus(),
       wirelessSection,
       identitySection,
       powerSection,
@@ -2114,6 +2115,42 @@ class SpcFlexCCard extends HTMLElement {
         ${this._escapeHtml(label)}
       </button>
     `).join("")}</div>`;
+  }
+
+  _renderPanelStatus() {
+    const sensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+      entityId.startsWith("sensor.") &&
+      Object.hasOwn(stateObj.attributes || {}, "system_alerts") &&
+      Object.hasOwn(stateObj.attributes || {}, "ethernet")
+    );
+    if (!sensor) return "";
+    const { state, attributes } = sensor.stateObj;
+    const available = state && state !== "unknown" && state !== "unavailable";
+    const alerts = available ? Object.entries(attributes.system_alerts || {}) : [];
+    const ethernet = available ? attributes.ethernet || {} : {};
+    const rows = alerts.map(([key, flags]) => {
+      const states = ["active", "alerted", "inhibited", "isolated"]
+        .filter((flag) => flags?.[flag] === true)
+        .map((flag) => this._t(`panel_status.${flag}`));
+      return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span class="${flags?.active ? "danger" : states.length ? "warning" : "muted"}">${this._escapeHtml(states.join(" · ") || this._t("panel_status.clear"))}</span></div>`;
+    }).join("");
+    const network = [["IP_ADDRESS", "ip"], ["NETMASK", "mask"], ["GATEWAY", "gateway"], ["DHCP_ENABLED", "dhcp"]]
+      .filter(([key]) => ethernet[key] != null && ethernet[key] !== "")
+      .map(([key, label]) => {
+        const value = key === "DHCP_ENABLED" ? this._t(`panel_status.${ethernet[key] === "1" ? "enabled" : ethernet[key] === "0" ? "disabled" : "unknown"}`) : ethernet[key];
+        return `<div class="technical-line"><span>${this._t(`panel_status.${label}`)}</span><span>${this._escapeHtml(String(value))}</span></div>`;
+      }).join("");
+    return `<div class="technical-section" data-technical-section="panel-status">
+      <div class="technical-section-title">${this._t("panel_status.title")}</div>
+      <details class="system-detail-card" data-system-detail-key="panel-status">
+        <summary>${available ? this._t("panel_status.snapshot") : this._t("panel_status.unknown")}</summary>
+        <div class="system-detail-body">
+          ${available ? `<div class="muted">${this._escapeHtml(this._formatEventDateTime(state))}</div>` : ""}
+          ${rows || `<div class="muted">${this._t("panel_status.unknown")}</div>`}
+          ${network ? `<div class="technical-section-title">${this._t("panel_status.ethernet")}</div>${network}` : ""}
+        </div>
+      </details>
+    </div>`;
   }
 
   _renderSystem() {
@@ -4646,6 +4683,38 @@ SpcFlexCCard.prototype._render = function () {
 
 const SPC_FLEXC_CARD_TRANSLATIONS = {
   fr: {
+    "panel_status.mains_fault": "Défaut secteur",
+    "panel_status.battery_fault": "Défaut batterie",
+    "panel_status.psu_fault": "Défaut alimentation",
+    "panel_status.aux_fuse_fault": "Fusible auxiliaire",
+    "panel_status.external_bell_fuse_fault": "Fusible sirène extérieure",
+    "panel_status.internal_bell_fuse_fault": "Fusible sirène intérieure",
+    "panel_status.bell_tamper": "Autoprotection sirène",
+    "panel_status.cabinet_tamper": "Autoprotection centrale",
+    "panel_status.aux_tamper_1": "Autoprotection auxiliaire 1",
+    "panel_status.aux_tamper_2": "Autoprotection auxiliaire 2",
+    "panel_status.antenna_tamper": "Autoprotection antenne",
+    "panel_status.rf_jamming": "Brouillage RF centrale (SYSALERT)",
+    "panel_status.fail_to_communicate": "Échec communication",
+    "panel_status.xbus_cable_fault": "Défaut câble X-BUS",
+    "panel_status.code_tamper": "Autoprotection code",
+    "panel_status.ethernet_link": "Alerte liaison Ethernet",
+    "panel_status.network_fault": "Défaut réseau",
+    "panel_status.title": "État système centrale",
+    "panel_status.snapshot": "Dernier relevé centrale",
+    "panel_status.active": "Actif",
+    "panel_status.alerted": "Alerte mémorisée",
+    "panel_status.inhibited": "Inhibé",
+    "panel_status.isolated": "Isolé",
+    "panel_status.clear": "Aucun bit actif",
+    "panel_status.ethernet": "Informations Ethernet",
+    "panel_status.unknown": "Non renseigné",
+    "panel_status.dhcp": "DHCP",
+    "panel_status.ip": "Adresse IP",
+    "panel_status.mask": "Masque",
+    "panel_status.gateway": "Passerelle",
+    "panel_status.enabled": "Activé",
+    "panel_status.disabled": "Désactivé",
     "system.pir_diagnostics": "Diagnostic PIR",
     "system.pir_slow_reads": "lectures lentes (1 h)",
     "system.pir_maximum": "Durée maximale",
@@ -4814,6 +4883,38 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "editor.help": "Les secteurs sont récupérés depuis l'entité d'alarme. Les détecteurs SPC sont découverts automatiquement parmi les binary_sensor possédant les attributs zone_id, area_id et spc_zone_type. Les diagnostics et informations techniques sont rattachés à la même intégration via les registres Home Assistant quand ceux-ci sont disponibles.",
   },
   en: {
+    "panel_status.mains_fault": "Mains fault",
+    "panel_status.battery_fault": "Battery fault",
+    "panel_status.psu_fault": "PSU fault",
+    "panel_status.aux_fuse_fault": "Auxiliary fuse fault",
+    "panel_status.external_bell_fuse_fault": "External bell fuse fault",
+    "panel_status.internal_bell_fuse_fault": "Internal bell fuse fault",
+    "panel_status.bell_tamper": "Bell tamper",
+    "panel_status.cabinet_tamper": "Cabinet tamper",
+    "panel_status.aux_tamper_1": "Auxiliary tamper 1",
+    "panel_status.aux_tamper_2": "Auxiliary tamper 2",
+    "panel_status.antenna_tamper": "Antenna tamper",
+    "panel_status.rf_jamming": "Controller RF jamming (SYSALERT)",
+    "panel_status.fail_to_communicate": "Fail to communicate",
+    "panel_status.xbus_cable_fault": "X-BUS cable fault",
+    "panel_status.code_tamper": "Code tamper",
+    "panel_status.ethernet_link": "Ethernet link alert",
+    "panel_status.network_fault": "Network fault",
+    "panel_status.title": "Panel system status",
+    "panel_status.snapshot": "Last panel snapshot",
+    "panel_status.active": "Active",
+    "panel_status.alerted": "Latched alert",
+    "panel_status.inhibited": "Inhibited",
+    "panel_status.isolated": "Isolated",
+    "panel_status.clear": "No flags set",
+    "panel_status.ethernet": "Ethernet information",
+    "panel_status.unknown": "Not reported",
+    "panel_status.dhcp": "DHCP",
+    "panel_status.ip": "IP address",
+    "panel_status.mask": "Netmask",
+    "panel_status.gateway": "Gateway",
+    "panel_status.enabled": "Enabled",
+    "panel_status.disabled": "Disabled",
     "system.pir_diagnostics": "PIR diagnostics",
     "system.pir_slow_reads": "slow reads (1 h)",
     "system.pir_maximum": "Maximum duration",
