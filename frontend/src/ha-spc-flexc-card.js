@@ -2949,6 +2949,31 @@ class SpcFlexCCard extends HTMLElement {
           line-height: 1.3;
         }
 
+        [data-technical-section="panel-status"] .technical-line {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          align-items: start;
+          gap: 12px;
+          padding: 3px 0;
+        }
+
+        [data-technical-section="panel-status"] .technical-line > span {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+
+        [data-technical-section="panel-status"] .technical-line > span:last-child {
+          text-align: right;
+        }
+
+        [data-technical-section="panel-status"] .system-detail-body {
+          margin-top: 10px;
+        }
+
+        [data-technical-section="panel-status"] .system-detail-body > .technical-section-title {
+          margin-top: 12px;
+        }
+
         .technical-section-title {
           margin-bottom: 8px;
           color: var(--secondary-text-color);
