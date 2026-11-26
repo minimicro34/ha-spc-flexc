@@ -2131,8 +2131,8 @@ class SpcFlexCCard extends HTMLElement {
     const rows = alerts.map(([key, flags]) => {
       const states = ["active", "alerted", "inhibited", "isolated"]
         .filter((flag) => flags?.[flag] === true)
-        .map((flag) => this._t(`panel_status.${flag}`));
-      return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span class="${flags?.active ? "danger" : states.length ? "warning" : "muted"}">${this._escapeHtml(states.join(" · ") || this._t("panel_status.clear"))}</span></div>`;
+        .map((flag) => `<span class="${flag === "active" ? "danger" : flag === "isolated" ? "panel-status-isolated" : "warning"}">${this._escapeHtml(this._t(`panel_status.${flag}`))}</span>`);
+      return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span>${states.join(" · ") || `<span class="muted">${this._escapeHtml(this._t("panel_status.clear"))}</span>`}</span></div>`;
     }).join("");
     const network = [["IP_ADDRESS", "ip"], ["NETMASK", "mask"], ["GATEWAY", "gateway"], ["DHCP_ENABLED", "dhcp"]]
       .filter(([key]) => ethernet[key] != null && ethernet[key] !== "")
@@ -2964,6 +2964,10 @@ class SpcFlexCCard extends HTMLElement {
 
         [data-technical-section="panel-status"] .technical-line > span:last-child {
           text-align: right;
+        }
+
+        [data-technical-section="panel-status"] .panel-status-isolated {
+          color: var(--info-color, #64a5e8);
         }
 
         [data-technical-section="panel-status"] .system-detail-body {
