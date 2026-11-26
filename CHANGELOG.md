@@ -8,6 +8,26 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.10-beta.4]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.10-beta.4`
+- SPC FlexC Card: `1.0.31`
+
+### Fixed
+
+- Align panel system alert labels and Ethernet values in two columns, with spacing and wrapping for narrow cards.
+- Preserve all existing diagnostic semantics and zone tamper states.
+
+### Validation
+
+- Beta.3 SPC4300 startup, discovery, all 17 SYSALERT entries, Ethernet data and periodic snapshot refresh confirmed. Card layout correction pending visual validation.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.10-beta.3...v1.1.10-beta.4
+
+---
+
 ## [1.1.10-beta.3]
 
 ### Version
