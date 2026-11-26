@@ -1,8 +1,11 @@
 """Tests for SPC FlexC Home Assistant device helpers."""
 
+from dataclasses import dataclass
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from custom_components.spc_flexc.flexc.device import (
+    _set_parent_device,
     _xbus_model,
     build_area_device_info,
     build_door_device_info,
@@ -215,3 +218,24 @@ def test_ambiguous_xbus_devices_keep_distinct_serial_device_info() -> None:
         )
         == 3
     )
+
+
+@dataclass
+class _DataclassDeviceInfo:
+    via_device_id: str | None = None
+
+
+def test_parent_device_dataclass_and_legacy_mapping() -> None:
+    coordinator = _coordinator()
+    modern = _DataclassDeviceInfo()
+    legacy: dict[str, Any] = {}
+    with patch(
+        "custom_components.spc_flexc.flexc.device.dr.async_get_device_id_by_identifier",
+        return_value="parent-id",
+        create=True,
+    ):
+        _set_parent_device(coordinator, cast(Any, modern), ("spc_flexc", "SERIAL"))
+        _set_parent_device(coordinator, cast(Any, legacy), ("spc_flexc", "SERIAL"))
+
+    assert modern.via_device_id == "parent-id"
+    assert legacy["via_device_id"] == "parent-id"
