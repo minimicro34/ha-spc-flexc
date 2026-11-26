@@ -196,4 +196,7 @@ def _set_parent_device(
     )
 
     if parent_device_id is not None:
-        cast(dict[str, Any], device_info)["via_device_id"] = parent_device_id
+        if hasattr(device_info, "via_device_id"):
+            setattr(device_info, "via_device_id", parent_device_id)
+        else:
+            cast(dict[str, Any], device_info)["via_device_id"] = parent_device_id
