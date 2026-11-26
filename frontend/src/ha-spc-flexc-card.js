@@ -961,7 +961,7 @@ class SpcFlexCCard extends HTMLElement {
 
     const diagnostics = [];
 
-    for (const { entityId, stateObj } of this._scopedStates()) {
+    for (const { entityId, stateObj, registryEntry } of this._scopedStates()) {
       if (!entityId.startsWith("binary_sensor.")) {
         continue;
       }
@@ -979,6 +979,7 @@ class SpcFlexCCard extends HTMLElement {
       diagnostics.push({
         entityId,
         stateObj,
+        registryEntry,
         deviceClass: String(
           attrs.device_class || ""
         ).toLowerCase(),
@@ -1011,13 +1012,21 @@ class SpcFlexCCard extends HTMLElement {
         (item) =>
           item.deviceClass === "problem" &&
           item.stateObj.state === "on"
-      )
-      .sort((a, b) =>
-        a.friendlyName.localeCompare(
-          b.friendlyName,
-          this._locale()
-        )
       );
+
+    const snapshot = this._panelStatusSnapshot();
+    if (snapshot && !["unknown", "unavailable"].includes(snapshot.stateObj.state)) {
+      const existing = { mains_fault: "mains_fault", battery_fault: "battery_fault", cabinet_tamper: "panel_tamper" };
+      for (const [key, flags] of Object.entries(snapshot.stateObj.attributes.system_alerts || {})) {
+        if (flags?.active !== true) continue;
+        const suffix = existing[key];
+        if (suffix && faults.some((fault) =>
+          String(fault.registryEntry?.unique_id || "").endsWith(`_${suffix}`)
+        )) continue;
+        faults.push({ friendlyName: this._t(`panel_status.${key}`) });
+      }
+    }
+    faults.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName, this._locale()));
 
     return {
       scopeAvailable: true,
@@ -2117,12 +2126,16 @@ class SpcFlexCCard extends HTMLElement {
     `).join("")}</div>`;
   }
 
-  _renderPanelStatus() {
-    const sensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+  _panelStatusSnapshot() {
+    return this._scopedStates(true).find(({ entityId, stateObj }) =>
       entityId.startsWith("sensor.") &&
       Object.hasOwn(stateObj.attributes || {}, "system_alerts") &&
       Object.hasOwn(stateObj.attributes || {}, "ethernet")
     );
+  }
+
+  _renderPanelStatus() {
+    const sensor = this._panelStatusSnapshot();
     if (!sensor) return "";
     const { state, attributes } = sensor.stateObj;
     const available = state && state !== "unknown" && state !== "unavailable";
@@ -2131,7 +2144,7 @@ class SpcFlexCCard extends HTMLElement {
     const rows = alerts.map(([key, flags]) => {
       const states = ["active", "alerted", "inhibited", "isolated"]
         .filter((flag) => flags?.[flag] === true)
-        .map((flag) => `<span class="${flag === "active" ? "danger" : flag === "isolated" ? "panel-status-isolated" : "warning"}">${this._escapeHtml(this._t(`panel_status.${flag}`))}</span>`);
+        .map((flag) => `<span class="${flag === "active" ? "danger" : "warning"}">${this._escapeHtml(this._t(`panel_status.${flag}`))}</span>`);
       return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span>${states.join(" · ") || `<span class="muted">${this._escapeHtml(this._t("panel_status.clear"))}</span>`}</span></div>`;
     }).join("");
     const network = [["IP_ADDRESS", "ip"], ["NETMASK", "mask"], ["GATEWAY", "gateway"], ["DHCP_ENABLED", "dhcp"]]
@@ -2964,10 +2977,6 @@ class SpcFlexCCard extends HTMLElement {
 
         [data-technical-section="panel-status"] .technical-line > span:last-child {
           text-align: right;
-        }
-
-        [data-technical-section="panel-status"] .panel-status-isolated {
-          color: var(--info-color, #64a5e8);
         }
 
         [data-technical-section="panel-status"] .system-detail-body {
