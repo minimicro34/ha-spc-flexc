@@ -9,10 +9,12 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Fixed
 
 - Acknowledge long FlexC replies correctly. A reply longer than `0x2800` (10240) bytes arrives in several DATA parts, and each DATA ACK must carry the number of application bytes received so far. Echoing the full application length made the panel resend the first part until the command timed out (long access and system logs, the full user list).
+- The acknowledgement count is reset with the reply buffer at command start, command cleanup and when the SPC opens a new connection. A part received again with the same SPT sequence and data is acknowledged with the same count and not appended twice.
 
 ### Tests
 
 - Added coverage for the cumulative acknowledgement of a three-part reply and its reassembly.
+- Added coverage for a multi-part reply interrupted by a new connection (including a continuation without the new-message marker) and for a repeated part.
 
 ---
 

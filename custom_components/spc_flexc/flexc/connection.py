@@ -218,9 +218,12 @@ class FlexCClient:
         self._poll_waiter: asyncio.Future[dict[str, Any]] | None = None
         self._response_buffer = bytearray()
         self._response_length: int | None = None
-        # Bytes of the current multi-part application message acknowledged.
+        # Bytes of the current multi-part application message acknowledged,
+        # and the last part counted (SPT sequence and data), so that a part
+        # the panel sends again is not counted twice.
         self._ack_total: int | None = None
         self._ack_received = 0
+        self._ack_last_part: tuple[Any, bytes] | None = None
 
         self._event_callback: Callable[[dict[str, str]], None] | None = None
         self._session_ready_callback: Callable[[int], None] | None = None
@@ -325,6 +328,7 @@ class FlexCClient:
 
         self._session_generation += 1
         generation = self._session_generation
+        self._reset_reply_state()
         connection_started_at = asyncio.get_running_loop().time()
         self._reader = reader
         self._writer = writer
@@ -981,9 +985,10 @@ class FlexCClient:
             return
 
         if message_id == MSG_DATA:
+            ack_length, repeated = self._count_data_part(message)
             await self._send_wire(
                 self._build_clone_ack(
-                    _chunk_ack_source(message, self._data_ack_length(message)),
+                    _chunk_ack_source(message, ack_length),
                     MSG_DATA_ACK,
                 )
             )
@@ -995,6 +1000,9 @@ class FlexCClient:
             self._awaiting_poll_after_event = False
             self._context_event.set()
 
+            if repeated:
+                _LOGGER.debug("FlexC DATA part received again; not appended twice")
+                return
             self._handle_incoming_data(message)
             return
 
@@ -1011,18 +1019,37 @@ class FlexCClient:
             message_id,
         )
 
-    def _data_ack_length(self, message: Mapping[str, Any]) -> int | None:
-        """Return the cumulative application bytes to acknowledge for a DATA part."""
+    def _reset_reply_state(self) -> None:
+        """Forget a partly received reply (command boundary or new session)."""
+        self._response_buffer = bytearray()
+        self._response_length = None
+        self._ack_total = None
+        self._ack_received = 0
+        self._ack_last_part = None
+
+    def _count_data_part(self, message: Mapping[str, Any]) -> tuple[int | None, bool]:
+        """Count one DATA part; return the cumulative ACK length and if it is a repeat.
+
+        The ACK length is the number of application bytes received so far, or
+        ``None`` when no message start has been seen in this command (the ACK
+        then carries at most one part length). A part with the same SPT
+        sequence and the same data as the part counted last is a repeat: it is
+        acknowledged with the same length again and not counted or appended.
+        """
         if "application_length" not in message:
-            return None
+            return None, False
+        part = (message.get("spt_sequence"), bytes(message.get("app_data", b"")))
         if message.get("new_application_message"):
             self._ack_total = int(message["application_length"])
             self._ack_received = 0
+            self._ack_last_part = None
         if self._ack_total is None:
-            return None
-        part_length = len(message.get("app_data", b""))
-        self._ack_received = min(self._ack_received + part_length, self._ack_total)
-        return self._ack_received
+            return None, False
+        if part == self._ack_last_part:
+            return self._ack_received, True
+        self._ack_last_part = part
+        self._ack_received = min(self._ack_received + len(part[1]), self._ack_total)
+        return self._ack_received, False
 
     def _handle_incoming_data(
         self,
@@ -1240,8 +1267,7 @@ class FlexCClient:
             self._active_trace = trace
             self._pending_reply = pending
             command_generation = self._session_generation
-            self._response_buffer = bytearray()
-            self._response_length = None
+            self._reset_reply_state()
 
             application = self._build_application_buffer(command)
 
@@ -1313,8 +1339,7 @@ class FlexCClient:
                 if self._pending_reply is pending:
                     self._pending_reply = None
 
-                self._response_buffer = bytearray()
-                self._response_length = None
+                self._reset_reply_state()
 
     async def async_recover_session(self) -> None:
         """Wait until a timed-out FlexC session has a fresh command context."""
