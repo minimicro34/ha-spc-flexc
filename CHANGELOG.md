@@ -12,7 +12,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Version
 
-- Integration: `1.1.10`
+- Integration (`manifest.json`): `1.1.10`
 - SPC FlexC Card: `1.1.0`
 
 ### Added
