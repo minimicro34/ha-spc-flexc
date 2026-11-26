@@ -257,3 +257,15 @@ test("panel status rows have scoped alignment and wrapping styles", () => {
   assert.match(frontend, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/);
   assert.match(frontend, /\[data-technical-section="panel-status"\] \.technical-line > span:last-child \{\s*text-align: right;/);
 });
+
+test("system health includes active snapshot faults without duplicating event faults", () => {
+  const card = new (cardClass())();
+  card._t = (key) => key;
+  card._locale = () => "en";
+  card._diagnosticScope = { entityIds: new Set() };
+  const snapshot = { entityId: "sensor.panel_status", stateObj: { state: "2026-11-26T20:00:00+00:00", attributes: { ethernet: {}, system_alerts: { mains_fault: { active: true }, network_fault: { active: true }, rf_jamming: { active: true }, battery_fault: { alerted: true }, cabinet_tamper: { isolated: true } } } } };
+  card._scopedStates = () => [snapshot, { entityId: "binary_sensor.renamed", registryEntry: { unique_id: "entry_mains_fault" }, stateObj: { state: "on", attributes: { device_class: "problem", friendly_name: "Mains" } } }, { entityId: "binary_sensor.rf", registryEntry: { unique_id: "entry_rf_jamming" }, stateObj: { state: "on", attributes: { device_class: "problem", friendly_name: "RF event" } } }];
+  assert.deepEqual(Array.from(card._getSystemDiagnostics().faults, f => f.friendlyName).sort(), ["Mains", "RF event", "panel_status.network_fault", "panel_status.rf_jamming"]);
+  snapshot.stateObj.state = "unknown";
+  assert.equal(card._getSystemDiagnostics().faults.length, 2);
+});
