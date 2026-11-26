@@ -8,6 +8,47 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ---
 
+## [1.1.10] - 2026-11-26
+
+### Version
+
+- Integration: `1.1.10`
+- SPC FlexC Card: `1.1.0`
+
+### Added
+
+- Best-effort read-only CMD_STATUS_PANEL polling initializes and reconciles existing mains, battery and cabinet tamper fault entities while preserving real-time event priority (#15, #21).
+- Timestamped diagnostic snapshot with 17 SYSALERT flags and reported Ethernet settings, without extra commands or configuration writes.
+- Collapsible French/English card diagnostics with independent flag colors: red for active faults, amber for latched, inhibited or isolated flags, grey for no fault reported.
+- Active SYSALERT faults in the main system health summary, deduplicating existing mains, battery and cabinet tamper faults and keeping RF sources distinct.
+- Italian integration translations for community review.
+
+### Fixed
+
+- Cumulative acknowledgements and reassembly of fragmented FlexC replies exceeding 10,240 bytes (#20), including repeated fragments and session boundaries.
+- Validate 32-bit masks, preserve event-driven states on failed reads and clear failed diagnostic snapshots. Unsupported status reads are disabled only for explicit result codes 17, 65 and 103 for the current session.
+- Align diagnostic labels and values with responsive wrapping and separate Ethernet information.
+
+### Validation
+
+- Beta.4 CI, HACS and Hassfest passed; reported total coverage 92.15%.
+- Independent SPC4300 beta.4 startup, handshake, discovery, all 17 SYSALERT entries, Ethernet data, periodic refresh and normal-state card layout validated without integration errors.
+- Contributor SPC4300 firmware 3.14.1 validation confirmed fragmented reply handling and cabinet tamper INPUT behavior.
+
+### Known limitations
+
+- AIC1200 CMD_STATUS_PANEL support remains unconfirmed. AC frequency and zone tamper semantics are unchanged.
+- Clear masks do not prove hardware presence. Physical fault transitions and active-state card colors have not been independently validated on the beta.4 installation; long fragmented replies were validated by the contributor, not independently reproduced.
+- Italian translations await native-speaker review; the card remains French/English.
+
+### Acknowledgements
+
+Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (#20), system alert polling (#21), regression tests, hardware validation and constructive review follow-up. Thanks also to **@indigo2gm** for reporting the AIC1200 diagnostic behavior in #15.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.9...v1.1.10
+
+---
+
 ## [1.1.10-beta.4]
 
 ### Version
