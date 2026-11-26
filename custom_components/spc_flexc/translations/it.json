@@ -1,0 +1,162 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SPC FlexC",
+        "description": "Configura il ricevitore FlexC locale.",
+        "data": {
+          "host": "Indirizzo SPC",
+          "port": "Porta FlexC",
+          "encryption_key": "Chiave AES-256",
+          "command_username": "Nome utente dei comandi",
+          "command_password": "Password dei comandi"
+        }
+      },
+      "reconfigure": {
+        "title": "Riconfigura SPC FlexC",
+        "description": "Aggiorna la connessione SPC FlexC e le credenziali dei comandi.",
+        "data": {
+          "host": "Indirizzo SPC",
+          "port": "Porta FlexC",
+          "encryption_key": "Chiave AES-256",
+          "command_username": "Nome utente dei comandi",
+          "command_password": "Password dei comandi"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "xbus_tamper_fault": {
+        "name": "Guasto manomissione"
+      },
+      "xbus_tamper_isolated": {
+        "name": "Manomissione isolata"
+      }
+    },
+    "sensor": {
+      "xbus_aux_voltage": {
+        "name": "Tensione ausiliaria"
+      },
+      "xbus_aux_current": {
+        "name": "Corrente ausiliaria"
+      },
+      "xbus_diagnostics": {
+        "name": "Diagnostica X-BUS"
+      },
+      "xbus_device_id": {
+        "name": "ID dispositivo X-BUS"
+      },
+      "xbus_device_type": {
+        "name": "Tipo di dispositivo"
+      },
+      "xbus_hardware_id": {
+        "name": "ID hardware"
+      },
+      "xbus_input_count": {
+        "name": "Numero di ingressi"
+      },
+      "xbus_output_count": {
+        "name": "Numero di uscite"
+      },
+      "xbus_rf_type": {
+        "name": "Tipo RF"
+      },
+      "xbus_rf_version": {
+        "name": "Versione RF"
+      },
+      "xbus_reader_type": {
+        "name": "Tipo di lettore"
+      },
+      "xbus_position_1": {
+        "name": "Posizione 1"
+      },
+      "xbus_position_2": {
+        "name": "Posizione 2"
+      },
+      "xbus_psu_type": {
+        "name": "Tipo di alimentatore"
+      },
+      "xbus_sia_address": {
+        "name": "Indirizzo SIA"
+      },
+      "xbus_status_raw": {
+        "name": "Stato grezzo"
+      },
+      "xbus_input_raw": {
+        "name": "Ingresso grezzo"
+      },
+      "xbus_alert_raw": {
+        "name": "Allarme grezzo"
+      },
+      "xbus_inhibit_raw": {
+        "name": "Inibizione grezza"
+      },
+      "xbus_isolate_raw": {
+        "name": "Isolamento grezzo"
+      }
+    },
+    "button": {
+      "open_momentarily": {
+        "name": "Modalità libera temporanea"
+      },
+      "open_permanently": {
+        "name": "Modalità libera"
+      },
+      "set_normal": {
+        "name": "Modalità normale"
+      },
+      "lock": {
+        "name": "Modalità accesso vietato"
+      },
+      "restore": {
+        "name": "Ripristina {zone_name}"
+      }
+    },
+    "switch": {
+      "inhibition": {
+        "name": "Inibizione {zone_name}"
+      }
+    }
+  },
+  "exceptions": {
+    "area_not_ready_engineer": {
+      "message": "Impossibile inserire {area}: la modalità installatore è attiva (motivo SPC {reason})."
+    },
+    "area_not_ready_zone": {
+      "message": "Impossibile inserire {area}: la zona {zone} (ID {zone_id}) non è pronta (motivo SPC {reason})."
+    },
+    "area_not_ready_faults": {
+      "message": "Impossibile cambiare la modalità di {area}: l'area non è pronta (motivo SPC {reason}). Guasti attivi: {faults}"
+    },
+    "area_not_ready": {
+      "message": "Impossibile cambiare la modalità di {area}: l'area non è pronta (motivo SPC {reason})."
+    },
+    "partset_a_not_supported": {
+      "message": "{area} non supporta l'inserimento parziale A."
+    },
+    "partset_b_not_supported": {
+      "message": "{area} non supporta l'inserimento parziale B."
+    },
+    "global_arm_incomplete": {
+      "message": "Inserimento globale SPC incompleto. Aree già comandate: {areas}. Errore: {error}"
+    },
+    "global_disarm_incomplete": {
+      "message": "Disinserimento globale SPC incompleto. Errori: {errors}"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nomi visualizzati degli utenti",
+        "description": "Una riga USER_ID=Nome visualizzato per utente (ad esempio 9995=Home Assistant).",
+        "data": {
+          "user_aliases": "Nomi utente personalizzati"
+        }
+      }
+    },
+    "error": {
+      "invalid_aliases": "Usa una riga USER_ID numerico=Nome visualizzato per utente."
+    }
+  }
+}
