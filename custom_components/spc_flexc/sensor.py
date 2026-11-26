@@ -65,6 +65,7 @@ async def async_setup_entry(
         + [
             SpcLastEventDiagnosticSensor(coordinator),
             SpcPirSlowReadDiagnosticSensor(coordinator),
+            SpcPanelStatusDiagnosticSensor(coordinator),
         ]
     )
     known_ats: set[int] = set()
@@ -357,6 +358,33 @@ class SpcLastEventDiagnosticSensor(
                 }
                 for event in getattr(self.coordinator, "_recent_event_identifiers", [])
             ],
+        }
+
+
+class SpcPanelStatusDiagnosticSensor(
+    CoordinatorEntity[SpcFlexCCoordinator], SensorEntity
+):
+    """Expose the latest successful read-only panel status snapshot."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Panel status diagnostics"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: SpcFlexCCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id(coordinator)}_panel_status_diagnostics"
+        self._attr_device_info = build_device_info(coordinator)
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.coordinator.data.panel_status_at
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return {
+            "system_alerts": self.coordinator.data.system_alerts,
+            "ethernet": self.coordinator.data.panel_ethernet,
         }
 
 
