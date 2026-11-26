@@ -68,6 +68,7 @@ def _coordinator_stub() -> MagicMock:
     coordinator._last_area_diagnostic_log = 0.0
     coordinator.client.async_ensure_connected = AsyncMock()
     coordinator.client.async_wait_for_event_resync = AsyncMock(return_value=0.0)
+    coordinator._async_read_system_alerts_locked = AsyncMock()
     return coordinator
 
 
@@ -1118,6 +1119,7 @@ def test_panel_tamper_event_schedules_persistence(event_id, expected) -> None:
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
     coordinator.state = SpcState()
     coordinator._tamper_store = MagicMock()
+    coordinator._fault_event_revisions = {}
 
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
 
