@@ -103,14 +103,15 @@ def _mask(value: str | None) -> int | None:
     if value is None:
         return None
     try:
-        return int(value, 16)
+        mask = int(value, 16)
+        return mask if 0 <= mask <= 0xFFFFFFFF else None
     except ValueError:
         return None
 
 
 def _flag(attributes: dict[str, str], name: str) -> bool | None:
     value = attributes.get(name)
-    return None if value is None else value == "1"
+    return value == "1" if value in ("0", "1") else None
 
 
 def parse_status_panel(response: str) -> PanelStatus:
