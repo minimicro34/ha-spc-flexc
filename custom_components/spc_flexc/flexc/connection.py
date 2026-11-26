@@ -1339,6 +1339,11 @@ class FlexCClient:
 
         return parse_alert_status(response)
 
+    @property
+    def session_generation(self) -> int:
+        """Number of the current SPC TCP session; it changes on every reconnect."""
+        return self._session_generation
+
     async def async_get_panel_status(self) -> PanelStatus:
         """Read CMD_STATUS_PANEL: current system alert masks (read-only)."""
         command = build_status_panel_command(

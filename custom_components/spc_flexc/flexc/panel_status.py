@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 from .flexml import (
     FlexMLError,
+    FlexMLReplyError,
     _build_command_envelope,
     _parse_reply_root,
     _validate_reply,
@@ -50,12 +51,27 @@ SYSTEM_ALERTS: tuple[SystemAlertInfo, ...] = (
 
 
 # Event-driven panel faults (FaultState fields) and the system alert that
-# reports the same condition in CMD_STATUS_PANEL.
+# reports the same condition in CMD_STATUS_PANEL. The fault takes the alert's
+# INPUT bit: the condition as it is now. The ALERT bit stays set until the
+# alert is restored at the panel, also after the condition has cleared.
 PANEL_FAULT_ALERTS: dict[str, str] = {
     "mains_fault": "mains_fault",
     "battery_fault": "battery_fault",
     "panel_tamper": "cabinet_tamper",
 }
+
+
+# RESULT codes that mean this panel or command profile does not offer
+# CMD_STATUS_PANEL: 17 not available on this panel, 65 not ticked in the
+# ATS's command profile, 103 unknown command.
+STATUS_PANEL_UNSUPPORTED_CODES = frozenset({"17", "65", "103"})
+
+
+def is_status_panel_unsupported(err: Exception) -> bool:
+    """Return True for an explicit unsupported or not-permitted reply."""
+    return (
+        isinstance(err, FlexMLReplyError) and err.code in STATUS_PANEL_UNSUPPORTED_CODES
+    )
 
 
 @dataclass(frozen=True)

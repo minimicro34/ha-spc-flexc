@@ -1119,6 +1119,7 @@ def test_panel_tamper_event_schedules_persistence(event_id, expected) -> None:
     coordinator = MagicMock(spec=SpcFlexCCoordinator)
     coordinator.state = SpcState()
     coordinator._tamper_store = MagicMock()
+    coordinator._fault_event_revisions = {}
 
     SpcFlexCCoordinator._handle_flexc_event(coordinator, {"EV_ID": event_id})
 

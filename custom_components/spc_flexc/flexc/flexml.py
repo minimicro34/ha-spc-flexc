@@ -16,6 +16,11 @@ class FlexMLError(Exception):
 class FlexMLReplyError(FlexMLError):
     """FLEXML command returned an error."""
 
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        """Keep the panel's RESULT code, when the reply carried one."""
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass(frozen=True, slots=True)
 class FlexMLDiscoveryResult:
@@ -163,7 +168,8 @@ def _validate_reply(reply: ET.Element, expected_tag: str) -> None:
     command_result = reply.get("CMD_RESULT")
     if result != "0" or command_result != "OK":
         raise FlexMLReplyError(
-            f"{expected_tag} failed: RESULT={result!r}, CMD_RESULT={command_result!r}"
+            f"{expected_tag} failed: RESULT={result!r}, CMD_RESULT={command_result!r}",
+            code=result,
         )
 
 

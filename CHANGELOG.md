@@ -8,11 +8,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
-- Read the panel's current system alert states with `CMD_STATUS_PANEL` once per panel poll, so the mains fault, panel battery fault and panel tamper entities have a known state after start-up instead of staying Unknown until a fault or restore event arrives (#15). FlexC events still update them in real time. A panel or command profile that does not answer `CMD_STATUS_PANEL` keeps the event-only behaviour, and the command is not sent again in that session.
+- Read the panel's current system alert states with `CMD_STATUS_PANEL` once per panel poll, so the mains fault, panel battery fault and panel tamper entities have a known state after start-up instead of staying Unknown until a fault or restore event arrives (#15). FlexC events still update them in real time. The read is best effort and the last command of the poll: a reply with `RESULT` 17, 65 or 103 (not available, not permitted, unknown) turns it off until the next FlexC session; any other failure, including a timeout, leaves the faults as they are and does not fail the update. A fault or restore event received during the read wins over the older snapshot. The faults take the alert's `INPUT` bit (the condition now), not the `ALERT` bit, which stays set until the alert is restored at the panel. `FlexMLReplyError` now keeps the reply's `RESULT` code.
 
 ### Tests
 
-- Added coverage for the `SYSALERT` masks, the polled fault states, real-time event updates after a poll, panels without `CMD_STATUS_PANEL` and panel tamper persistence.
+- Added coverage for the `SYSALERT` masks, the polled fault states, real-time event updates after a poll, events during the read, unsupported replies and a new session re-enabling the read, transient failures, missing or malformed masks, the read's place at the end of the poll and panel tamper persistence.
 
 ---
 
