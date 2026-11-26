@@ -337,11 +337,11 @@ Routine PIR, EVENT and POLL resynchronization traces are logged at
 ## SPC FlexC Card
 
 Starting with **SPC FlexC v1.1.2**, the SPC FlexC Card is bundled with this
-integration. **The bundled SPC FlexC Card is v1.0.30**. It is no longer
+integration. **The bundled SPC FlexC Card is v1.1.0**. It is no longer
 distributed as a separate HACS Dashboard plugin.
 
 The integration serves the bundled card at
-`/spc_flexc/ha-spc-flexc-card.js?v=1.0.30` and automatically registers it as a
+`/spc_flexc/ha-spc-flexc-card.js?v=1.1.0` and automatically registers it as a
 Lovelace JavaScript module when resources are managed in storage mode.
 The card supports alarm control, areas, detectors, doors, Mapping Gates,
 X-BUS and system diagnostics. The bundled card preserves the physical detector

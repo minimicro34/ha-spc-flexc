@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.30";
+const CARD_VERSION = "1.1.0";
 
 class SpcFlexCCard extends HTMLElement {
   static getConfigElement() {
@@ -961,7 +961,7 @@ class SpcFlexCCard extends HTMLElement {
 
     const diagnostics = [];
 
-    for (const { entityId, stateObj } of this._scopedStates()) {
+    for (const { entityId, stateObj, registryEntry } of this._scopedStates()) {
       if (!entityId.startsWith("binary_sensor.")) {
         continue;
       }
@@ -979,6 +979,7 @@ class SpcFlexCCard extends HTMLElement {
       diagnostics.push({
         entityId,
         stateObj,
+        registryEntry,
         deviceClass: String(
           attrs.device_class || ""
         ).toLowerCase(),
@@ -1011,13 +1012,21 @@ class SpcFlexCCard extends HTMLElement {
         (item) =>
           item.deviceClass === "problem" &&
           item.stateObj.state === "on"
-      )
-      .sort((a, b) =>
-        a.friendlyName.localeCompare(
-          b.friendlyName,
-          this._locale()
-        )
       );
+
+    const snapshot = this._panelStatusSnapshot();
+    if (snapshot && !["unknown", "unavailable"].includes(snapshot.stateObj.state)) {
+      const existing = { mains_fault: "mains_fault", battery_fault: "battery_fault", cabinet_tamper: "panel_tamper" };
+      for (const [key, flags] of Object.entries(snapshot.stateObj.attributes.system_alerts || {})) {
+        if (flags?.active !== true) continue;
+        const suffix = existing[key];
+        if (suffix && faults.some((fault) =>
+          String(fault.registryEntry?.unique_id || "").endsWith(`_${suffix}`)
+        )) continue;
+        faults.push({ friendlyName: this._t(`panel_status.${key}`) });
+      }
+    }
+    faults.sort((a, b) => a.friendlyName.localeCompare(b.friendlyName, this._locale()));
 
     return {
       scopeAvailable: true,
@@ -2117,12 +2126,16 @@ class SpcFlexCCard extends HTMLElement {
     `).join("")}</div>`;
   }
 
-  _renderPanelStatus() {
-    const sensor = this._scopedStates(true).find(({ entityId, stateObj }) =>
+  _panelStatusSnapshot() {
+    return this._scopedStates(true).find(({ entityId, stateObj }) =>
       entityId.startsWith("sensor.") &&
       Object.hasOwn(stateObj.attributes || {}, "system_alerts") &&
       Object.hasOwn(stateObj.attributes || {}, "ethernet")
     );
+  }
+
+  _renderPanelStatus() {
+    const sensor = this._panelStatusSnapshot();
     if (!sensor) return "";
     const { state, attributes } = sensor.stateObj;
     const available = state && state !== "unknown" && state !== "unavailable";
@@ -2131,8 +2144,8 @@ class SpcFlexCCard extends HTMLElement {
     const rows = alerts.map(([key, flags]) => {
       const states = ["active", "alerted", "inhibited", "isolated"]
         .filter((flag) => flags?.[flag] === true)
-        .map((flag) => this._t(`panel_status.${flag}`));
-      return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span class="${flags?.active ? "danger" : states.length ? "warning" : "muted"}">${this._escapeHtml(states.join(" · ") || this._t("panel_status.clear"))}</span></div>`;
+        .map((flag) => `<span class="${flag === "active" ? "danger" : "warning"}">${this._escapeHtml(this._t(`panel_status.${flag}`))}</span>`);
+      return `<div class="technical-line"><span>${this._escapeHtml(this._t(`panel_status.${key}`))}</span><span>${states.join(" · ") || `<span class="muted">${this._escapeHtml(this._t("panel_status.clear"))}</span>`}</span></div>`;
     }).join("");
     const network = [["IP_ADDRESS", "ip"], ["NETMASK", "mask"], ["GATEWAY", "gateway"], ["DHCP_ENABLED", "dhcp"]]
       .filter(([key]) => ethernet[key] != null && ethernet[key] !== "")
@@ -2947,6 +2960,31 @@ class SpcFlexCCard extends HTMLElement {
         .event-history-row {
           padding: 3px 0;
           line-height: 1.3;
+        }
+
+        [data-technical-section="panel-status"] .technical-line {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          align-items: start;
+          gap: 12px;
+          padding: 3px 0;
+        }
+
+        [data-technical-section="panel-status"] .technical-line > span {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+
+        [data-technical-section="panel-status"] .technical-line > span:last-child {
+          text-align: right;
+        }
+
+        [data-technical-section="panel-status"] .system-detail-body {
+          margin-top: 10px;
+        }
+
+        [data-technical-section="panel-status"] .system-detail-body > .technical-section-title {
+          margin-top: 12px;
         }
 
         .technical-section-title {
@@ -4706,7 +4744,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "panel_status.alerted": "Alerte mémorisée",
     "panel_status.inhibited": "Inhibé",
     "panel_status.isolated": "Isolé",
-    "panel_status.clear": "Aucun bit actif",
+    "panel_status.clear": "Aucun défaut signalé",
     "panel_status.ethernet": "Informations Ethernet",
     "panel_status.unknown": "Non renseigné",
     "panel_status.dhcp": "DHCP",
@@ -4906,7 +4944,7 @@ const SPC_FLEXC_CARD_TRANSLATIONS = {
     "panel_status.alerted": "Latched alert",
     "panel_status.inhibited": "Inhibited",
     "panel_status.isolated": "Isolated",
-    "panel_status.clear": "No flags set",
+    "panel_status.clear": "No fault reported",
     "panel_status.ethernet": "Ethernet information",
     "panel_status.unknown": "Not reported",
     "panel_status.dhcp": "DHCP",
