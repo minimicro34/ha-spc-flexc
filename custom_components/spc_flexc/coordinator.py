@@ -448,7 +448,8 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         self.state.panel_ethernet = {
             key: value
             for key, value in status.ethernet.items()
-            if key in ("FITTED", "STATE", "DHCP_ENABLED", "IP_ADDRESS", "NETMASK", "GATEWAY")
+            if key
+            in ("FITTED", "STATE", "DHCP_ENABLED", "IP_ADDRESS", "NETMASK", "GATEWAY")
         }
         if self.state.system_alerts or self.state.panel_ethernet:
             self.state.panel_status_at = datetime.now(UTC)
