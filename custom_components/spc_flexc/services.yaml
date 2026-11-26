@@ -1,0 +1,45 @@
+get_log:
+  fields:
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: spc_flexc
+    log:
+      required: true
+      selector:
+        select:
+          translation_key: log
+          options:
+            - access
+            - system
+            - zone
+            - ats
+            - ats_network
+            - atp
+            - atp_network
+            - wireless
+    id:
+      required: false
+      example: 3
+      selector:
+        number:
+          min: 1
+          max: 999
+          mode: box
+    atp:
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 16
+          mode: box
+    limit:
+      required: false
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 2000
+          mode: box

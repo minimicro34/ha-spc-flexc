@@ -52,6 +52,18 @@
     }
   },
   "exceptions": {
+      "no_loaded_entry": {
+      "message": "No loaded SPC FlexC integration was found."
+    },
+    "several_entries": {
+      "message": "There are several SPC FlexC panels; choose one with config_entry_id."
+    },
+    "log_needs_id": {
+      "message": "The {log} log needs an id (door, zone or ATS number)."
+    },
+    "log_read_failed": {
+      "message": "Could not read the {log} log: {error}"
+    },
     "area_not_ready_engineer": {"message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."},
     "area_not_ready_zone": {"message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."},
     "area_not_ready_faults": {"message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"},
@@ -60,5 +72,47 @@
     "partset_b_not_supported": {"message": "{area} does not support Part Set B."},
     "global_arm_incomplete": {"message": "SPC global arming was incomplete. Areas already commanded: {areas}. Error: {error}"},
     "global_disarm_incomplete": {"message": "SPC global disarming was incomplete. Errors: {errors}"}
+  },
+  "selector": {
+    "log": {
+      "options": {
+        "access": "Access log (door)",
+        "system": "System log",
+        "zone": "Zone log",
+        "ats": "FlexC ATS event log",
+        "ats_network": "FlexC ATS network log",
+        "atp": "FlexC ATP log",
+        "atp_network": "FlexC ATP network log",
+        "wireless": "Wireless log"
+      }
+    }
+  },
+  "services": {
+    "get_log": {
+      "name": "Read panel log",
+      "description": "Reads a log from the SPC panel and returns its entries, newest first. Card numbers are never returned.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Panel",
+          "description": "SPC FlexC panel. Needed only when there are several."
+        },
+        "log": {
+          "name": "Log",
+          "description": "Which log to read."
+        },
+        "id": {
+          "name": "ID",
+          "description": "Door number for the access log, zone number for the zone log, ATS number for the ATS event log."
+        },
+        "atp": {
+          "name": "ATP",
+          "description": "ATP number within the ATS, for the ATP logs (default 1)."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum number of entries to return."
+        }
+      }
+    }
   }
 }

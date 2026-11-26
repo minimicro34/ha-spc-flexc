@@ -48,6 +48,7 @@ It implements a native FlexC receiver directly inside Home Assistant. The SPC pa
 - [Zone inhibition, isolation and restoration](#zone-inhibition-isolation-and-restoration)
 - [Mapping Gates / outputs](#mapping-gates--outputs)
 - [X-BUS](#x-bus)
+- [Panel logs](#panel-logs)
 - [Diagnostics](#diagnostics)
 - [Security recommendations](#security-recommendations)
 - [Known limitations](#known-limitations)
@@ -534,6 +535,33 @@ Operational entities can include auxiliary voltage/current and independent tampe
 Unknown or unvalidated values are deliberately not given speculative meanings.
 
 X-BUS control is not exposed unless the corresponding write semantics have been validated.
+
+---
+
+## Panel logs
+
+The `spc_flexc.get_log` action reads one of the panel's own logs and returns its entries, newest first. It only reads; card numbers are never returned.
+
+| `log` | `id` | Entry fields |
+| --- | --- | --- |
+| `access` | door number | `time`, `type`, `type_name`, `detail`, `door_id`, `door_name`, `user_id`, `user_name`, `text` |
+| `system` | — | `time`, `text`, `raw` |
+| `zone` | zone number | `time`, `zone_id`, `input`, `resistance` |
+| `wireless` | — | `time`, `radio_id`, `status`, `battery`, `signal`, `receiver_id` |
+| `ats` | FlexC ATS number | the fields of a FlexC event (`event_id`, `text`, area, zone, door, user, SIA/CID codes) |
+| `ats_network` | FlexC ATS number | `time`, `ats_id`, `message_id`, `text` |
+| `atp`, `atp_network` | FlexC ATS number, with `atp` = ATP number (default 1) | `time`, `ats_id`, `atp`, `message_id`, `text` (`atp` also `data`) |
+
+`limit` caps the number of entries returned (default 100); the response also gives the total. The Command Profile must allow the matching `GET_*_LOG` command. On an SPC4300 the access log holds about 900 entries per door, so the reply spans several FlexC DATA parts (see #20).
+
+```yaml
+action: spc_flexc.get_log
+data:
+  log: access
+  id: 3
+  limit: 20
+response_variable: access_log
+```
 
 ---
 

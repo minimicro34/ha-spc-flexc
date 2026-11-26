@@ -47,6 +47,7 @@ from .flexc.events import (
     apply_zone_event,
 )
 from .flexc.flexml import FlexMLError
+from .flexc.logs import build_log_command, parse_log
 from .flexc.panel_status import PANEL_FAULT_ALERTS, is_status_panel_unsupported
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
@@ -465,6 +466,25 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         tamper = faults.panel_tamper
         if tamper is not None and tamper != tamper_before:
             self._tamper_store.async_delay_save(lambda: {"panel_tamper": tamper}, 1)
+
+    async def async_read_log(
+        self, kind: str, object_id: int | None = None, sub_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Read one panel log (read-only); records are returned newest first."""
+        async with self._client_operation_lock:
+            await self.client.async_ensure_connected()
+            command = build_log_command(
+                kind,
+                object_id,
+                self.client.command_username,
+                self.client.command_password,
+                sub_id,
+            )
+            response = await async_retry_read_once(
+                partial(self.client.async_send_flexml, command),
+                description=f"reading the {kind} log",
+            )
+        return parse_log(response, kind, dt_util.get_default_time_zone())
 
     async def async_restore_area_history(self) -> None:
         """Restore persisted area history, never stale operating modes."""
