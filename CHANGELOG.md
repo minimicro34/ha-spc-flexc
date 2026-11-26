@@ -6,15 +6,40 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
+---
+
+## [1.1.10-beta.1]
+
+### Version
+
+- Integration (`manifest.json`): `1.1.10-beta.1`
+- SPC FlexC Card: `1.0.29` (unchanged)
+
 ### Fixed
 
-- Acknowledge long FlexC replies correctly. A reply longer than `0x2800` (10240) bytes arrives in several DATA parts, and each DATA ACK must carry the number of application bytes received so far. Echoing the full application length made the panel resend the first part until the command timed out (long access and system logs, the full user list).
-- The acknowledgement count is reset with the reply buffer at command start, command cleanup and when the SPC opens a new connection. A part received again with the same SPT sequence and data is acknowledged with the same count and not appended twice.
+- Correct cumulative DATA acknowledgements for fragmented FlexC replies exceeding 10,240 bytes, preventing repeated first fragments and command timeouts (#20).
+- Reset reply buffers and acknowledgement tracking at command boundaries and on session replacement.
+- Acknowledge repeated continuation fragments with identical SPT sequence and payload without counting or appending them twice.
 
 ### Tests
 
-- Added coverage for the cumulative acknowledgement of a three-part reply and its reassembly.
-- Added coverage for a multi-part reply interrupted by a new connection (including a continuation without the new-message marker) and for a repeated part.
+- Added regression coverage for cumulative acknowledgements, reply reassembly, interrupted replies, session replacement and repeated fragments.
+- PR #20 CI passed with 92.02% coverage.
+
+### Validation
+
+- Contributor validation on SPC4300 firmware 3.14.1: a 21,811-byte reply received in three fragments without retransmission.
+- Independent SPC4300 validation pending. This prerelease isolates the transport changes before subsequent beta releases.
+
+### Known limitations
+
+- Retransmissions using a different SPT sequence have not been observed or independently characterized.
+
+### Acknowledgements
+
+- Special thanks to **@ToFinToFun** for the transport fix, regression tests, hardware validation and responsive review follow-up.
+
+**Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.9...v1.1.10-beta.1
 
 ---
 
