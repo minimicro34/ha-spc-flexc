@@ -71,6 +71,10 @@ CONNECT_TIMEOUT = 30.0
 COMMAND_TIMEOUT = 15.0
 FRAME_IDLE_TIMEOUT = 60.0
 MAX_FRAME_LENGTH = 65536
+# The SPC sends an application reply longer than this in several DATA
+# messages. Each acknowledgement must carry at most this length; echoing the
+# full application length makes the panel resend the first part forever.
+REPLY_CHUNK_LENGTH = 0x2800
 COMMAND_NAME_PATTERN = re.compile(r"<(CMD_[A-Z0-9_]+)\b")
 
 
@@ -112,6 +116,26 @@ def _put16(value: int) -> bytes:
 
 def _put32(value: int) -> bytes:
     return int(value & 0xFFFFFFFF).to_bytes(4, "big")
+
+
+def _chunk_ack_source(
+    message: Mapping[str, Any], acknowledged: int | None = None
+) -> dict[str, Any]:
+    """Return the DATA message with the acknowledged length in its header.
+
+    The acknowledgement clones the message's data header, whose first four
+    bytes are a length. For a reply split into several parts the panel
+    expects the number of application bytes received so far
+    (``acknowledged``); if it gets anything else it sends the same part
+    again. Without ``acknowledged`` the length is capped to one part.
+    """
+    if "data_header" not in message or "application_length" not in message:
+        return dict(message)
+    if acknowledged is None:
+        acknowledged = min(int(message["application_length"]), REPLY_CHUNK_LENGTH)
+    header = bytearray(message["data_header"])
+    header[0:4] = _put32(acknowledged)
+    return {**message, "data_header": bytes(header)}
 
 
 @dataclass
@@ -194,6 +218,9 @@ class FlexCClient:
         self._poll_waiter: asyncio.Future[dict[str, Any]] | None = None
         self._response_buffer = bytearray()
         self._response_length: int | None = None
+        # Bytes of the current multi-part application message acknowledged.
+        self._ack_total: int | None = None
+        self._ack_received = 0
 
         self._event_callback: Callable[[dict[str, str]], None] | None = None
         self._session_ready_callback: Callable[[int], None] | None = None
@@ -956,7 +983,7 @@ class FlexCClient:
         if message_id == MSG_DATA:
             await self._send_wire(
                 self._build_clone_ack(
-                    message,
+                    _chunk_ack_source(message, self._data_ack_length(message)),
                     MSG_DATA_ACK,
                 )
             )
@@ -983,6 +1010,19 @@ class FlexCClient:
             "Unhandled valid FlexC message 0x%02X",
             message_id,
         )
+
+    def _data_ack_length(self, message: Mapping[str, Any]) -> int | None:
+        """Return the cumulative application bytes to acknowledge for a DATA part."""
+        if "application_length" not in message:
+            return None
+        if message.get("new_application_message"):
+            self._ack_total = int(message["application_length"])
+            self._ack_received = 0
+        if self._ack_total is None:
+            return None
+        part_length = len(message.get("app_data", b""))
+        self._ack_received = min(self._ack_received + part_length, self._ack_total)
+        return self._ack_received
 
     def _handle_incoming_data(
         self,

@@ -6,6 +6,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Acknowledge long FlexC replies correctly. A reply longer than `0x2800` (10240) bytes arrives in several DATA parts, and each DATA ACK must carry the number of application bytes received so far. Echoing the full application length made the panel resend the first part until the command timed out (long access and system logs, the full user list).
+
+### Tests
+
+- Added coverage for the cumulative acknowledgement of a three-part reply and its reassembly.
+
 ---
 
 ## [1.1.9] - 2026-11-26
