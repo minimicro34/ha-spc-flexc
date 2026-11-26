@@ -20,6 +20,7 @@ from custom_components.spc_flexc.sensor import (
     SpcDoorStatusSensor,
     SpcLastEventDiagnosticSensor,
     SpcPanelSensor,
+    SpcPanelStatusDiagnosticSensor,
     SpcPirSlowReadDiagnosticSensor,
     SpcXBusAuxCurrentSensor,
     SpcXBusAuxVoltageSensor,
@@ -193,7 +194,7 @@ async def test_setup_entry_adds_static_and_dynamic_sensors() -> None:
     await async_setup_entry(
         MagicMock(), entry, lambda entities: batches.append(list(entities))
     )
-    assert len(batches[0]) == 6
+    assert len(batches[0]) == 7
     assert (
         sum(isinstance(entity, SpcPirSlowReadDiagnosticSensor) for entity in batches[0])
         == 1
@@ -411,3 +412,18 @@ def test_last_event_alarm_classification(
     assert attributes["alarm_transition"] == transition
     assert attributes["recent_events"][0]["alarm_type"] == alarm_type
     assert attributes["recent_events"][0]["alarm_transition"] == transition
+
+
+def test_panel_status_diagnostic_sensor() -> None:
+    coordinator = _coordinator()
+    sensor = SpcPanelStatusDiagnosticSensor(coordinator)
+    assert sensor.native_value is None
+    stamp = datetime(2026, 11, 26, tzinfo=UTC)
+    coordinator.data.panel_status_at = stamp
+    coordinator.data.system_alerts = {"network_fault": {"isolated": True}}
+    coordinator.data.panel_ethernet = {"IP_ADDRESS": "192.0.2.10"}
+    assert sensor.native_value == stamp
+    assert sensor.extra_state_attributes == {
+        "system_alerts": {"network_fault": {"isolated": True}},
+        "ethernet": {"IP_ADDRESS": "192.0.2.10"},
+    }
