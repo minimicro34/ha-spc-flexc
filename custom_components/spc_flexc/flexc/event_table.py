@@ -17,6 +17,7 @@ class EventInfo(NamedTuple):
     address_type: str
     sia: str | None
     cid: str | None
+    display_description: str | None = None
 
 
 EVENT_TABLE: dict[int, EventInfo] = {
@@ -669,7 +670,7 @@ def event_description(event_id: int | None) -> str | None:
 
 # Validated FlexC IDs from SPC event tables and field diagnostics.
 # Descriptions are diagnostic metadata, not persistent alarm states.
-FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
+_DESCRIPTION_OVERRIDES: dict[int, str] = {
     3000: "Entry granted",
     3001: "Entry denied",
     3002: "Exit granted",
@@ -757,13 +758,31 @@ for _base, _prefix, _restored in (
         _zone_type = FLEXC_ZONE_EVENT_TYPES.get(_suffix) or _panel_zone_type(
             1200 + _suffix, f"Zone type {_suffix}"
         )
-        FLEXC_EVENT_DESCRIPTIONS[_base + _suffix] = (
+        _DESCRIPTION_OVERRIDES[_base + _suffix] = (
             f"{_prefix} restored [{_zone_type}]"
             if _restored
             else f"{_prefix} [{_zone_type}]"
         )
 
 
-# Every other event: the panel's own name from its complete event table.
-for _event_id, _event_info in EVENT_TABLE.items():
-    FLEXC_EVENT_DESCRIPTIONS.setdefault(_event_id, _event_info.en)
+# Keep the original panel metadata and attach our validated display labels.
+for _event_id, _description in _DESCRIPTION_OVERRIDES.items():
+    EVENT_TABLE[_event_id] = EVENT_TABLE[_event_id]._replace(
+        display_description=_description
+    )
+
+
+def display_event_description(event_id: int | None) -> str | None:
+    """Return the integration's display label, falling back to the panel name."""
+    if event_id is None:
+        return None
+    info = EVENT_TABLE.get(event_id)
+    return None if info is None else info.display_description or info.en
+
+
+# Compatibility view for existing callers; all values derive from EVENT_TABLE.
+FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
+    event_id: info.display_description or info.en
+    for event_id, info in EVENT_TABLE.items()
+}
+
