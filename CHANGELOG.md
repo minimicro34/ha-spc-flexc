@@ -8,11 +8,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
-- Event descriptions for all 608 events in the panel's own complete event table (SPC4300, firmware 3.14.1), with SIA/CID codes, in `flexc/event_table.py` and `docs/EVENT_TABLE.md`. Existing descriptions are kept; events without one get the panel's English name (#9, #26).
+- Event descriptions for all 608 events in the panel's own complete event table (SPC4300, firmware 3.14.1), with SIA/CID codes, in `flexc/event_table.py` and `docs/EVENT_TABLE.md`. Existing descriptions are kept; events without one get the panel's English name ([#9](https://github.com/minimicro34/ha-spc-flexc/issues/9), [#26](https://github.com/minimicro34/ha-spc-flexc/pull/26)).
 
 ### Changed
 
-- Centralized event description resolution in `flexc/event_table.py`, providing a single source of truth for event metadata and display descriptions (#27).
+- Centralized event description resolution in `flexc/event_table.py`, providing a single source of truth for event metadata and display descriptions ([#27](https://github.com/minimicro34/ha-spc-flexc/pull/27)).
 - Removed 25 redundant description overrides: 489 original panel descriptions and 119 customized English descriptions remain, preserving existing display labels.
 - Preserved compatibility with existing event description lookups while removing duplicated catalogue logic from `sensor.py`.
 
@@ -26,11 +26,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Every event in the table has a description, existing labels are unchanged, `3010`/`3004` are distinct, and no "Zone type N" placeholder remains for an event in the table.
 - Added regression tests for the shared event catalogue, description fallback and non-redundant overrides.
 - Updated door event regression tests to validate the actual catalogue lookup rather than the internal source code structure.
-- Validated with 522 Python tests, 24 JavaScript tests and 92.20% local Python code coverage. CI, HACS and Hassfest checks passed for #27.
+- Validated with 522 Python tests, 24 JavaScript tests and 92.20% local Python code coverage. CI, HACS and Hassfest checks passed for [#27](https://github.com/minimicro34/ha-spc-flexc/pull/27).
 
 ### Contributors
 
-- Thanks to @ToFinToFun for contributing the complete panel event catalogue and validating door event descriptions on real hardware (#26).
+- Thanks to [@ToFinToFun](https://github.com/ToFinToFun) for contributing the complete panel event catalogue and validating door event descriptions on real hardware ([#26](https://github.com/minimicro34/ha-spc-flexc/pull/26)).
 
 ---
 
@@ -43,7 +43,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
-- Best-effort read-only CMD_STATUS_PANEL polling initializes and reconciles existing mains, battery and cabinet tamper fault entities while preserving real-time event priority (#15, #21).
+- Best-effort read-only CMD_STATUS_PANEL polling initializes and reconciles existing mains, battery and cabinet tamper fault entities while preserving real-time event priority ([#15](https://github.com/minimicro34/ha-spc-flexc/issues/15), [#21](https://github.com/minimicro34/ha-spc-flexc/pull/21)).
 - Timestamped diagnostic snapshot with 17 SYSALERT flags and reported Ethernet settings, without extra commands or configuration writes.
 - Collapsible French/English card diagnostics with independent flag colors: red for active faults, amber for latched, inhibited or isolated flags, grey for no fault reported.
 - Active SYSALERT faults in the main system health summary, deduplicating existing mains, battery and cabinet tamper faults and keeping RF sources distinct.
@@ -51,7 +51,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Fixed
 
-- Cumulative acknowledgements and reassembly of fragmented FlexC replies exceeding 10,240 bytes (#20), including repeated fragments and session boundaries.
+- Cumulative acknowledgements and reassembly of fragmented FlexC replies exceeding 10,240 bytes ([#20](https://github.com/minimicro34/ha-spc-flexc/pull/20)), including repeated fragments and session boundaries.
 - Validate 32-bit masks, preserve event-driven states on failed reads and clear failed diagnostic snapshots. Unsupported status reads are disabled only for explicit result codes 17, 65 and 103 for the current session.
 - Align diagnostic labels and values with responsive wrapping and separate Ethernet information.
 
@@ -69,7 +69,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Acknowledgements
 
-Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (#20), system alert polling (#21), regression tests, hardware validation and constructive review follow-up. Thanks also to **@indigo2gm** for reporting the AIC1200 diagnostic behavior in #15.
+Special thanks to **[@ToFinToFun](https://github.com/ToFinToFun)** for the fragmented reply acknowledgement fix ([#20](https://github.com/minimicro34/ha-spc-flexc/pull/20)), system alert polling ([#21](https://github.com/minimicro34/ha-spc-flexc/pull/21)), regression tests, hardware validation and constructive review follow-up. Thanks also to **[@indigo2gm](https://github.com/indigo2gm)** for reporting the AIC1200 diagnostic behavior in [#15](https://github.com/minimicro34/ha-spc-flexc/issues/15).
 
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.9...v1.1.10
 
@@ -145,7 +145,7 @@ Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (
 
 ### Added
 
-- Initialize and reconcile existing mains fault, panel battery fault and panel tamper entities using `CMD_STATUS_PANEL` once per panel poll, while preserving real-time FlexC event updates (#15, #21).
+- Initialize and reconcile existing mains fault, panel battery fault and panel tamper entities using `CMD_STATUS_PANEL` once per panel poll, while preserving real-time FlexC event updates ([#15](https://github.com/minimicro34/ha-spc-flexc/issues/15), [#21](https://github.com/minimicro34/ha-spc-flexc/pull/21)).
 - Use the SYSALERT INPUT mask for current fault conditions rather than latched ALERT states.
 - Preserve known and unknown states when masks are missing or malformed, and prioritize fault or restore events received during a status read.
 
@@ -173,7 +173,7 @@ Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (
 
 ### Acknowledgements
 
-- Special thanks to **@ToFinToFun** for system alert polling, regression tests, hardware measurements and careful review follow-up.
+- Special thanks to **[@ToFinToFun](https://github.com/ToFinToFun)** for system alert polling, regression tests, hardware measurements and careful review follow-up.
 
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.10-beta.1...v1.1.10-beta.2
 
@@ -188,14 +188,14 @@ Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (
 
 ### Fixed
 
-- Correct cumulative DATA acknowledgements for fragmented FlexC replies exceeding 10,240 bytes, preventing repeated first fragments and command timeouts (#20).
+- Correct cumulative DATA acknowledgements for fragmented FlexC replies exceeding 10,240 bytes, preventing repeated first fragments and command timeouts ([#20](https://github.com/minimicro34/ha-spc-flexc/pull/20)).
 - Reset reply buffers and acknowledgement tracking at command boundaries and on session replacement.
 - Acknowledge repeated continuation fragments with identical SPT sequence and payload without counting or appending them twice.
 
 ### Tests
 
 - Added regression coverage for cumulative acknowledgements, reply reassembly, interrupted replies, session replacement and repeated fragments.
-- PR #20 CI passed with 92.02% coverage.
+- PR [#20](https://github.com/minimicro34/ha-spc-flexc/pull/20) CI passed with 92.02% coverage.
 
 ### Validation
 
@@ -208,7 +208,7 @@ Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (
 
 ### Acknowledgements
 
-- Special thanks to **@ToFinToFun** for the transport fix, regression tests, hardware validation and responsive review follow-up.
+- Special thanks to **[@ToFinToFun](https://github.com/ToFinToFun)** for the transport fix, regression tests, hardware validation and responsive review follow-up.
 
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.9...v1.1.10-beta.1
 
@@ -273,7 +273,7 @@ Special thanks to **@ToFinToFun** for the fragmented reply acknowledgement fix (
 
 ### Acknowledgements
 
-Special thanks to **@psyclan** for his valuable technical feedback, investigation of the SPC4300 firmware-specific AES IV behavior, and real-world validation of the compatibility improvements.
+Special thanks to **[@psyclan](https://github.com/psyclan)** for his valuable technical feedback, investigation of the SPC4300 firmware-specific AES IV behavior, and real-world validation of the compatibility improvements.
 
 Thanks to everyone who continues to help improve SPC FlexC!
 
@@ -285,7 +285,7 @@ Thanks to everyone who continues to help improve SPC FlexC!
 
 ### Fixed
 
-- Added automatic AES-CBC IV compatibility detection for SPC panels that derive the FlexC IV from the configured encryption key (reported on SPC4300 firmware 3.12.0; see issue #17).
+- Added automatic AES-CBC IV compatibility detection for SPC panels that derive the FlexC IV from the configured encryption key (reported on SPC4300 firmware 3.12.0; see issue [#17](https://github.com/minimicro34/ha-spc-flexc/issues/17)).
 - Preserve the historical FlexC IV for existing installations and select the alternative only after a valid SHA-1 check on an incoming frame. Use the selected IV for outgoing frames during that TCP session; reset detection on reconnect.
 
 ### Tests
@@ -294,12 +294,12 @@ Thanks to everyone who continues to help improve SPC FlexC!
 
 ### Validation
 
-- Automated CI checks passed on PR #18. Real SPC4300 and historical-IV panel validation pending; this is a test prerelease.
+- Automated CI checks passed on PR [#18](https://github.com/minimicro34/ha-spc-flexc/pull/18). Real SPC4300 and historical-IV panel validation pending; this is a test prerelease.
 - For compatibility testing, enable INFO logging for `custom_components.spc_flexc` and check for the IV-switch message on panels requiring the alternative IV.
 
 ### Acknowledgements
 
-- Thanks to @psyclan for reporting issue #17 and providing the key-derived IV workaround.
+- Thanks to [@psyclan](https://github.com/psyclan) for reporting issue [#17](https://github.com/minimicro34/ha-spc-flexc/issues/17) and providing the key-derived IV workaround.
 
 **Full Changelog:** https://github.com/minimicro34/ha-spc-flexc/compare/v1.1.5...v1.1.6-beta.1
 
@@ -344,9 +344,9 @@ Thanks to everyone who continues to help improve SPC FlexC!
 
 Special thanks to the community members who helped improve and validate this release:
 
-- **@henrikekblad (Henrik)** — for technical discussions and valuable feedback.
-- **@Ruffy121** — for feedback and contributions throughout the beta cycle.
-- **@choupfamily (Ludovic, choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
+- **[@henrikekblad](https://github.com/henrikekblad) (Henrik)** — for technical discussions and valuable feedback.
+- **[@Ruffy121](https://github.com/Ruffy121)** — for feedback and contributions throughout the beta cycle.
+- **[@choupfamily](https://github.com/choupfamily) (Ludovic, choupfamily63 on HACF)** — for real-world testing, production validation, and detailed feedback.
 
 Thanks to everyone who helped make SPC FlexC v1.1.5 possible!
 
