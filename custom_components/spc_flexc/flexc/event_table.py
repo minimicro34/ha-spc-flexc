@@ -776,4 +776,3 @@ FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
     event_id: info.display_description or info.en
     for event_id, info in EVENT_TABLE.items()
 }
-
