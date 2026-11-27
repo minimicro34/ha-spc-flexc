@@ -29,11 +29,13 @@ from .flexc.device import (
     migrate_xbus_registry_identity,
 )
 from .flexc.event_table import (
-    FLEXC_EVENT_DESCRIPTIONS as FLEXC_EVENT_DESCRIPTIONS,
-    FLEXC_ZONE_EVENT_TYPES as FLEXC_ZONE_EVENT_TYPES,
+    FLEXC_EVENT_DESCRIPTIONS,
+    FLEXC_ZONE_EVENT_TYPES,
     display_event_description,
 )
 from .models import AtpState, DoorState
+
+__all__ = ["FLEXC_EVENT_DESCRIPTIONS", "FLEXC_ZONE_EVENT_TYPES", "async_setup_entry"]
 
 DESCRIPTIONS = (
     SensorEntityDescription(
