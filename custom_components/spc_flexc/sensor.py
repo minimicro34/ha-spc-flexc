@@ -31,6 +31,7 @@ from .flexc.device import (
 from .flexc.event_table import (
     FLEXC_EVENT_DESCRIPTIONS as FLEXC_EVENT_DESCRIPTIONS,
     FLEXC_ZONE_EVENT_TYPES as FLEXC_ZONE_EVENT_TYPES,
+    display_event_description,
 )
 from .models import AtpState, DoorState
 
@@ -248,7 +249,7 @@ class SpcLastEventDiagnosticSensor(
         return {
             "area_id": last["area_id"],
             "zone_id": last["zone_id"],
-            "event_description": FLEXC_EVENT_DESCRIPTIONS.get(last["event_id"]),
+            "event_description": display_event_description(last["event_id"]),
             "event_origin": _flexc_event_origin(last["event_id"]),
             "alarm_type": alarm[0] if alarm else None,
             "alarm_transition": alarm[1] if alarm else None,
@@ -265,7 +266,7 @@ class SpcLastEventDiagnosticSensor(
                         else None
                     ),
                     **event,
-                    "description": FLEXC_EVENT_DESCRIPTIONS.get(event["event_id"]),
+                    "description": display_event_description(event["event_id"]),
                     "origin": _flexc_event_origin(event["event_id"]),
                     "alarm_type": FLEXC_ALARM_EVENTS.get(
                         event["event_id"], (None, None)
