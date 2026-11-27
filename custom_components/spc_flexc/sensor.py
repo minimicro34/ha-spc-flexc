@@ -28,7 +28,10 @@ from .flexc.device import (
     build_xbus_device_info,
     migrate_xbus_registry_identity,
 )
-from .flexc.event_table import FLEXC_EVENT_DESCRIPTIONS, FLEXC_ZONE_EVENT_TYPES
+from .flexc.event_table import (
+    FLEXC_EVENT_DESCRIPTIONS as FLEXC_EVENT_DESCRIPTIONS,
+    FLEXC_ZONE_EVENT_TYPES as FLEXC_ZONE_EVENT_TYPES,
+)
 from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
