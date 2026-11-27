@@ -685,17 +685,8 @@ _DESCRIPTION_OVERRIDES: dict[int, str] = {
     3011: "Door closed",
     3012: "Door release (DRS)",
     3013: "Door alarm restored",
-    3014: "Unknown card",
-    3015: "Reader locked",
-    3016: "Reader unlocked",
     2100: "Zone input active",
     2101: "Zone input restored",
-    2103: "Zone input disconnected",
-    2107: "Zone input out of bounds",
-    1200: "Zone tamper",
-    1300: "Zone tamper restored",
-    1800: "Zone trouble",
-    1900: "Zone trouble restored",
     4002: "User panic",
     4009: "User medical alarm",
     4011: "User hold-up",
@@ -722,7 +713,6 @@ _DESCRIPTION_OVERRIDES: dict[int, str] = {
     6003: "FlexC path restored",
     6004: "ATS down",
     6005: "ATS restored",
-    7011: "Configuration changed",
 }
 
 
@@ -767,9 +757,10 @@ for _base, _prefix, _restored in (
 
 # Keep the original panel metadata and attach our validated display labels.
 for _event_id, _description in _DESCRIPTION_OVERRIDES.items():
-    EVENT_TABLE[_event_id] = EVENT_TABLE[_event_id]._replace(
-        display_description=_description
-    )
+    if _description != EVENT_TABLE[_event_id].en:
+        EVENT_TABLE[_event_id] = EVENT_TABLE[_event_id]._replace(
+            display_description=_description
+        )
 
 
 def display_event_description(event_id: int | None) -> str | None:
