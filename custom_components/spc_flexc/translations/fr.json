@@ -84,7 +84,7 @@
     }
   },
   "exceptions": {
-      "no_loaded_entry": {
+    "no_loaded_entry": {
       "message": "Aucune intégration SPC FlexC chargée n'a été trouvée."
     },
     "several_entries": {
@@ -119,6 +119,12 @@
     },
     "global_disarm_incomplete": {
       "message": "La mise hors service totale SPC est incomplète. Erreurs : {errors}"
+    },
+    "log_read_busy": {
+      "message": "Un autre journal est en cours de lecture sur cette centrale. Réessayez lorsqu'il est terminé."
+    },
+    "log_not_permitted": {
+      "message": "La centrale n'autorise pas la lecture du journal {log} : CMD_{command} n'est pas coché dans le profil de commandes de l'ATS."
     }
   },
   "options": {
@@ -152,7 +158,7 @@
   "services": {
     "get_log": {
       "name": "Lire un journal de la centrale",
-      "description": "Lit un journal de la centrale SPC et renvoie ses entrées, les plus récentes d'abord. Les numéros de carte ne sont jamais renvoyés.",
+      "description": "Lit un journal de la centrale SPC et renvoie ses entrées, les plus récentes d'abord. Réservé aux administrateurs. Les données de carte et les champs non décodés de la centrale ne sont pas renvoyés ; les textes de la centrale sont renvoyés tels quels. La centrale envoie toujours le journal complet ; la limite ne fait que raccourcir le résultat.",
       "fields": {
         "config_entry_id": {
           "name": "Centrale",

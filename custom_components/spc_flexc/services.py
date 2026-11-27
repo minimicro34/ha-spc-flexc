@@ -14,11 +14,12 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.service import async_register_admin_service
 
 from .const import DOMAIN
 from .flexc.connection import FlexCError
-from .flexc.flexml import FlexMLError
-from .flexc.logs import LOG_KINDS
+from .flexc.flexml import FlexMLError, FlexMLReplyError
+from .flexc.logs import LOG_KINDS, LogReadBusy
 
 if TYPE_CHECKING:
     from .coordinator import SpcFlexCCoordinator
@@ -31,6 +32,8 @@ ATTR_ID = "id"
 ATTR_LIMIT = "limit"
 ATTR_ATP = "atp"
 DEFAULT_LIMIT = 100
+# FlexML RESULT: the command is not ticked in the ATS's Command Profile.
+RESULT_NOT_PERMITTED = "65"
 
 GET_LOG_SCHEMA = vol.Schema(
     {
@@ -86,12 +89,29 @@ async def _async_get_log(hass: HomeAssistant, call: ServiceCall) -> ServiceRespo
             records = await coordinator.async_read_log(
                 kind, object_id if log.id_attribute is not None else None
             )
+    except LogReadBusy as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="log_read_busy"
+        ) from err
+    except FlexMLReplyError as err:
+        if err.code == RESULT_NOT_PERMITTED:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="log_not_permitted",
+                translation_placeholders={"log": kind, "command": log.command},
+            ) from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="log_read_failed",
+            translation_placeholders={"log": kind, "error": str(err)},
+        ) from err
     except (FlexCError, FlexMLError) as err:
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="log_read_failed",
             translation_placeholders={"log": kind, "error": str(err)},
         ) from err
+    # The panel always sends the whole log; the limit only shortens the result.
     entries: list[Any] = records[: call.data[ATTR_LIMIT]]
     return {
         "log": kind,
@@ -102,14 +122,19 @@ async def _async_get_log(hass: HomeAssistant, call: ServiceCall) -> ServiceRespo
 
 
 def async_setup_services(hass: HomeAssistant) -> None:
-    """Register the integration's services (once)."""
+    """Register the integration's services (once).
+
+    The panel logs hold who came and went and when, so reading them is limited
+    to Home Assistant administrators.
+    """
     if hass.services.has_service(DOMAIN, SERVICE_GET_LOG):
         return
 
     async def get_log(call: ServiceCall) -> ServiceResponse:
         return await _async_get_log(hass, call)
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_GET_LOG,
         get_log,

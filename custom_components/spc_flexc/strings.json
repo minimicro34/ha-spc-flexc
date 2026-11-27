@@ -64,6 +64,12 @@
     "log_read_failed": {
       "message": "Could not read the {log} log: {error}"
     },
+    "log_read_busy": {
+      "message": "Another log is being read from this panel. Try again when it has finished."
+    },
+    "log_not_permitted": {
+      "message": "The panel does not allow reading the {log} log: CMD_{command} is not ticked in the ATS's Command Profile."
+    },
     "area_not_ready_engineer": {"message": "Cannot arm {area}: installer/engineer mode is active (SPC reason {reason})."},
     "area_not_ready_zone": {"message": "Cannot arm {area}: zone {zone} (ID {zone_id}) is not ready (SPC reason {reason})."},
     "area_not_ready_faults": {"message": "Cannot change the mode of {area}: the area is not ready (SPC reason {reason}). Active faults: {faults}"},
@@ -90,7 +96,7 @@
   "services": {
     "get_log": {
       "name": "Read panel log",
-      "description": "Reads a log from the SPC panel and returns its entries, newest first. Card numbers are never returned.",
+      "description": "Reads a log from the SPC panel and returns its entries, newest first. Administrators only. Card data and undecoded panel fields are not returned; the panel's texts are returned as written. The panel always sends the whole log; the limit only shortens the result.",
       "fields": {
         "config_entry_id": {
           "name": "Panel",

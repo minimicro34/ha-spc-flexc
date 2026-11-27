@@ -120,7 +120,7 @@
     }
   },
   "exceptions": {
-      "no_loaded_entry": {
+    "no_loaded_entry": {
       "message": "No loaded SPC FlexC integration was found."
     },
     "several_entries": {
@@ -155,6 +155,12 @@
     },
     "global_disarm_incomplete": {
       "message": "SPC global disarming was incomplete. Errors: {errors}"
+    },
+    "log_read_busy": {
+      "message": "Another log is being read from this panel. Try again when it has finished."
+    },
+    "log_not_permitted": {
+      "message": "The panel does not allow reading the {log} log: CMD_{command} is not ticked in the ATS's Command Profile."
     }
   },
   "options": {
@@ -188,7 +194,7 @@
   "services": {
     "get_log": {
       "name": "Read panel log",
-      "description": "Reads a log from the SPC panel and returns its entries, newest first. Card numbers are never returned.",
+      "description": "Reads a log from the SPC panel and returns its entries, newest first. Administrators only. Card data and undecoded panel fields are not returned; the panel's texts are returned as written. The panel always sends the whole log; the limit only shortens the result.",
       "fields": {
         "config_entry_id": {
           "name": "Panel",

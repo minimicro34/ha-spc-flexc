@@ -47,7 +47,7 @@ from .flexc.events import (
     apply_zone_event,
 )
 from .flexc.flexml import FlexMLError
-from .flexc.logs import build_log_command, parse_log
+from .flexc.logs import LogReadBusy, build_log_command, parse_log
 from .flexc.panel_status import PANEL_FAULT_ALERTS, is_status_panel_unsupported
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
@@ -380,6 +380,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # arrived while CMD_STATUS_PANEL was being read.
         self._fault_event_revisions: dict[str, int] = {}
         self._client_operation_lock = asyncio.Lock()
+        # One log read at a time per panel, so that repeated log requests
+        # cannot queue up in front of the regular polling and alarm commands.
+        self._log_read_lock = asyncio.Lock()
         self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
         self._xbus_poll_task: asyncio.Task[None] | None = None
@@ -470,8 +473,16 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
     async def async_read_log(
         self, kind: str, object_id: int | None = None, sub_id: int | None = None
     ) -> list[dict[str, Any]]:
-        """Read one panel log (read-only); records are returned newest first."""
-        async with self._client_operation_lock:
+        """Read one panel log (read-only); records are returned newest first.
+
+        Only one log read runs at a time for a panel; a second request while one
+        is running raises ``LogReadBusy`` instead of waiting. The read holds the
+        operation lock like any other command, so the polling waiting for that
+        lock runs before the next log read can start.
+        """
+        if self._log_read_lock.locked():
+            raise LogReadBusy(kind)
+        async with self._log_read_lock, self._client_operation_lock:
             await self.client.async_ensure_connected()
             command = build_log_command(
                 kind,

@@ -143,6 +143,24 @@
     },
     "global_disarm_incomplete": {
       "message": "Disinserimento globale SPC incompleto. Errori: {errors}"
+    },
+    "no_loaded_entry": {
+      "message": "Nessuna integrazione SPC FlexC caricata trovata."
+    },
+    "several_entries": {
+      "message": "Sono presenti più centrali SPC FlexC; sceglierne una con config_entry_id."
+    },
+    "log_needs_id": {
+      "message": "Il registro {log} richiede un id (numero di porta, zona o ATS)."
+    },
+    "log_read_failed": {
+      "message": "Impossibile leggere il registro {log}: {error}"
+    },
+    "log_read_busy": {
+      "message": "È in corso la lettura di un altro registro da questa centrale. Riprovare al termine."
+    },
+    "log_not_permitted": {
+      "message": "La centrale non consente la lettura del registro {log}: CMD_{command} non è selezionato nel profilo comandi dell'ATS."
     }
   },
   "options": {
@@ -157,6 +175,48 @@
     },
     "error": {
       "invalid_aliases": "Usa una riga USER_ID numerico=Nome visualizzato per utente."
+    }
+  },
+  "selector": {
+    "log": {
+      "options": {
+        "access": "Registro accessi (porta)",
+        "system": "Registro di sistema",
+        "zone": "Registro zona",
+        "ats": "Registro eventi ATS FlexC",
+        "ats_network": "Registro rete ATS FlexC",
+        "atp": "Registro ATP FlexC",
+        "atp_network": "Registro rete ATP FlexC",
+        "wireless": "Registro radio"
+      }
+    }
+  },
+  "services": {
+    "get_log": {
+      "name": "Leggi registro della centrale",
+      "description": "Legge un registro dalla centrale SPC e ne restituisce le voci, dalla più recente. Solo per amministratori. I dati delle tessere e i campi non decodificati della centrale non vengono restituiti; i testi della centrale sono restituiti così come sono. La centrale invia sempre l'intero registro; il limite accorcia solo il risultato.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Centrale",
+          "description": "Centrale SPC FlexC. Necessaria solo se ce ne sono più di una."
+        },
+        "log": {
+          "name": "Registro",
+          "description": "Quale registro leggere."
+        },
+        "id": {
+          "name": "ID",
+          "description": "Numero della porta per il registro accessi, numero della zona per il registro zona, numero dell'ATS per i registri ATS e ATP."
+        },
+        "atp": {
+          "name": "ATP",
+          "description": "Numero dell'ATP all'interno dell'ATS, per i registri ATP (predefinito 1)."
+        },
+        "limit": {
+          "name": "Limite",
+          "description": "Numero massimo di voci restituite."
+        }
+      }
     }
   }
 }

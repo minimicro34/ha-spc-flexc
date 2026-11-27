@@ -1,8 +1,10 @@
 """Read-only FLEXML log commands: access, system, zone and FlexC ATS event logs.
 
 Each log is read with one command and returned as a list of records. Only the
-fields listed for a log are kept; card numbers and other card data are never
-returned.
+fields listed for a log are kept. Card data (card number, format, bit count)
+and the panel's undecoded fields (the system log's ``RAW``, the ATP log's
+``DATA``) are not returned, because their content cannot be checked. Free-text
+fields are returned as the panel writes them.
 """
 
 from __future__ import annotations
@@ -18,6 +20,10 @@ from .flexml import (
     _parse_reply_root,
     _validate_reply,
 )
+
+
+class LogReadBusy(Exception):
+    """Another log read for the same panel is still running."""
 
 
 @dataclass(frozen=True)
@@ -84,7 +90,7 @@ LOG_KINDS: dict[str, LogKind] = {
         reply_tag="REPLY_GET_SYSTEM_LOG",
         record_tag="SYSTEM_LOG_EVENT",
         time_field="TIME",
-        fields={"TEXT": ("text", "str"), "RAW": ("raw", "str")},
+        fields={"TEXT": ("text", "str")},
     ),
     "zone": LogKind(
         command="GET_ZONE_LOG",
@@ -148,7 +154,6 @@ LOG_KINDS: dict[str, LogKind] = {
             "ATS_ID": ("ats_id", "int"),
             "ATP_SEQ_ID": ("atp", "int"),
             "MSG_ID": ("message_id", "int"),
-            "DATA": ("data", "str"),
             "ATP_LOG_MESSAGE": ("text", "str"),
         },
     ),
@@ -219,6 +224,12 @@ def _convert(value: str, kind: str) -> Any:
 
 
 def _panel_time(value: str | None, timezone: tzinfo) -> datetime | None:
+    """Return a panel time stamp (``HHMMSSDDMMYYYY``) in ``timezone``.
+
+    The panel's time stamps carry no time zone. They are read as local time in
+    the time zone given (Home Assistant's), which assumes the panel's clock is
+    set to the same local time. A missing or invalid time gives ``None``.
+    """
     if not value:
         return None
     try:

@@ -9,7 +9,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Added
 
 - Event descriptions for all 608 events in the panel's own complete event table (SPC4300, firmware 3.14.1), with SIA/CID codes, in `flexc/event_table.py` and `docs/EVENT_TABLE.md`. Existing descriptions are kept; events without one get the panel's English name ([#9](https://github.com/minimicro34/ha-spc-flexc/issues/9), [#26](https://github.com/minimicro34/ha-spc-flexc/pull/26)).
-- `spc_flexc.get_log` action: reads the panel's own logs (access per door, system, zone, wireless, FlexC ATS event and network logs, ATP logs) and returns the entries newest first. Read-only; card numbers are never returned. Long logs need the long-reply acknowledgement fix (#20).
+- `spc_flexc.get_log` action: reads the panel's own logs (access per door, system, zone, wireless, FlexC ATS event and network logs, ATP logs) and returns the entries newest first. Read-only and for administrators only; card data and the panel's undecoded fields are not returned. One log read at a time per panel. Long logs need the long-reply acknowledgement fix (#20).
 
 ### Changed
 
@@ -28,7 +28,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Added regression tests for the shared event catalogue, description fallback and non-redundant overrides.
 - Updated door event regression tests to validate the actual catalogue lookup rather than the internal source code structure.
 - Validated with 522 Python tests, 24 JavaScript tests and 92.20% local Python code coverage. CI, HACS and Hassfest checks passed for [#27](https://github.com/minimicro34/ha-spc-flexc/pull/27).
-- Added coverage for the log commands, record parsing per log type, card data never being returned, and the action's errors and limits.
+- Added coverage for the log commands, record parsing per log type (including wireless and ATP network), card data and undecoded fields not being returned, empty replies, invalid time stamps, a refused command (`65`), one read at a time, panel selection with several entries, administrator-only access, and the action's errors and limits.
 
 ### Contributors
 

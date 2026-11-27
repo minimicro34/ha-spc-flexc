@@ -1,16 +1,29 @@
 """Panel logs (read-only) and the get_log service."""
 
+import asyncio
 from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import (
+    HomeAssistantError,
+    ServiceValidationError,
+    Unauthorized,
+)
 
 from custom_components.spc_flexc.flexc.connection import FlexCCommandTimeout
 from custom_components.spc_flexc.flexc.flexml import FlexMLError, FlexMLReplyError
-from custom_components.spc_flexc.flexc.logs import build_log_command, parse_log
-from custom_components.spc_flexc.services import GET_LOG_SCHEMA, _async_get_log
+from custom_components.spc_flexc.flexc.logs import (
+    LogReadBusy,
+    build_log_command,
+    parse_log,
+)
+from custom_components.spc_flexc.services import (
+    GET_LOG_SCHEMA,
+    _async_get_log,
+    async_setup_services,
+)
 
 # Record shapes as sent by an SPC4300 (firmware 3.16); values are placeholders.
 ACCESS_LOG = (
@@ -80,12 +93,9 @@ def test_ats_log_never_returns_card_data() -> None:
 
 
 def test_system_and_zone_logs() -> None:
+    # RAW is undecoded panel data and is not returned.
     assert parse_log(SYSTEM_LOG, "system", UTC) == [
-        {
-            "time": "2026-11-03T23:25:07+00:00",
-            "text": "Config changed",
-            "raw": "076F020000000000",
-        }
+        {"time": "2026-11-03T23:25:07+00:00", "text": "Config changed"}
     ]
     zone = parse_log(ZONE_LOG, "zone", UTC)
     assert [(r["input"], r["resistance"]) for r in zone] == [(0, 0), (1, 255)]
@@ -199,3 +209,236 @@ def test_atp_logs() -> None:
         UTC,
     )
     assert records[0]["message_id"] == 43 and records[0]["atp"] == 1
+    # DATA is undecoded panel data and is not returned.
+    assert "data" not in records[0]
+
+
+def _reply(tag: str, records: str = "") -> str:
+    return (
+        f'<FLEXML_REPLY VER="1.0"><{tag} RESULT="0" CMD_RESULT="OK">'
+        f"{records}</{tag}></FLEXML_REPLY>"
+    )
+
+
+@pytest.mark.parametrize(
+    ("kind", "tag"),
+    [
+        ("access", "REPLY_GET_ACCESS_LOG"),
+        ("system", "REPLY_GET_SYSTEM_LOG"),
+        ("wireless", "REPLY_GET_WIRELESS_LOG"),
+        ("atp_network", "REPLY_GET_FLEXC_ATP_NETWORK_LOG"),
+    ],
+)
+def test_empty_reply_gives_no_records(kind: str, tag: str) -> None:
+    assert parse_log(_reply(tag), kind, UTC) == []
+
+
+def test_invalid_or_missing_time_is_none_and_kept_last_in_panel_order() -> None:
+    records = parse_log(
+        _reply(
+            "REPLY_GET_SYSTEM_LOG",
+            '<SYSTEM_LOG_EVENT TIME="99999999999999" TEXT="bad" />'
+            '<SYSTEM_LOG_EVENT TIME="23250703112026" TEXT="ok" />'
+            '<SYSTEM_LOG_EVENT TEXT="none" />'
+            '<SYSTEM_LOG_EVENT TIME="" TEXT="empty" />',
+        ),
+        "system",
+        UTC,
+    )
+    assert [(r["text"], r["time"]) for r in records] == [
+        ("ok", "2026-11-03T23:25:07+00:00"),
+        ("bad", None),
+        ("none", None),
+        ("empty", None),
+    ]
+
+
+def test_panel_time_is_read_in_the_given_time_zone() -> None:
+    from zoneinfo import ZoneInfo
+
+    records = parse_log(SYSTEM_LOG, "system", ZoneInfo("Europe/Paris"))
+    assert records[0]["time"] == "2026-11-03T23:25:07+01:00"
+
+
+def test_wireless_log() -> None:
+    assert '<CMD_GET_WIRELESS_LOG SENSOR_ID="1" />' in build_log_command(
+        "wireless", None, "u", "p"
+    )
+    records = parse_log(
+        _reply(
+            "REPLY_GET_WIRELESS_LOG",
+            '<WIRELESS_LOG_EVENT TIME="08150027112026" SENSOR_ID="0123456" '
+            'STATUS="1" BATTERY="1" SIGNAL="7" RECEIVER_ID="0" />',
+        ),
+        "wireless",
+        UTC,
+    )
+    # The radio ID stays a string, so leading zeros are kept.
+    assert records == [
+        {
+            "time": "2026-11-27T08:15:00+00:00",
+            "radio_id": "0123456",
+            "status": 1,
+            "battery": 1,
+            "signal": 7,
+            "receiver_id": 0,
+        }
+    ]
+
+
+def test_atp_network_log() -> None:
+    records = parse_log(
+        _reply(
+            "REPLY_GET_FLEXC_ATP_NETWORK_LOG",
+            '<ATP_NETWORK_LOG ATS_ID="2" ATP_SEQ_ID="1" MSG_ID="5" '
+            'TIMESTAMP="22114709112026" NETWORK_LOG_MESSAGE="Connected" />',
+        ),
+        "atp_network",
+        UTC,
+    )
+    assert records == [
+        {
+            "time": "2026-11-09T22:11:47+00:00",
+            "ats_id": 2,
+            "atp": 1,
+            "message_id": 5,
+            "text": "Connected",
+        }
+    ]
+
+
+def _entry(entry_id: str, coordinator) -> MagicMock:
+    entry = MagicMock()
+    entry.entry_id = entry_id
+    entry.state = ConfigEntryState.LOADED
+    entry.runtime_data = coordinator
+    return entry
+
+
+def _reader() -> MagicMock:
+    coordinator = MagicMock()
+    coordinator.async_read_log = AsyncMock(return_value=[])
+    return coordinator
+
+
+@pytest.mark.asyncio
+async def test_several_panels_need_an_explicit_entry() -> None:
+    first, second = _reader(), _reader()
+    hass = MagicMock()
+    hass.config_entries.async_entries.return_value = [
+        _entry("first", first),
+        _entry("second", second),
+    ]
+    with pytest.raises(ServiceValidationError) as err:
+        await _async_get_log(hass, _call(log="system"))
+    assert err.value.translation_key == "several_entries"
+
+    await _async_get_log(hass, _call(log="system", config_entry_id="second"))
+    second.async_read_log.assert_awaited_once_with("system", None)
+    first.async_read_log.assert_not_awaited()
+
+    with pytest.raises(ServiceValidationError) as err:
+        await _async_get_log(hass, _call(log="system", config_entry_id="other"))
+    assert err.value.translation_key == "no_loaded_entry"
+
+
+@pytest.mark.asyncio
+async def test_command_not_in_the_command_profile() -> None:
+    coordinator = MagicMock()
+    coordinator.async_read_log = AsyncMock(
+        side_effect=FlexMLReplyError("not permitted", code="65")
+    )
+    with pytest.raises(HomeAssistantError) as err:
+        await _async_get_log(_hass_with_entry(coordinator), _call(log="system"))
+    assert err.value.translation_key == "log_not_permitted"
+    assert err.value.translation_placeholders == {
+        "log": "system",
+        "command": "GET_SYSTEM_LOG",
+    }
+
+
+@pytest.mark.asyncio
+async def test_other_reply_error_is_a_read_failure() -> None:
+    coordinator = MagicMock()
+    coordinator.async_read_log = AsyncMock(
+        side_effect=FlexMLReplyError("missing parameter", code="102")
+    )
+    with pytest.raises(HomeAssistantError) as err:
+        await _async_get_log(_hass_with_entry(coordinator), _call(log="system"))
+    assert err.value.translation_key == "log_read_failed"
+
+
+@pytest.mark.asyncio
+async def test_busy_reader_is_reported() -> None:
+    coordinator = MagicMock()
+    coordinator.async_read_log = AsyncMock(side_effect=LogReadBusy("system"))
+    with pytest.raises(HomeAssistantError) as err:
+        await _async_get_log(_hass_with_entry(coordinator), _call(log="system"))
+    assert err.value.translation_key == "log_read_busy"
+
+
+@pytest.mark.asyncio
+async def test_one_log_read_at_a_time_per_panel() -> None:
+    from custom_components.spc_flexc.coordinator import SpcFlexCCoordinator
+
+    release = asyncio.Event()
+
+    async def slow_send(command: str) -> str:
+        await release.wait()
+        return _reply("REPLY_GET_SYSTEM_LOG")
+
+    coordinator = SpcFlexCCoordinator.__new__(SpcFlexCCoordinator)
+    coordinator._client_operation_lock = asyncio.Lock()
+    coordinator._log_read_lock = asyncio.Lock()
+    coordinator.client = MagicMock()
+    coordinator.client.async_ensure_connected = AsyncMock()
+    coordinator.client.command_username = "u"
+    coordinator.client.command_password = "p"
+    coordinator.client.async_send_flexml = slow_send
+
+    first = asyncio.create_task(coordinator.async_read_log("system"))
+    await asyncio.sleep(0)
+    with pytest.raises(LogReadBusy):
+        await coordinator.async_read_log("access", 1)
+    release.set()
+    assert await first == []
+    # Free again once the first read has finished.
+    assert await coordinator.async_read_log("system") == []
+
+
+def _registered_handler(hass: MagicMock):
+    hass.services.has_service.return_value = False
+    async_setup_services(hass)
+    args = hass.services.async_register.call_args.args
+    return args[2]
+
+
+@pytest.mark.asyncio
+async def test_get_log_is_for_administrators_only() -> None:
+    hass = MagicMock()
+    handler = _registered_handler(hass)
+    user = MagicMock()
+    user.is_admin = False
+    hass.auth.async_get_user = AsyncMock(return_value=user)
+    call = _call(log="system")
+    call.context.user_id = "user"
+    with pytest.raises(Unauthorized):
+        await handler(call)
+    hass.async_run_hass_job.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_log_runs_for_an_administrator() -> None:
+    hass = MagicMock()
+    handler = _registered_handler(hass)
+    user = MagicMock()
+    user.is_admin = True
+    hass.auth.async_get_user = AsyncMock(return_value=user)
+    coordinator = _reader()
+    hass.config_entries.async_entries.return_value = [_entry("abc", coordinator)]
+    hass.async_run_hass_job = lambda job, call: asyncio.ensure_future(job.target(call))
+    call = _call(log="system")
+    call.context.user_id = "admin"
+    result = await handler(call)
+    assert result["log"] == "system"
+    coordinator.async_read_log.assert_awaited_once_with("system", None)
