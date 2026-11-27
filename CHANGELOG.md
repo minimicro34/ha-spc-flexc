@@ -31,6 +31,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Contributors
 
 - Thanks to [@ToFinToFun](https://github.com/ToFinToFun) for contributing the complete panel event catalogue and validating door event descriptions on real hardware ([#26](https://github.com/minimicro34/ha-spc-flexc/pull/26)).
+- Swedish integration translations, reviewed by a native speaker; the card remains French/English.
 
 ---
 
