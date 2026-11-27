@@ -11,9 +11,10 @@ from custom_components.spc_flexc.flexc.event_table import (
 def test_catalogue_display_labels():
     assert len(EVENT_TABLE) == 608
     assert set(FLEXC_EVENT_DESCRIPTIONS) == set(EVENT_TABLE)
-    assert sum(
-        info.display_description is not None for info in EVENT_TABLE.values()
-    ) == 119
+    assert (
+        sum(info.display_description is not None for info in EVENT_TABLE.values())
+        == 119
+    )
     for event_id, info in EVENT_TABLE.items():
         assert info.display_description is None or info.display_description != info.en
         assert event_description(event_id) == info.en
