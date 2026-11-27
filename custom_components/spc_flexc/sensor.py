@@ -28,7 +28,7 @@ from .flexc.device import (
     build_xbus_device_info,
     migrate_xbus_registry_identity,
 )
-from .flexc.event_table import EVENT_TABLE
+from .flexc.event_table import FLEXC_EVENT_DESCRIPTIONS, FLEXC_ZONE_EVENT_TYPES
 from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
@@ -132,108 +132,6 @@ async def async_setup_entry(
 
     add_dynamic_entities()
     entry.async_on_unload(coordinator.async_add_listener(add_dynamic_entities))
-
-
-# Validated FlexC IDs from SPC event tables and field diagnostics.
-# Descriptions are diagnostic metadata, not persistent alarm states.
-FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
-    3000: "Entry granted",
-    3001: "Entry denied",
-    3002: "Exit granted",
-    3003: "Exit denied",
-    3004: "Door open too long",
-    3005: "Door left open",
-    3006: "Door forced",
-    3007: "Door normal",
-    3008: "Door locked (access denied)",
-    3009: "Door unlocked (free access)",
-    3010: "Door opened",
-    3011: "Door closed",
-    3012: "Door release (DRS)",
-    3013: "Door alarm restored",
-    3014: "Unknown card",
-    3015: "Reader locked",
-    3016: "Reader unlocked",
-    2100: "Zone input active",
-    2101: "Zone input restored",
-    2103: "Zone input disconnected",
-    2107: "Zone input out of bounds",
-    1200: "Zone tamper",
-    1300: "Zone tamper restored",
-    1800: "Zone trouble",
-    1900: "Zone trouble restored",
-    4002: "User panic",
-    4009: "User medical alarm",
-    4011: "User hold-up",
-    3523: "Confirmed hold-up",
-    8026: "Wireless keypad medical alarm",
-    8027: "Wireless keypad medical restore",
-    8028: "Wireless keypad fire alarm",
-    8029: "Wireless keypad fire restore",
-    8030: "Wireless keypad panic alarm",
-    8031: "Wireless keypad panic restore",
-    5348: "X-BUS keypad panic alarm",
-    5349: "X-BUS keypad panic restore",
-    5350: "X-BUS keypad fire alarm",
-    5351: "X-BUS keypad fire restore",
-    5352: "X-BUS keypad medical alarm",
-    5353: "X-BUS keypad medical restore",
-    8006: "Wireless device tamper",
-    8007: "Wireless device tamper restore",
-    8012: "Wireless device low battery",
-    8013: "Wireless device battery restore",
-    8014: "Wireless device fault",
-    8015: "Wireless device fault restore",
-    6002: "FlexC path down",
-    6003: "FlexC path restored",
-    6004: "ATS down",
-    6005: "ATS restored",
-    7011: "Configuration changed",
-}
-
-
-# Zone event suffixes identify the SPC zone type. Names below are
-# documented mappings; other suffixes retain their numeric type rather
-# than guessing a misleading human-readable label.
-FLEXC_ZONE_EVENT_TYPES: dict[int, str] = {
-    0: "Alarm Zone",
-    1: "Entry / Exit",
-    3: "Fire",
-    8: "Tamper",
-    12: "Unused Zone",
-    15: "Detector Fault",
-    23: "Glass Break",
-}
-
-
-def _panel_zone_type(event_id: int, default: str) -> str:
-    """Return the zone type the panel's event table names, e.g. "Line Zone"."""
-    info = EVENT_TABLE.get(event_id)
-    if info is None or "[" not in info.en:
-        return default
-    return info.en.rsplit("[", 1)[1].rstrip("]")
-
-
-for _base, _prefix, _restored in (
-    (1200, "Zone tamper", False),
-    (1300, "Zone tamper", True),
-    (1800, "Zone trouble", False),
-    (1900, "Zone trouble", True),
-):
-    for _suffix in range(24):
-        _zone_type = FLEXC_ZONE_EVENT_TYPES.get(_suffix) or _panel_zone_type(
-            1200 + _suffix, f"Zone type {_suffix}"
-        )
-        FLEXC_EVENT_DESCRIPTIONS[_base + _suffix] = (
-            f"{_prefix} restored [{_zone_type}]"
-            if _restored
-            else f"{_prefix} [{_zone_type}]"
-        )
-
-
-# Every other event: the panel's own name from its complete event table.
-for _event_id, _event_info in EVENT_TABLE.items():
-    FLEXC_EVENT_DESCRIPTIONS.setdefault(_event_id, _event_info.en)
 
 
 # Origin is intentionally separate from alarm state: user-triggered panic
