@@ -30,7 +30,7 @@ def test_door_event_descriptions_cover_spc_table():
         3007: "Door normal",
         3008: "Door locked (access denied)",
         3009: "Door unlocked (free access)",
-        3010: "Door open too long",
+        3010: "Door opened",
         3011: "Door closed",
         3012: "Door release (DRS)",
         3013: "Door alarm restored",

@@ -6,6 +6,19 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ## [Unreleased]
 
+### Added
+
+- Event descriptions for all 608 events in the panel's own complete event table (SPC4300, firmware 3.14.1), with SIA/CID codes, in `flexc/event_table.py` and `docs/EVENT_TABLE.md`. Existing descriptions are kept; events without one get the panel's English name (#9).
+
+### Fixed
+
+- Event `3010` is described as **Door opened**, as the panel names it ("Door Open"), not "Door open too long" (that is `3004`).
+- Zone tamper and trouble events for zone types without a label show the panel's zone type name (for example *Line Zone*) instead of "Zone type N".
+
+### Tests
+
+- Every event in the table has a description, existing labels are unchanged, `3010`/`3004` are distinct, and no "Zone type N" placeholder remains for an event in the table.
+
 ---
 
 ## [1.1.10] - 2026-11-26

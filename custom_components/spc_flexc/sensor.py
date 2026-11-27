@@ -28,6 +28,7 @@ from .flexc.device import (
     build_xbus_device_info,
     migrate_xbus_registry_identity,
 )
+from .flexc.event_table import EVENT_TABLE
 from .models import AtpState, DoorState
 
 DESCRIPTIONS = (
@@ -146,7 +147,7 @@ FLEXC_EVENT_DESCRIPTIONS: dict[int, str] = {
     3007: "Door normal",
     3008: "Door locked (access denied)",
     3009: "Door unlocked (free access)",
-    3010: "Door open too long",
+    3010: "Door opened",
     3011: "Door closed",
     3012: "Door release (DRS)",
     3013: "Door alarm restored",
@@ -204,6 +205,15 @@ FLEXC_ZONE_EVENT_TYPES: dict[int, str] = {
     23: "Glass Break",
 }
 
+
+def _panel_zone_type(event_id: int, default: str) -> str:
+    """Return the zone type the panel's event table names, e.g. "Line Zone"."""
+    info = EVENT_TABLE.get(event_id)
+    if info is None or "[" not in info.en:
+        return default
+    return info.en.rsplit("[", 1)[1].rstrip("]")
+
+
 for _base, _prefix, _restored in (
     (1200, "Zone tamper", False),
     (1300, "Zone tamper", True),
@@ -211,12 +221,19 @@ for _base, _prefix, _restored in (
     (1900, "Zone trouble", True),
 ):
     for _suffix in range(24):
-        _zone_type = FLEXC_ZONE_EVENT_TYPES.get(_suffix, f"Zone type {_suffix}")
+        _zone_type = FLEXC_ZONE_EVENT_TYPES.get(_suffix) or _panel_zone_type(
+            1200 + _suffix, f"Zone type {_suffix}"
+        )
         FLEXC_EVENT_DESCRIPTIONS[_base + _suffix] = (
             f"{_prefix} restored [{_zone_type}]"
             if _restored
             else f"{_prefix} [{_zone_type}]"
         )
+
+
+# Every other event: the panel's own name from its complete event table.
+for _event_id, _event_info in EVENT_TABLE.items():
+    FLEXC_EVENT_DESCRIPTIONS.setdefault(_event_id, _event_info.en)
 
 
 # Origin is intentionally separate from alarm state: user-triggered panic
