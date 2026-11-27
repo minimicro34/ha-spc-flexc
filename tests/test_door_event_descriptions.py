@@ -1,24 +1,10 @@
 """Regression tests for SPC door event diagnostic descriptions."""
 
-import ast
-from pathlib import Path
+from custom_components.spc_flexc.flexc.event_table import display_event_description
 
 
 def test_door_event_descriptions_cover_spc_table():
     """All door event IDs 3000-3016 have the expected English labels."""
-    source = Path("custom_components/spc_flexc/sensor.py").read_text(encoding="utf-8")
-    module = ast.parse(source)
-    mapping = next(
-        node.value
-        for node in module.body
-        if isinstance(node, ast.AnnAssign)
-        and isinstance(node.target, ast.Name)
-        and node.target.id == "FLEXC_EVENT_DESCRIPTIONS"
-    )
-    labels = {
-        ast.literal_eval(key): ast.literal_eval(value)
-        for key, value in zip(mapping.keys, mapping.values, strict=True)
-    }
     expected = {
         3000: "Entry granted",
         3001: "Entry denied",
@@ -38,4 +24,6 @@ def test_door_event_descriptions_cover_spc_table():
         3015: "Reader locked",
         3016: "Reader unlocked",
     }
-    assert {event_id: labels[event_id] for event_id in range(3000, 3017)} == expected
+    assert {
+        event_id: display_event_description(event_id) for event_id in range(3000, 3017)
+    } == expected
