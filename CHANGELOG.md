@@ -8,7 +8,13 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Added
 
-- Event descriptions for all 608 events in the panel's own complete event table (SPC4300, firmware 3.14.1), with SIA/CID codes, in `flexc/event_table.py` and `docs/EVENT_TABLE.md`. Existing descriptions are kept; events without one get the panel's English name (#9).
+- Event descriptions for all 608 events in the panel's own complete event table (SPC4300, firmware 3.14.1), with SIA/CID codes, in `flexc/event_table.py` and `docs/EVENT_TABLE.md`. Existing descriptions are kept; events without one get the panel's English name (#9, #26).
+
+### Changed
+
+- Centralized event description resolution in `flexc/event_table.py`, providing a single source of truth for event metadata and display descriptions (#27).
+- Removed 25 redundant description overrides: 489 original panel descriptions and 119 customized English descriptions remain, preserving existing display labels.
+- Preserved compatibility with existing event description lookups while removing duplicated catalogue logic from `sensor.py`.
 
 ### Fixed
 
@@ -18,6 +24,13 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Tests
 
 - Every event in the table has a description, existing labels are unchanged, `3010`/`3004` are distinct, and no "Zone type N" placeholder remains for an event in the table.
+- Added regression tests for the shared event catalogue, description fallback and non-redundant overrides.
+- Updated door event regression tests to validate the actual catalogue lookup rather than the internal source code structure.
+- Validated with 522 Python tests, 24 JavaScript tests and 92.20% local Python code coverage. CI, HACS and Hassfest checks passed for #27.
+
+### Contributors
+
+- Thanks to @ToFinToFun for contributing the complete panel event catalogue and validating door event descriptions on real hardware (#26).
 
 ---
 
