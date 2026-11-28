@@ -47,6 +47,7 @@ from .flexc.events import (
     apply_zone_event,
 )
 from .flexc.flexml import FlexMLError
+from .flexc.logs import LogReadBusy, build_log_command, parse_log
 from .flexc.panel_status import PANEL_FAULT_ALERTS, is_status_panel_unsupported
 from .flexc.read_retry import async_retry_read_once
 from .flexc.xbus import async_get_xbus_status
@@ -379,6 +380,9 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         # arrived while CMD_STATUS_PANEL was being read.
         self._fault_event_revisions: dict[str, int] = {}
         self._client_operation_lock = asyncio.Lock()
+        # One log read at a time per panel, so that repeated log requests
+        # cannot queue up in front of the regular polling and alarm commands.
+        self._log_read_lock = asyncio.Lock()
         self._discovery_task: asyncio.Task[None] | None = None
         self._zone_poll_task: asyncio.Task[None] | None = None
         self._xbus_poll_task: asyncio.Task[None] | None = None
@@ -465,6 +469,33 @@ class SpcFlexCCoordinator(DataUpdateCoordinator[SpcState]):
         tamper = faults.panel_tamper
         if tamper is not None and tamper != tamper_before:
             self._tamper_store.async_delay_save(lambda: {"panel_tamper": tamper}, 1)
+
+    async def async_read_log(
+        self, kind: str, object_id: int | None = None, sub_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Read one panel log (read-only); records are returned newest first.
+
+        Only one log read runs at a time for a panel; a second request while one
+        is running raises ``LogReadBusy`` instead of waiting. The read holds the
+        operation lock like any other command, so the polling waiting for that
+        lock runs before the next log read can start.
+        """
+        if self._log_read_lock.locked():
+            raise LogReadBusy(kind)
+        async with self._log_read_lock, self._client_operation_lock:
+            await self.client.async_ensure_connected()
+            command = build_log_command(
+                kind,
+                object_id,
+                self.client.command_username,
+                self.client.command_password,
+                sub_id,
+            )
+            response = await async_retry_read_once(
+                partial(self.client.async_send_flexml, command),
+                description=f"reading the {kind} log",
+            )
+        return parse_log(response, kind, dt_util.get_default_time_zone())
 
     async def async_restore_area_history(self) -> None:
         """Restore persisted area history, never stale operating modes."""
