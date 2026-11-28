@@ -160,7 +160,7 @@
       "message": "È in corso la lettura di un altro registro da questa centrale. Riprovare al termine."
     },
     "log_not_permitted": {
-      "message": "La centrale non consente la lettura del registro {log}: CMD_{command} non è selezionato nel profilo comandi dell'ATS."
+      "message": "La centrale non consente la lettura dello storico {log}: CMD_{command} non è selezionato nel profilo comandi dell'ATS."
     }
   },
   "options": {
@@ -180,21 +180,21 @@
   "selector": {
     "log": {
       "options": {
-        "access": "Registro accessi (porta)",
-        "system": "Registro di sistema",
-        "zone": "Registro zona",
-        "ats": "Registro eventi ATS FlexC",
-        "ats_network": "Registro rete ATS FlexC",
-        "atp": "Registro ATP FlexC",
-        "atp_network": "Registro rete ATP FlexC",
-        "wireless": "Registro radio"
+        "access": "Storico accessi (porta)",
+        "system": "Storico di sistema",
+        "zone": "Storico zone",
+        "ats": "Storico eventi ATS FlexC",
+        "ats_network": "Storico rete ATS FlexC",
+        "atp": "Storico ATP FlexC",
+        "atp_network": "Storico rete ATP FlexC",
+        "wireless": "Storico radio"
       }
     }
   },
   "services": {
     "get_log": {
-      "name": "Leggi registro della centrale",
-      "description": "Legge un registro dalla centrale SPC e ne restituisce le voci, dalla più recente. Solo per amministratori. I dati delle tessere e i campi non decodificati della centrale non vengono restituiti; i testi della centrale sono restituiti così come sono. La centrale invia sempre l'intero registro; il limite accorcia solo il risultato.",
+      "name": "Leggi storico della centrale",
+      "description": "Legge lo storico dalla centrale SPC e ne restituisce le voci, dalla più recente. Solo per amministratori. I dati dei badge e i campi non decodificati della centrale non vengono restituiti; i testi della centrale sono restituiti così come sono. La centrale invia sempre l'intero storico; il limite accorcia solo il risultato.",
       "fields": {
         "config_entry_id": {
           "name": "Centrale",
@@ -202,15 +202,15 @@
         },
         "log": {
           "name": "Registro",
-          "description": "Quale registro leggere."
+          "description": "Quale storico leggere."
         },
         "id": {
           "name": "ID",
-          "description": "Numero della porta per il registro accessi, numero della zona per il registro zona, numero dell'ATS per i registri ATS e ATP."
+          "description": "Numero della porta per lo storico accessi, numero della zona per lo storico zona, numero dell'ATS per gli storici ATS e ATP."
         },
         "atp": {
           "name": "ATP",
-          "description": "Numero dell'ATP all'interno dell'ATS, per i registri ATP (predefinito 1)."
+          "description": "Numero dell'ATP all'interno dell'ATS, per gli storici ATP (predefinito 1)."
         },
         "limit": {
           "name": "Limite",
