@@ -1,0 +1,162 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SPC FlexC",
+        "description": "Konfigurera den lokala FlexC-mottagaren.",
+        "data": {
+          "host": "SPC-adress",
+          "port": "FlexC-port",
+          "encryption_key": "AES-256-nyckel",
+          "command_username": "Kommandoanvändarnamn",
+          "command_password": "Kommandolösenord"
+        }
+      },
+      "reconfigure": {
+        "title": "Konfigurera om SPC FlexC",
+        "description": "Uppdatera SPC FlexC-anslutningen och kommandoanvändaren.",
+        "data": {
+          "host": "SPC-adress",
+          "port": "FlexC-port",
+          "encryption_key": "AES-256-nyckel",
+          "command_username": "Kommandoanvändarnamn",
+          "command_password": "Kommandolösenord"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "xbus_tamper_fault": {
+        "name": "Sabotage"
+      },
+      "xbus_tamper_isolated": {
+        "name": "Sabotage isolerat"
+      }
+    },
+    "sensor": {
+      "xbus_aux_voltage": {
+        "name": "AUX-utgång, spänning"
+      },
+      "xbus_aux_current": {
+        "name": "AUX-utgång, ström"
+      },
+      "xbus_diagnostics": {
+        "name": "X-BUS-diagnostik"
+      },
+      "xbus_device_id": {
+        "name": "X-BUS-id"
+      },
+      "xbus_device_type": {
+        "name": "Enhetstyp"
+      },
+      "xbus_hardware_id": {
+        "name": "Hårdvaru-id"
+      },
+      "xbus_input_count": {
+        "name": "Antal ingångar"
+      },
+      "xbus_output_count": {
+        "name": "Antal utgångar"
+      },
+      "xbus_rf_type": {
+        "name": "RF-typ"
+      },
+      "xbus_rf_version": {
+        "name": "RF-version"
+      },
+      "xbus_reader_type": {
+        "name": "Läsartyp"
+      },
+      "xbus_position_1": {
+        "name": "Position 1"
+      },
+      "xbus_position_2": {
+        "name": "Position 2"
+      },
+      "xbus_psu_type": {
+        "name": "Nätaggregatstyp"
+      },
+      "xbus_sia_address": {
+        "name": "SIA-adress"
+      },
+      "xbus_status_raw": {
+        "name": "Rå status"
+      },
+      "xbus_input_raw": {
+        "name": "Rå ingång"
+      },
+      "xbus_alert_raw": {
+        "name": "Rått larm"
+      },
+      "xbus_inhibit_raw": {
+        "name": "Rå spärr"
+      },
+      "xbus_isolate_raw": {
+        "name": "Rå isolering"
+      }
+    },
+    "button": {
+      "open_momentarily": {
+        "name": "Momentant olåst"
+      },
+      "open_permanently": {
+        "name": "Olåst läge"
+      },
+      "set_normal": {
+        "name": "Normalläge"
+      },
+      "lock": {
+        "name": "Blockerat läge"
+      },
+      "restore": {
+        "name": "Återställ {zone_name}"
+      }
+    },
+    "switch": {
+      "inhibition": {
+        "name": "Spärra {zone_name}"
+      }
+    }
+  },
+  "exceptions": {
+    "area_not_ready_engineer": {
+      "message": "Kan inte tillkoppla {area}: installatörsläge är aktivt (SPC-orsak {reason})."
+    },
+    "area_not_ready_zone": {
+      "message": "Kan inte tillkoppla {area}: sektion {zone} (id {zone_id}) är inte redo (SPC-orsak {reason})."
+    },
+    "area_not_ready_faults": {
+      "message": "Kan inte ändra läge för {area}: området är inte redo (SPC-orsak {reason}). Aktiva fel: {faults}"
+    },
+    "area_not_ready": {
+      "message": "Kan inte ändra läge för {area}: området är inte redo (SPC-orsak {reason})."
+    },
+    "partset_a_not_supported": {
+      "message": "{area} stöder inte deltillkoppling A."
+    },
+    "partset_b_not_supported": {
+      "message": "{area} stöder inte deltillkoppling B."
+    },
+    "global_arm_incomplete": {
+      "message": "SPC:s tillkoppling av alla områden blev inte fullständig. Områden som redan fått kommandot: {areas}. Fel: {error}"
+    },
+    "global_disarm_incomplete": {
+      "message": "SPC:s frånkoppling av alla områden blev inte fullständig. Fel: {errors}"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Visningsnamn för användare",
+        "description": "Ett USER_ID=Visningsnamn per rad (till exempel 9995=Home Assistant).",
+        "data": {
+          "user_aliases": "Ersättningsnamn för användare"
+        }
+      }
+    },
+    "error": {
+      "invalid_aliases": "Använd ett numeriskt USER_ID=Visningsnamn per rad."
+    }
+  }
+}
