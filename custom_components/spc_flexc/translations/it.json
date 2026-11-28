@@ -8,19 +8,19 @@
           "host": "Indirizzo SPC",
           "port": "Porta FlexC",
           "encryption_key": "Chiave AES-256",
-          "command_username": "Nome utente dei comandi",
-          "command_password": "Password dei comandi"
+          "command_username": "Nome utente comandi",
+          "command_password": "Password comandi"
         }
       },
       "reconfigure": {
         "title": "Riconfigura SPC FlexC",
-        "description": "Aggiorna la connessione SPC FlexC e le credenziali dei comandi.",
+        "description": "Aggiorna la connessione SPC FlexC e le credenziali comandi.",
         "data": {
           "host": "Indirizzo SPC",
           "port": "Porta FlexC",
           "encryption_key": "Chiave AES-256",
-          "command_username": "Nome utente dei comandi",
-          "command_password": "Password dei comandi"
+          "command_username": "Nome utente comandi",
+          "command_password": "Password comandi"
         }
       }
     }
@@ -45,10 +45,10 @@
         "name": "Diagnostica X-BUS"
       },
       "xbus_device_id": {
-        "name": "ID dispositivo X-BUS"
+        "name": "ID periferica X-BUS"
       },
       "xbus_device_type": {
-        "name": "Tipo di dispositivo"
+        "name": "Tipo di periferica"
       },
       "xbus_hardware_id": {
         "name": "ID hardware"
@@ -81,33 +81,33 @@
         "name": "Indirizzo SIA"
       },
       "xbus_status_raw": {
-        "name": "Stato grezzo"
+        "name": "Stato raw"
       },
       "xbus_input_raw": {
-        "name": "Ingresso grezzo"
+        "name": "Ingresso raw"
       },
       "xbus_alert_raw": {
-        "name": "Allarme grezzo"
+        "name": "Allarme raw"
       },
       "xbus_inhibit_raw": {
-        "name": "Inibizione grezza"
+        "name": "Inibizione raw"
       },
       "xbus_isolate_raw": {
-        "name": "Isolamento grezzo"
+        "name": "Isolamento raw"
       }
     },
     "button": {
       "open_momentarily": {
-        "name": "Modalità libera temporanea"
+        "name": "Modalità aperta temporanea"
       },
       "open_permanently": {
-        "name": "Modalità libera"
+        "name": "Modalità aperta in permanenza"
       },
       "set_normal": {
         "name": "Modalità normale"
       },
       "lock": {
-        "name": "Modalità accesso vietato"
+        "name": "Modalità bloccata"
       },
       "restore": {
         "name": "Ripristina {zone_name}"
@@ -139,10 +139,10 @@
       "message": "{area} non supporta l'inserimento parziale B."
     },
     "global_arm_incomplete": {
-      "message": "Inserimento globale SPC incompleto. Aree già comandate: {areas}. Errore: {error}"
+      "message": "Inserimento totale SPC incompleto. Aree già comandate: {areas}. Errore: {error}"
     },
     "global_disarm_incomplete": {
-      "message": "Disinserimento globale SPC incompleto. Errori: {errors}"
+      "message": "Disinserimento totale SPC incompleto. Errori: {errors}"
     },
     "no_loaded_entry": {
       "message": "Nessuna integrazione SPC FlexC caricata trovata."
@@ -167,14 +167,14 @@
     "step": {
       "init": {
         "title": "Nomi visualizzati degli utenti",
-        "description": "Una riga USER_ID=Nome visualizzato per utente (ad esempio 9995=Home Assistant).",
+        "description": "Una riga per utente nel formato ID=Nome (ad esempio 9995=Home Assistant).",
         "data": {
-          "user_aliases": "Nomi utente personalizzati"
+          "user_aliases": "Alias degli utenti"
         }
       }
     },
     "error": {
-      "invalid_aliases": "Usa una riga USER_ID numerico=Nome visualizzato per utente."
+      "invalid_aliases": "Ogni riga deve contenere USER_ID numerico=Nome visualizzato."
     }
   },
   "selector": {
