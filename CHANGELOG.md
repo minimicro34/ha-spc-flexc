@@ -32,8 +32,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 ### Contributors
 
-- Thanks to [@ToFinToFun](https://github.com/ToFinToFun) for contributing the complete panel event catalogue and validating door event descriptions on real hardware ([#26](https://github.com/minimicro34/ha-spc-flexc/pull/26)).
-- Thanks to [@ToFinToFun](https://github.com/ToFinToFun) for implementing read-only panel log retrieval, hardware validation, privacy safeguards and regression tests ([#25](https://github.com/minimicro34/ha-spc-flexc/pull/25)).
+- Thanks to [@ToFinToFun](https://github.com/ToFinToFun) for contributing the complete panel event catalogue, validating door event descriptions on real hardware, and implementing read-only panel log retrieval with privacy safeguards, hardware validation and regression tests ([#26](https://github.com/minimicro34/ha-spc-flexc/pull/26), [#25](https://github.com/minimicro34/ha-spc-flexc/pull/25)).
 
 ---
 
