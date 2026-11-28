@@ -17,6 +17,8 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 - Removed 25 redundant description overrides: 489 original panel descriptions and 119 customized English descriptions remain, preserving existing display labels.
 - Preserved compatibility with existing event description lookups while removing duplicated catalogue logic from `sensor.py`.
 
+- Improved Italian translations following a native speaker review ([#15](https://github.com/minimicro34/ha-spc-flexc/issues/15)).
+
 ### Fixed
 
 - Event `3010` is described as **Door opened**, as the panel names it ("Door Open"), not "Door open too long" (that is `3004`).
@@ -33,6 +35,7 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 ### Contributors
 
 - Thanks to [@ToFinToFun](https://github.com/ToFinToFun) for contributing the complete panel event catalogue, validating door event descriptions on real hardware, and implementing read-only panel log retrieval with privacy safeguards, hardware validation and regression tests ([#26](https://github.com/minimicro34/ha-spc-flexc/pull/26), [#25](https://github.com/minimicro34/ha-spc-flexc/pull/25)).
+- Thanks to [@indigo2gm](https://github.com/indigo2gm) for reviewing and improving the Italian translations ([#15](https://github.com/minimicro34/ha-spc-flexc/issues/15)).
 
 ---
 
